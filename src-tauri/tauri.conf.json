@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Iris-Creation",
+  "version": "0.1.0",
+  "identifier": "com.iris-creation.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Iris-Creation",
+        "width": 1280,
+        "height": 800,
+        "resizable": true
+      }
+    ]
+  }
+}

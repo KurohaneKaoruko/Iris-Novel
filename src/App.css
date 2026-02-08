@@ -1,0 +1,555 @@
+.appShell {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  color: #d4d4d4;
+}
+
+.appTopbar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #2b2b2b;
+  padding: 0 12px;
+  gap: 12px;
+  background: #202020;
+}
+
+.appTitle {
+  font-weight: 600;
+}
+
+.appTopbarSpacer {
+  flex: 1;
+}
+
+.appTopbarRight {
+  font-size: 12px;
+  color: #a6a6a6;
+}
+
+.topbarInput {
+  width: 380px;
+  max-width: 40vw;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #2f2f2f;
+  background: #141414;
+  color: #d4d4d4;
+  padding: 0 10px;
+  outline: none;
+}
+
+.topbarInput:focus {
+  border-color: #3a6ea5;
+}
+
+.topbarButton {
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #2f2f2f;
+  background: #262626;
+  color: #d4d4d4;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.topbarButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.topbarLabel {
+  font-size: 12px;
+  color: #a6a6a6;
+}
+
+.topbarInputSmall {
+  width: 90px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #2f2f2f;
+  background: #141414;
+  color: #d4d4d4;
+  padding: 0 10px;
+  outline: none;
+}
+
+.topbarInputSmall:focus {
+  border-color: #3a6ea5;
+}
+
+.appBody {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.appSidebar {
+  width: 260px;
+  border-right: 1px solid #2b2b2b;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #181818;
+}
+
+.appMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.appRight {
+  width: 360px;
+  border-left: 1px solid #2b2b2b;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #181818;
+}
+
+.panelHeader {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 1px solid #2b2b2b;
+  font-size: 12px;
+  color: #bdbdbd;
+}
+
+.panelBody {
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+  font-size: 12px;
+  color: #9b9b9b;
+}
+
+.panelScroll {
+  overflow: auto;
+}
+
+.errorText {
+  color: #ff6b6b;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+
+.treeRow {
+  user-select: none;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+  border-radius: 4px;
+}
+
+.treeRow:hover {
+  background: #242424;
+}
+
+.treeDir {
+  color: #c8c8c8;
+}
+
+.treeFile {
+  color: #bdbdbd;
+  cursor: pointer;
+}
+
+.gitToolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.gitStatusList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.gitEmpty {
+  color: #9b9b9b;
+  font-size: 12px;
+}
+
+.gitRow {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.gitRow:hover {
+  background: #242424;
+}
+
+.gitRowActive {
+  background: #2a2a2a;
+}
+
+.gitStatus {
+  width: 30px;
+  color: #c8c8c8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.gitPath {
+  color: #bdbdbd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gitDiff {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0 0 10px 0;
+  padding: 8px;
+  border: 1px solid #2b2b2b;
+  border-radius: 8px;
+  background: #141414;
+  color: #d4d4d4;
+  font-size: 11px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.gitCommitBox {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.gitInput {
+  flex: 1;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #2f2f2f;
+  background: #0f0f0f;
+  color: #d4d4d4;
+  padding: 0 10px;
+  outline: none;
+}
+
+.gitLog {
+  border-top: 1px solid #2b2b2b;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gitLogRow {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: #bdbdbd;
+}
+
+.gitLogId {
+  width: 60px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  color: #a6a6a6;
+}
+
+.gitLogMsg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modalPanel {
+  width: 860px;
+  max-width: 92vw;
+  background: #181818;
+  border: 1px solid #2b2b2b;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid #2b2b2b;
+  background: #202020;
+}
+
+.modalTitle {
+  font-size: 13px;
+  color: #d4d4d4;
+  font-weight: 600;
+}
+
+.modalSpacer {
+  flex: 1;
+}
+
+.modalBody {
+  padding: 12px;
+}
+
+.graphCanvas {
+  width: 760px;
+  height: 520px;
+  max-width: 100%;
+  border: 1px solid #2b2b2b;
+  border-radius: 10px;
+  background: #141414;
+}
+
+.graphHint {
+  margin-top: 10px;
+  color: #9b9b9b;
+  font-size: 12px;
+}
+
+.chatList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chatEmpty {
+  color: #9b9b9b;
+  font-size: 12px;
+}
+
+.chatMsg {
+  border: 1px solid #2b2b2b;
+  border-radius: 8px;
+  padding: 10px;
+  background: #141414;
+}
+
+.chatUser {
+  background: #161b22;
+}
+
+.chatAssistant {
+  background: #141414;
+}
+
+.chatMeta {
+  font-size: 11px;
+  color: #a6a6a6;
+  margin-bottom: 6px;
+}
+
+.chatContent {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  color: #d4d4d4;
+}
+
+.chatActions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.chatComposer {
+  position: sticky;
+  bottom: 0;
+  padding-top: 10px;
+  margin-top: 12px;
+  border-top: 1px solid #2b2b2b;
+  background: #181818;
+}
+
+.chatComposerRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chatInput {
+  width: 100%;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid #2f2f2f;
+  background: #141414;
+  color: #d4d4d4;
+  padding: 0 10px;
+  outline: none;
+}
+
+.chatInput:focus {
+  border-color: #3a6ea5;
+}
+
+.aiToolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.aiToolbarInfo {
+  font-size: 12px;
+  color: #a6a6a6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.aiSettings {
+  border: 1px solid #2b2b2b;
+  border-radius: 8px;
+  padding: 10px;
+  background: #141414;
+  margin-bottom: 12px;
+}
+
+.aiSettingsGroup {
+  margin-top: 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #c8c8c8;
+}
+
+.aiSettingsRow {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.aiSettingsRowFull {
+  grid-template-columns: 110px 1fr;
+  align-items: start;
+}
+
+.aiLabel {
+  font-size: 12px;
+  color: #bdbdbd;
+}
+
+.aiInput {
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #2f2f2f;
+  background: #0f0f0f;
+  color: #d4d4d4;
+  padding: 0 10px;
+  outline: none;
+}
+
+.aiSelect {
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #2f2f2f;
+  background: #0f0f0f;
+  color: #d4d4d4;
+  padding: 0 8px;
+  outline: none;
+}
+
+.aiTextarea {
+  min-height: 90px;
+  border-radius: 6px;
+  border: 1px solid #2f2f2f;
+  background: #0f0f0f;
+  color: #d4d4d4;
+  padding: 8px 10px;
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.aiSettingsActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.editorTabs {
+  height: 36px;
+  border-bottom: 1px solid #2b2b2b;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  color: #bdbdbd;
+  background: #1a1a1a;
+  font-size: 12px;
+  gap: 6px;
+  overflow: auto;
+}
+
+.tabsSpacer {
+  flex: 1;
+}
+
+.tabActive {
+  padding: 6px 10px;
+  background: #2a2a2a;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabInactive {
+  padding: 6px 10px;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: #a6a6a6;
+}
+
+.editorArea {
+  flex: 1;
+  min-height: 0;
+  background: #1e1e1e;
+  color: #9b9b9b;
+}
+
+.emptyHint {
+  padding: 12px;
+  font-size: 12px;
+  color: #9b9b9b;
+}
+
+.appStatusbar {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid #2b2b2b;
+  padding: 0 10px;
+  gap: 18px;
+  background: #202020;
+  color: #bdbdbd;
+  font-size: 12px;
+}
+
+.statusItem {
+  white-space: nowrap;
+}

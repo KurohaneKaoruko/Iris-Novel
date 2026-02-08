@@ -1,0 +1,166 @@
+import { invoke } from '@tauri-apps/api/core'
+
+export type WorkspaceInfo = {
+  root: string
+}
+
+export type AppSettings = {
+  output: {
+    use_markdown: boolean
+  }
+  providers: {
+    active: 'openai' | 'claude' | 'wenxin' | string
+    openai: {
+      api_key: string
+      base_url: string
+      model: string
+      temperature: number
+      max_tokens: number
+    }
+    claude: {
+      api_key: string
+      model: string
+      max_tokens: number
+    }
+    wenxin: {
+      api_key: string
+      base_url: string
+      model: string
+      temperature: number
+      max_tokens: number
+    }
+  }
+  active_agent_id: string
+}
+
+export type FsEntry = {
+  name: string
+  path: string
+  kind: 'dir' | 'file'
+  children: FsEntry[]
+}
+
+export function isTauriApp(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+export async function setWorkspace(path: string): Promise<WorkspaceInfo> {
+  return invoke<WorkspaceInfo>('set_workspace', { path })
+}
+
+export async function initNovel(): Promise<void> {
+  return invoke<void>('init_novel')
+}
+
+export async function listWorkspaceTree(maxDepth = 6): Promise<FsEntry> {
+  return invoke<FsEntry>('list_workspace_tree', { maxDepth })
+}
+
+export async function readText(path: string): Promise<string> {
+  return invoke<string>('read_text', { relative_path: path })
+}
+
+export async function writeText(path: string, content: string): Promise<void> {
+  return invoke<void>('write_text', { relative_path: path, content })
+}
+
+export async function createFile(path: string): Promise<void> {
+  return invoke<void>('create_file', { relative_path: path })
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  return invoke<AppSettings>('get_app_settings')
+}
+
+export async function setAppSettings(settings: AppSettings): Promise<void> {
+  return invoke<void>('set_app_settings', { settings })
+}
+
+export type Agent = {
+  id: string
+  name: string
+  category: string
+  system_prompt: string
+  temperature: number
+  max_tokens: number
+}
+
+export async function getAgents(): Promise<Agent[]> {
+  return invoke<Agent[]>('get_agents')
+}
+
+export async function setAgents(agents_list: Agent[]): Promise<void> {
+  return invoke<void>('set_agents', { agents_list })
+}
+
+export async function exportAgents(): Promise<string> {
+  return invoke<string>('export_agents')
+}
+
+export async function importAgents(json: string): Promise<void> {
+  return invoke<void>('import_agents', { json })
+}
+
+export type GitStatusItem = {
+  path: string
+  status: string
+}
+
+export type GitCommitInfo = {
+  id: string
+  summary: string
+  author: string
+  time: number
+}
+
+export async function gitInit(): Promise<void> {
+  return invoke<void>('git_init')
+}
+
+export async function gitStatus(): Promise<GitStatusItem[]> {
+  return invoke<GitStatusItem[]>('git_status')
+}
+
+export async function gitDiff(path: string): Promise<string> {
+  return invoke<string>('git_diff', { path })
+}
+
+export async function gitCommit(message: string): Promise<string> {
+  return invoke<string>('git_commit', { message })
+}
+
+export async function gitLog(max = 20): Promise<GitCommitInfo[]> {
+  return invoke<GitCommitInfo[]>('git_log', { max })
+}
+
+export type ChatHistoryMessage = {
+  role: 'user' | 'assistant' | string
+  content: string
+}
+
+export type ChatSession = {
+  id: string
+  workspace_root: string
+  created_at: number
+  updated_at: number
+  messages: ChatHistoryMessage[]
+}
+
+export type ChatSessionSummary = {
+  id: string
+  workspace_root: string
+  updated_at: number
+  message_count: number
+}
+
+export async function saveChatSession(session: ChatSession): Promise<void> {
+  return invoke<void>('save_chat_session', { session })
+}
+
+export async function listChatSessions(workspace_root?: string | null): Promise<ChatSessionSummary[]> {
+  return invoke<ChatSessionSummary[]>('list_chat_sessions', { workspace_root: workspace_root ?? null })
+}
+
+export async function getChatSession(id: string): Promise<ChatSession> {
+  return invoke<ChatSession>('get_chat_session', { id })
+}
