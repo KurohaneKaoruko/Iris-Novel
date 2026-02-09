@@ -16,6 +16,8 @@
     "@monaco-editor/react": "^4.6.0",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.6.0",
+    "dompurify": "^3.1.7",
+    "marked": "^15.0.6",
     "monaco-editor": "^0.52.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

@@ -308,8 +308,49 @@ body {
 
 .editor-content {
   flex: 1;
-  overflow: auto;
-  padding: 20px;
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+}
+
+.editor-pane {
+  flex: 1;
+  overflow: hidden;
+}
+
+.preview-pane {
+  width: 50%;
+  max-width: 50%;
+  border-left: 1px solid #2a2a2a;
+  background-color: #252526;
+  overflow-y: auto;
+  padding: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #4b4b4b #252526;
+}
+
+.preview-pane::-webkit-scrollbar {
+  width: 10px;
+}
+
+.preview-pane::-webkit-scrollbar-track {
+  background: #252526;
+}
+
+.preview-pane::-webkit-scrollbar-thumb {
+  background: #4b4b4b;
+  border-radius: 8px;
+  border: 2px solid #252526;
+}
+
+.preview-pane::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a;
+}
+
+.preview-empty {
+  color: #888;
+  font-size: 13px;
+  padding: 12px;
 }
 
 .markdown-editor {

@@ -1,8 +1,11 @@
 import Editor from '@monaco-editor/react'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
 import type { editor as MonacoEditor } from 'monaco-editor'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import './App.css'
 import {
   createFile,
@@ -82,6 +85,8 @@ function App() {
   const [tree, setTree] = useState<FsEntry | null>(null)
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([])
   const [activePath, setActivePath] = useState<string | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -136,6 +141,7 @@ function App() {
   const [graphEdges, setGraphEdges] = useState<Array<{ from: string; to: string; type?: string }>>([])
 
   const activeFile = useMemo(() => openFiles.find((f) => f.path === activePath) ?? null, [openFiles, activePath])
+  const canPreview = useMemo(() => !!activeFile && activeFile.path.toLowerCase().endsWith('.md'), [activeFile])
   const activeCharCount = useMemo(() => {
     if (!activeFile) return 0
     return activeFile.content.replace(/\s/g, '').length
@@ -755,6 +761,23 @@ function App() {
   // --- Effects ---
 
   useEffect(() => {
+    if (!showPreview || !activeFile || !canPreview) {
+      setPreviewHtml('')
+      return
+    }
+    const content = activeFile.content
+    const t = window.setTimeout(() => {
+      try {
+        const html = marked.parse(content, { breaks: true }) as string
+        setPreviewHtml(DOMPurify.sanitize(html))
+      } catch {
+        setPreviewHtml('')
+      }
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [activeFile, canPreview, showPreview])
+
+  useEffect(() => {
     if (!isTauriApp()) return
     void reloadAppSettings()
     void getAgents()
@@ -908,6 +931,11 @@ function App() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void onSaveActive()
+        return
+      }
       if (e.ctrlKey && e.shiftKey && e.code === 'KeyL') {
         e.preventDefault()
         chatInputRef.current?.focus()
@@ -915,7 +943,25 @@ function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [onSaveActive])
+
+  useEffect(() => {
+    if (!isTauriApp()) return
+    const hasUnsaved = openFiles.some((f) => f.dirty) || settingsDirty
+    if (!hasUnsaved) return
+    let unlisten: null | (() => void) = null
+    void getCurrentWindow()
+      .onCloseRequested(async (event) => {
+        const ok = await showConfirm('存在未保存内容，确认要关闭吗？')
+        if (!ok) event.preventDefault()
+      })
+      .then((u) => {
+        unlisten = u
+      })
+    return () => {
+      if (unlisten) unlisten()
+    }
+  }, [openFiles, settingsDirty, showConfirm])
 
   useEffect(() => {
     if (!isTauriApp()) return
@@ -1182,8 +1228,19 @@ function App() {
                   style={{ marginLeft: 8 }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    setOpenFiles((prev) => prev.filter((p) => p.path !== f.path))
-                    if (activePath === f.path) setActivePath(null)
+                    void (async () => {
+                      if (f.dirty) {
+                        const ok = await showConfirm(`文件“${f.name}”未保存，确认关闭吗？`)
+                        if (!ok) return
+                      }
+                      setOpenFiles((prev) => {
+                        const next = prev.filter((p) => p.path !== f.path)
+                        if (activePath === f.path) {
+                          setActivePath(next[next.length - 1]?.path ?? null)
+                        }
+                        return next
+                      })
+                    })()
                   }}
                 >
                   ×
@@ -1198,30 +1255,54 @@ function App() {
           <button className="icon-button" disabled={!activeFile || !activeFile.dirty} onClick={() => void onSaveActive()} title="保存">
             💾
           </button>
+          <button
+            className="icon-button"
+            disabled={!activeFile || !canPreview}
+            onClick={() => setShowPreview((v) => !v)}
+            title="预览"
+          >
+            👁
+          </button>
         </div>
         <div className="editor-content">
           {activeFile ? (
-            <Editor
-              theme="vs-dark"
-              language="plaintext"
-              value={activeFile.content}
-              onMount={(editor, monaco) => {
-                editorRef.current = editor
-                monacoRef.current = monaco
-              }}
-              onChange={(v) => {
-                const value = v ?? ''
-                setOpenFiles((prev) => prev.map((f) => (f.path === activeFile.path ? { ...f, content: value, dirty: true } : f)))
-              }}
-              options={{
-                minimap: { enabled: false },
-                wordWrap: 'on',
-                fontSize: 14,
-                lineNumbers: 'off',
-                padding: { top: 16, bottom: 16 },
-              }}
-              className="markdown-editor"
-            />
+            <>
+              <div className="editor-pane" style={showPreview && canPreview ? { width: '50%', maxWidth: '50%' } : undefined}>
+                <Editor
+                  theme="vs-dark"
+                  language="plaintext"
+                  value={activeFile.content}
+                  onMount={(editor, monaco) => {
+                    editorRef.current = editor
+                    monacoRef.current = monaco
+                  }}
+                  onChange={(v) => {
+                    const value = v ?? ''
+                    setOpenFiles((prev) =>
+                      prev.map((f) => (f.path === activeFile.path ? { ...f, content: value, dirty: true } : f)),
+                    )
+                  }}
+                  options={{
+                    minimap: { enabled: false },
+                    wordWrap: 'on',
+                    fontSize: 14,
+                    lineNumbers: 'off',
+                    padding: { top: 16, bottom: 16 },
+                    unicodeHighlight: { ambiguousCharacters: false },
+                  }}
+                  className="markdown-editor"
+                />
+              </div>
+              {showPreview && canPreview ? (
+                <div className="preview-pane">
+                  {previewHtml ? (
+                    <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                  ) : (
+                    <div className="preview-empty">无预览内容</div>
+                  )}
+                </div>
+              ) : null}
+            </>
           ) : (
             <div className="welcome-screen">
               <h1>Iris-Creation</h1>
