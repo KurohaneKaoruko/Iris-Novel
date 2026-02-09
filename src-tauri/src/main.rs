@@ -16,6 +16,7 @@ fn main() {
     .invoke_handler(tauri::generate_handler![
       commands::ping,
       commands::set_workspace,
+      commands::get_last_workspace,
       commands::init_novel,
       commands::list_workspace_tree,
       commands::read_text,
@@ -26,6 +27,8 @@ fn main() {
       commands::rename_entry,
       commands::get_app_settings,
       commands::set_app_settings,
+      commands::get_api_key_status,
+      commands::set_api_key,
       commands::get_agents,
       commands::set_agents,
       commands::export_agents,

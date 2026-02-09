@@ -9,7 +9,9 @@ import {
   createDir,
   deleteEntry,
   getAgents,
+  getApiKeyStatus,
   getAppSettings,
+  getLastWorkspace,
   gitCommit,
   gitDiff,
   gitInit,
@@ -22,6 +24,7 @@ import {
   readText,
   renameEntry,
   setAgents,
+  setApiKey,
   setAppSettings,
   saveChatSession,
   setWorkspace,
@@ -74,6 +77,7 @@ function App() {
   // Workspace & Files
   const [workspaceInput, setWorkspaceInput] = useState('')
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null)
+  const [lastWorkspace, setLastWorkspace] = useState<string | null>(null)
   const [tree, setTree] = useState<FsEntry | null>(null)
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([])
   const [activePath, setActivePath] = useState<string | null>(null)
@@ -96,6 +100,7 @@ function App() {
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
   const graphCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const autoOpenedRef = useRef(false)
 
   // Chat State
   const [chatMessages, setChatMessages] = useState<ChatItem[]>([])
@@ -113,6 +118,9 @@ function App() {
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [agentsList, setAgentsList] = useState<Agent[]>([])
   const [agentEditorId, setAgentEditorId] = useState<string>('')
+  const [settingsSnapshot, setSettingsSnapshot] = useState<AppSettings | null>(null)
+  const [agentsSnapshot, setAgentsSnapshot] = useState<Agent[] | null>(null)
+  const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({})
 
   // Git State
   const [gitItems, setGitItems] = useState<GitStatusItem[]>([])
@@ -150,7 +158,6 @@ function App() {
   }, [workspaceRoot])
 
   const refreshGit = useCallback(async () => {
-    if (!workspaceRoot) return
     if (!isTauriApp()) return
     try {
       const [items, commits] = await Promise.all([gitStatus(), gitLog(20)])
@@ -162,7 +169,7 @@ function App() {
       setGitCommits([])
       setGitError(e instanceof Error ? e.message : String(e))
     }
-  }, [workspaceRoot])
+  }, [])
 
   const reloadAppSettings = useCallback(async () => {
     if (!isTauriApp()) return
@@ -175,6 +182,27 @@ function App() {
       setAppSettingsState(null)
     }
   }, [])
+
+  const openWorkspacePath = useCallback(
+    async (path: string) => {
+      const p = path.trim()
+      if (!p) return
+      setError(null)
+      setBusy(true)
+      try {
+        const info = await setWorkspace(p)
+        setWorkspaceRoot(info.root)
+        setLastWorkspace(info.root)
+      } catch (e) {
+        setWorkspaceRoot(null)
+        setTree(null)
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [],
+  )
 
   const loadProjectSettings = useCallback(async () => {
     if (!workspaceRoot) return
@@ -248,31 +276,18 @@ function App() {
   }, [workspaceRoot])
 
   const onOpenWorkspace = useCallback(async () => {
-    setError(null)
-    setBusy(true)
     try {
       if (!isTauriApp()) {
-        const info = await setWorkspace(workspaceInput.trim())
-        setWorkspaceRoot(info.root)
+        await openWorkspacePath(workspaceInput)
       } else {
         const selected = await openFolderDialog()
-        if (!selected) {
-          setBusy(false)
-          return
-        }
-        const info = await setWorkspace(selected)
-        setWorkspaceRoot(info.root)
+        if (!selected) return
+        await openWorkspacePath(selected)
       }
-      const t = await listWorkspaceTree(6)
-      setTree(t)
-      await refreshGit()
-      await loadProjectSettings()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
     }
-  }, [workspaceInput, refreshGit, loadProjectSettings])
+  }, [openWorkspacePath, workspaceInput])
 
   const onOpenFile = useCallback(
     async (entry: FsEntry) => {
@@ -557,6 +572,70 @@ function App() {
     [reloadAppSettings, showErrorDialog],
   )
 
+  const settingsDirty = useMemo(() => {
+    if (!showSettings) return false
+    if (!appSettings) return false
+    if (!settingsSnapshot) return false
+    const a = JSON.stringify(appSettings)
+    const b = JSON.stringify(settingsSnapshot)
+    if (a !== b) return true
+    if (!agentsSnapshot) return false
+    return JSON.stringify(agentsList) !== JSON.stringify(agentsSnapshot)
+  }, [agentsList, agentsSnapshot, appSettings, settingsSnapshot, showSettings])
+
+  useEffect(() => {
+    if (!showSettings) {
+      setSettingsSnapshot(null)
+      setAgentsSnapshot(null)
+      return
+    }
+    if (appSettings && !settingsSnapshot) {
+      setSettingsSnapshot(appSettings)
+    }
+    if (!agentsSnapshot) {
+      setAgentsSnapshot(agentsList)
+    }
+  }, [agentsList, agentsSnapshot, appSettings, settingsSnapshot, showSettings])
+
+  const saveAndCloseSettings = useCallback(async () => {
+    if (!appSettings) return
+    try {
+      await setAppSettings(appSettings)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await showErrorDialog(`保存设置失败：${msg}`)
+      return
+    }
+    try {
+      await setAgents(agentsList)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await showErrorDialog(`保存智能体失败：${msg}`)
+      return
+    }
+    await reloadAppSettings()
+    setShowSettings(false)
+  }, [agentsList, appSettings, reloadAppSettings, showErrorDialog])
+
+  const requestCloseSettings = useCallback(() => {
+    void (async () => {
+      if (!settingsDirty) {
+        setShowSettings(false)
+        return
+      }
+      const shouldSave = await showConfirm('检测到未保存的设置更改，是否保存？')
+      if (shouldSave) {
+        await saveAndCloseSettings()
+        return
+      }
+      const discard = await showConfirm('确认放弃未保存的更改？')
+      if (!discard) return
+      if (settingsSnapshot) setAppSettingsState(settingsSnapshot)
+      if (agentsSnapshot) setAgentsList(agentsSnapshot)
+      setShowSettings(false)
+    })()
+  }, [agentsSnapshot, saveAndCloseSettings, settingsDirty, settingsSnapshot, showConfirm])
+
   const openChatContextMenu = useCallback((e: MouseEvent, message: string) => {
     e.preventDefault()
     e.stopPropagation()
@@ -688,6 +767,59 @@ function App() {
       })
       .catch(() => setAgentsList([]))
   }, [reloadAppSettings])
+
+  useEffect(() => {
+    if (!isTauriApp()) return
+    if (!showSettings) return
+    if (!appSettings) return
+    void (async () => {
+      const entries = await Promise.all(
+        appSettings.providers.map(async (p) => {
+          try {
+            const ok = await getApiKeyStatus(p.id)
+            return [p.id, ok] as const
+          } catch {
+            return [p.id, false] as const
+          }
+        }),
+      )
+      const next: Record<string, boolean> = {}
+      for (const [id, ok] of entries) next[id] = ok
+      setApiKeyStatus(next)
+    })()
+  }, [appSettings, showSettings])
+
+  useEffect(() => {
+    if (!isTauriApp()) return
+    if (autoOpenedRef.current) return
+    autoOpenedRef.current = true
+    void (async () => {
+      try {
+        const last = await getLastWorkspace()
+        setLastWorkspace(last)
+        if (!workspaceRoot && last) {
+          await openWorkspacePath(last)
+        }
+      } catch {
+        setLastWorkspace(null)
+      }
+    })()
+  }, [openWorkspacePath, workspaceRoot])
+
+  useEffect(() => {
+    if (!isTauriApp()) return
+    if (!workspaceRoot) return
+    void (async () => {
+      try {
+        const t = await listWorkspaceTree(6)
+        setTree(t)
+      } catch {
+        setTree(null)
+      }
+    })()
+    void refreshGit()
+    void loadProjectSettings()
+  }, [loadProjectSettings, refreshGit, workspaceRoot])
 
   useEffect(() => {
     if (!isTauriApp()) return
@@ -942,6 +1074,16 @@ function App() {
                     打开文件夹
                   </button>
                   {error ? <div className="error-text">{error}</div> : null}
+                  {lastWorkspace ? (
+                    <div className="welcome-recent" style={{ width: '100%' }}>
+                      <h3>最近打开</h3>
+                      <div className="recent-list">
+                        <div className="recent-item" onClick={() => void openWorkspacePath(lastWorkspace)}>
+                          {lastWorkspace}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                   {!isTauriApp() && (
                     <input
                       style={{ width: '100%', marginTop: 10, padding: 4 }}
@@ -1249,11 +1391,11 @@ function App() {
 
       {/* Settings Modal */}
       {showSettings ? (
-        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+        <div className="modal-overlay" onClick={requestCloseSettings}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>设置</h2>
-              <button className="close-btn" onClick={() => setShowSettings(false)}>
+              <button className="close-btn" onClick={requestCloseSettings}>
                 ×
               </button>
             </div>
@@ -1280,9 +1422,12 @@ function App() {
                     <input
                       type="checkbox"
                       checked={appSettings.output.use_markdown}
-                      onChange={(e) =>
-                        setAppSettingsState((prev) => (prev ? { ...prev, output: { ...prev.output, use_markdown: e.target.checked } } : prev))
-                      }
+                      onChange={(e) => {
+                        const prev = appSettings
+                        const next = { ...appSettings, output: { ...appSettings.output, use_markdown: e.target.checked } }
+                        setAppSettingsState(next)
+                        void persistAppSettings(next, prev)
+                      }}
                     />
                   </div>
                   <div className="form-group">
@@ -1336,6 +1481,9 @@ function App() {
                           <div style={{ color: '#fff', fontSize: 13, fontWeight: 500 }}>{p.name}</div>
                           <div style={{ color: '#888', fontSize: 11 }}>
                             {p.kind} • {p.model_name}
+                          </div>
+                          <div style={{ color: apiKeyStatus[p.id] ? '#9cdcfe' : '#888', fontSize: 11 }}>
+                            API Key：{apiKeyStatus[p.id] ? '已设置' : '未设置'}
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
@@ -1475,9 +1623,12 @@ function App() {
                                   style={{ position: 'absolute', top: 6, right: 6, padding: 2, fontSize: 12 }}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (!confirm('确定删除此智能体？')) return
-                                    setAgentsList((prev) => prev.filter((x) => x.id !== a.id))
-                                    setAgentEditorId('')
+                                    void (async () => {
+                                      const ok = await showConfirm('确定删除此智能体？')
+                                      if (!ok) return
+                                      setAgentsList((prev) => prev.filter((x) => x.id !== a.id))
+                                      setAgentEditorId('')
+                                    })()
                                   }}
                                 >
                                   🗑️
@@ -1530,24 +1681,7 @@ function App() {
                 <button
                   className="primary-button"
                   onClick={() => {
-                    void (async () => {
-                      try {
-                        await setAppSettings(appSettings)
-                      } catch (e) {
-                        const msg = e instanceof Error ? e.message : String(e)
-                        await showErrorDialog(`保存设置失败：${msg}`)
-                        return
-                      }
-                      try {
-                        await setAgents(agentsList)
-                      } catch (e) {
-                        const msg = e instanceof Error ? e.message : String(e)
-                        await showErrorDialog(`保存智能体失败：${msg}`)
-                        return
-                      }
-                      await reloadAppSettings()
-                      setShowSettings(false)
-                    })()
+                    void saveAndCloseSettings()
                   }}
                 >
                   保存并关闭
@@ -1617,7 +1751,9 @@ function App() {
                     type="password"
                     value={editingProvider.api_key ?? ''}
                     onChange={(e) => setEditingProvider((p) => ({ ...p, api_key: e.target.value }))}
-                    placeholder="sk-..."
+                    placeholder={
+                      editingProvider.id && apiKeyStatus[editingProvider.id] ? '已设置（留空表示不修改）' : 'sk-...'
+                    }
                   />
                 </div>
               </div>
@@ -1630,11 +1766,29 @@ function App() {
                   if (!appSettings) return
                   void (async () => {
                     const prev = appSettings
+                    const rawKey = (editingProvider.api_key ?? '').trim()
+                    const pid = editingProvider.id ?? ''
+                    if (isNewProvider && pid && !rawKey) {
+                      const ok = await showConfirm('未填写 API Key，仍要保存该模型配置吗？')
+                      if (!ok) return
+                    }
+                    if (pid && rawKey) {
+                      try {
+                        await setApiKey(pid, rawKey)
+                        setApiKeyStatus((m) => ({ ...m, [pid]: true }))
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e)
+                        await showErrorDialog(`保存 API Key 失败：${msg}`)
+                        return
+                      }
+                    }
                     let nextProviders = [...appSettings.providers]
                     if (isNewProvider) {
-                      nextProviders.push(editingProvider as ModelProvider)
+                      nextProviders.push({ ...(editingProvider as ModelProvider), api_key: '' })
                     } else {
-                      nextProviders = nextProviders.map((p) => (p.id === editingProvider.id ? (editingProvider as ModelProvider) : p))
+                      nextProviders = nextProviders.map((p) =>
+                        p.id === editingProvider.id ? ({ ...(editingProvider as ModelProvider), api_key: '' } as ModelProvider) : p,
+                      )
                     }
                     const next = { ...appSettings, providers: nextProviders }
                     setAppSettingsState(next)
@@ -1645,6 +1799,14 @@ function App() {
                       await showErrorDialog(`保存设置失败：${msg}`)
                       setAppSettingsState(prev)
                       return
+                    }
+                    if (pid) {
+                      try {
+                        const ok = await getApiKeyStatus(pid)
+                        setApiKeyStatus((m) => ({ ...m, [pid]: ok }))
+                      } catch {
+                        setApiKeyStatus((m) => ({ ...m, [pid]: false }))
+                      }
                     }
                     await reloadAppSettings()
                     setShowModelModal(false)

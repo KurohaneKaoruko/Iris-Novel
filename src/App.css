@@ -610,6 +610,26 @@ body {
 .modal-body {
   padding: 20px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #4b4b4b #252526;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #252526;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #4b4b4b;
+  border-radius: 8px;
+  border: 2px solid #252526;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #5a5a5a;
 }
 
 .settings-form {

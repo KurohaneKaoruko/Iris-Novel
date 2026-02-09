@@ -11,6 +11,7 @@ use std::path::{Component, Path, PathBuf};
 use std::time::Instant;
 use tauri::AppHandle;
 use tauri::Emitter;
+use tauri::Manager;
 use tauri::State;
 use notify::{EventKind, RecursiveMode, Watcher};
 
@@ -35,9 +36,51 @@ pub fn set_workspace(app: AppHandle, state: State<'_, AppState>, path: String) -
     eprintln!("fs_watcher_start_error: {e}");
     let _ = app.emit("fs_watch_error", serde_json::json!({ "message": e }));
   }
+  if let Err(e) = save_last_workspace(&app, &root) {
+    eprintln!("save_last_workspace_failed: {e}");
+  }
   Ok(WorkspaceInfo {
     root: root.to_string_lossy().to_string(),
   })
+}
+
+#[tauri::command]
+pub fn get_last_workspace(app: AppHandle) -> Result<Option<String>, String> {
+  let path = last_workspace_path(&app)?;
+  if !path.exists() {
+    return Ok(None);
+  }
+  let raw = fs::read_to_string(&path).map_err(|e| format!("read last workspace failed: {e}"))?;
+  #[derive(Deserialize)]
+  struct LastWorkspace {
+    path: String,
+  }
+  let v: LastWorkspace = serde_json::from_str(&raw).map_err(|e| format!("parse last workspace failed: {e}"))?;
+  let p = v.path.trim().to_string();
+  if p.is_empty() {
+    return Ok(None);
+  }
+  if !Path::new(&p).exists() {
+    return Ok(None);
+  }
+  Ok(Some(p))
+}
+
+fn last_workspace_path(app: &AppHandle) -> Result<PathBuf, String> {
+  let base = app
+    .path()
+    .app_data_dir()
+    .map_err(|e| format!("app data dir failed: {e}"))?;
+  Ok(base.join("Iris-Creation").join("last_workspace.json"))
+}
+
+fn save_last_workspace(app: &AppHandle, root: &Path) -> Result<(), String> {
+  let path = last_workspace_path(app)?;
+  if let Some(parent) = path.parent() {
+    fs::create_dir_all(parent).map_err(|e| format!("create last workspace dir failed: {e}"))?;
+  }
+  let payload = serde_json::json!({ "path": root.to_string_lossy().to_string() }).to_string();
+  fs::write(path, payload).map_err(|e| format!("write last workspace failed: {e}"))
 }
 
 #[tauri::command]
@@ -255,6 +298,28 @@ pub fn set_app_settings(app: AppHandle, settings: app_settings::AppSettings) -> 
   }
   
   app_settings::save(&app, &s)
+}
+
+#[tauri::command]
+pub fn get_api_key_status(provider_id: String) -> Result<bool, String> {
+  match secrets::get_api_key(provider_id.trim()) {
+    Ok(Some(v)) => Ok(!v.trim().is_empty()),
+    Ok(None) => Ok(false),
+    Err(e) => Err(e),
+  }
+}
+
+#[tauri::command]
+pub fn set_api_key(provider_id: String, api_key: String) -> Result<(), String> {
+  let pid = provider_id.trim();
+  if pid.is_empty() {
+    return Err("provider_id 不能为空".to_string());
+  }
+  let key = api_key.trim();
+  if key.is_empty() {
+    return Err("API Key 不能为空".to_string());
+  }
+  secrets::set_api_key(pid, key)
 }
 
 #[tauri::command]
@@ -596,10 +661,20 @@ pub fn chat_generate_stream(
       Ok(v) => v,
       Err(e) => {
         eprintln!("ai_error provider={} err={}", current_provider.id, e);
+        let stage = if e.contains("api key")
+          || e.contains("keyring")
+          || e.contains("request failed")
+          || e.contains("decode failed")
+          || e.contains("http ")
+        {
+          "provider"
+        } else {
+          "agent"
+        };
         let payload = serde_json::json!({
           "streamId": stream_id,
           "provider": current_provider.id,
-          "stage": "agent",
+          "stage": stage,
           "message": e
         });
         let _ = window.emit("ai_error", payload);
@@ -657,7 +732,10 @@ async fn call_openai_compatible(
   };
 
   if api_key.trim().is_empty() {
-    return Err("api key is empty".to_string());
+    return Err(format!(
+      "api key not found for provider={}; 请在“设置 > 模型配置”中填写 API Key",
+      cfg.id
+    ));
   }
   let base = cfg.base_url.trim_end_matches('/');
   let url = format!("{base}/chat/completions");
@@ -708,7 +786,10 @@ async fn call_anthropic(
     Err(e) => return Err(format!("keyring read failed: {e}")),
   };
   if api_key.trim().is_empty() {
-    return Err("api key is empty".to_string());
+    return Err(format!(
+      "api key not found for provider={}; 请在“设置 > 模型配置”中填写 API Key",
+      cfg.id
+    ));
   }
   let url = "https://api.anthropic.com/v1/messages";
   let body = serde_json::json!({

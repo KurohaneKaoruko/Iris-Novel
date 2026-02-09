@@ -38,6 +38,10 @@ export async function setWorkspace(path: string): Promise<WorkspaceInfo> {
   return invoke<WorkspaceInfo>('set_workspace', { path })
 }
 
+export async function getLastWorkspace(): Promise<string | null> {
+  return invoke<string | null>('get_last_workspace')
+}
+
 export async function openFolderDialog(): Promise<string | null> {
   const selected = await open({
     directory: true,
@@ -86,6 +90,14 @@ export async function getAppSettings(): Promise<AppSettings> {
 
 export async function setAppSettings(settings: AppSettings): Promise<void> {
   return invoke<void>('set_app_settings', { settings })
+}
+
+export async function getApiKeyStatus(providerId: string): Promise<boolean> {
+  return invoke<boolean>('get_api_key_status', { providerId })
+}
+
+export async function setApiKey(providerId: string, apiKey: string): Promise<void> {
+  return invoke<void>('set_api_key', { providerId, apiKey })
 }
 
 export type Agent = {
