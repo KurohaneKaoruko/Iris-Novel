@@ -1,14 +1,18 @@
 use crate::app_settings;
 use crate::agents;
+use crate::agent_system;
+use crate::ai_types::ChatMessage;
 use crate::chat_history;
 use crate::secrets;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::time::Instant;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::State;
+use notify::{EventKind, RecursiveMode, Watcher};
 
 #[tauri::command]
 pub fn ping() -> &'static str {
@@ -21,9 +25,16 @@ pub struct WorkspaceInfo {
 }
 
 #[tauri::command]
-pub fn set_workspace(state: State<'_, AppState>, path: String) -> Result<WorkspaceInfo, String> {
+pub fn set_workspace(app: AppHandle, state: State<'_, AppState>, path: String) -> Result<WorkspaceInfo, String> {
   let root = canonicalize_path(Path::new(&path))?;
   *state.workspace_root.lock().map_err(|_| "workspace lock poisoned")? = Some(root.clone());
+  if let Ok(mut w) = state.fs_watcher.lock() {
+    *w = None;
+  }
+  if let Err(e) = start_fs_watcher(&app, &state, root.clone()) {
+    eprintln!("fs_watcher_start_error: {e}");
+    let _ = app.emit("fs_watch_error", serde_json::json!({ "message": e }));
+  }
   Ok(WorkspaceInfo {
     root: root.to_string_lossy().to_string(),
   })
@@ -191,6 +202,55 @@ pub fn create_file(state: State<'_, AppState>, relative_path: String) -> Result<
     fs::create_dir_all(parent).map_err(|e| format!("create dir failed: {e}"))?;
   }
   fs::write(target, "").map_err(|e| format!("create file failed: {e}"))
+}
+
+#[tauri::command]
+pub fn create_dir(state: State<'_, AppState>, relative_path: String) -> Result<(), String> {
+  if relative_path.trim().is_empty() {
+    return Err("empty path is not allowed".to_string());
+  }
+  let root = get_workspace_root(&state)?;
+  let rel = validate_relative_path(&relative_path)?;
+  let target = root.join(rel);
+  fs::create_dir_all(target).map_err(|e| format!("create dir failed: {e}"))
+}
+
+#[tauri::command]
+pub fn delete_entry(state: State<'_, AppState>, relative_path: String) -> Result<(), String> {
+  if relative_path.trim().is_empty() {
+    return Err("empty path is not allowed".to_string());
+  }
+  let root = get_workspace_root(&state)?;
+  let rel = validate_relative_path(&relative_path)?;
+  let target = root.join(rel);
+  let md = fs::metadata(&target).map_err(|e| format!("stat failed: {e}"))?;
+  if md.is_dir() {
+    fs::remove_dir_all(target).map_err(|e| format!("delete dir failed: {e}"))
+  } else {
+    fs::remove_file(target).map_err(|e| format!("delete file failed: {e}"))
+  }
+}
+
+#[tauri::command]
+pub fn rename_entry(state: State<'_, AppState>, from_relative_path: String, to_relative_path: String) -> Result<(), String> {
+  if from_relative_path.trim().is_empty() || to_relative_path.trim().is_empty() {
+    return Err("empty path is not allowed".to_string());
+  }
+  let root = get_workspace_root(&state)?;
+  let from_rel = validate_relative_path(&from_relative_path)?;
+  let to_rel = validate_relative_path(&to_relative_path)?;
+  let to_norm = to_relative_path.replace('\\', "/");
+  if (to_norm.starts_with("concept/") || to_norm.starts_with("outline/") || to_norm.starts_with("stories/"))
+    && !to_norm.to_lowercase().ends_with(".md")
+  {
+    return Err("concept/outline/stories 目录仅允许 .md 文件".to_string());
+  }
+  let from = root.join(from_rel);
+  let to = root.join(to_rel);
+  if let Some(parent) = to.parent() {
+    fs::create_dir_all(parent).map_err(|e| format!("create dir failed: {e}"))?;
+  }
+  fs::rename(from, to).map_err(|e| format!("rename failed: {e}"))
 }
 
 #[tauri::command]
@@ -451,28 +511,18 @@ fn format_status(st: git2::Status) -> String {
   }
 }
 
-#[derive(Deserialize)]
-pub struct ChatMessage {
-  pub role: String,
-  pub content: String,
-}
-
 #[tauri::command]
 pub fn chat_generate_stream(
   app: AppHandle,
   window: tauri::Window,
+  state: State<'_, AppState>,
   stream_id: String,
   messages: Vec<ChatMessage>,
   use_markdown: bool,
   agent_id: Option<String>,
 ) -> Result<(), String> {
   let app = app.clone();
-  let last_user = messages
-    .iter()
-    .rev()
-    .find(|m| m.role == "user")
-    .map(|m| m.content.clone())
-    .unwrap_or_default();
+  let workspace_root = get_workspace_root(&state)?;
 
   tauri::async_runtime::spawn(async move {
     let payload_start = serde_json::json!({ "streamId": stream_id });
@@ -488,35 +538,62 @@ pub fn chat_generate_stream(
     let agent_max = agent.map(|a| a.max_tokens);
     let client = reqwest::Client::new();
 
-    let mut response = match settings.providers.active.as_str() {
-      "openai" => {
-        call_openai_compatible(
-          &client,
-          "openai",
-          &settings.providers.openai,
-          &messages,
-          agent_system.as_str(),
-          agent_temp,
-          agent_max,
-        )
-        .await
+    let provider = settings.providers.active.clone();
+    let mut runtime = agent_system::AgentRuntime::new(workspace_root);
+    let start = Instant::now();
+    let (mut response, perf) = match runtime
+      .run_react(messages, agent_system.clone(), |msgs| {
+        let provider = provider.clone();
+        let client = client.clone();
+        let openai = settings.providers.openai.clone();
+        let wenxin = settings.providers.wenxin.clone();
+        let claude = settings.providers.claude.clone();
+        let agent_temp = agent_temp;
+        let agent_max = agent_max;
+        async move {
+          let mut system = String::new();
+          for m in msgs.iter().filter(|m| m.role == "system") {
+            if !system.is_empty() {
+              system.push('\n');
+            }
+            system.push_str(m.content.as_str());
+          }
+          let filtered = msgs.into_iter().filter(|m| m.role != "system").collect::<Vec<_>>();
+          match provider.as_str() {
+            "openai" => call_openai_compatible(&client, "openai", &openai, &filtered, system.as_str(), agent_temp, agent_max).await,
+            "wenxin" => call_openai_compatible(&client, "wenxin", &wenxin, &filtered, system.as_str(), agent_temp, agent_max).await,
+            "claude" => call_anthropic(&client, "claude", &claude, &filtered, system.as_str(), agent_max).await,
+            _ => Err("unknown provider".to_string()),
+          }
+        }
+      })
+      .await
+    {
+      Ok(v) => v,
+      Err(e) => {
+        eprintln!("ai_error provider={} err={}", provider, e);
+        let payload = serde_json::json!({
+          "streamId": stream_id,
+          "provider": provider,
+          "stage": "agent",
+          "message": e
+        });
+        let _ = window.emit("ai_error", payload);
+        let payload_done = serde_json::json!({ "streamId": stream_id });
+        let _ = window.emit("ai_stream_done", payload_done);
+        return;
       }
-      "wenxin" => {
-        call_openai_compatible(
-          &client,
-          "wenxin",
-          &settings.providers.wenxin,
-          &messages,
-          agent_system.as_str(),
-          agent_temp,
-          agent_max,
-        )
-        .await
-      }
-      "claude" => call_anthropic(&client, "claude", &settings.providers.claude, &messages, agent_system.as_str(), agent_max).await,
-      _ => Err("unknown provider".to_string()),
-    }
-    .unwrap_or_else(|e| format!("模拟回复：{last_user}\n调用失败：{e}"));
+    };
+    let _ = window.emit(
+      "ai_perf",
+      serde_json::json!({
+        "streamId": stream_id,
+        "elapsed_ms": start.elapsed().as_millis(),
+        "steps": perf.steps,
+        "model_ms": perf.model_ms,
+        "tool_ms": perf.tool_ms
+      }),
+    );
 
     if !effective_use_markdown {
       response = normalize_plaintext(&response);
@@ -651,6 +728,42 @@ fn get_workspace_root(state: &State<'_, AppState>) -> Result<PathBuf, String> {
 
 fn canonicalize_path(path: &Path) -> Result<PathBuf, String> {
   fs::canonicalize(path).map_err(|e| format!("invalid path: {e}"))
+}
+
+fn start_fs_watcher(app: &AppHandle, state: &State<'_, AppState>, root: PathBuf) -> Result<(), String> {
+  let app_handle = app.clone();
+  let root_for_strip = root.clone();
+  let mut watcher =
+    notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| match res {
+      Ok(event) => {
+        let kind = match event.kind {
+          EventKind::Create(_) => "create",
+          EventKind::Modify(_) => "modify",
+          EventKind::Remove(_) => "remove",
+          EventKind::Access(_) => "access",
+          EventKind::Other => "other",
+          EventKind::Any => "any",
+        };
+        for p in event.paths {
+          let rel = p
+            .strip_prefix(&root_for_strip)
+            .unwrap_or(&p)
+            .to_string_lossy()
+            .to_string()
+            .replace('\\', "/");
+          let _ = app_handle.emit("fs_changed", serde_json::json!({ "kind": kind, "path": rel }));
+        }
+      }
+      Err(e) => {
+        let _ = app_handle.emit("fs_watch_error", serde_json::json!({ "message": e.to_string() }));
+      }
+    })
+    .map_err(|e| format!("create watcher failed: {e}"))?;
+  watcher
+    .watch(&root, RecursiveMode::Recursive)
+    .map_err(|e| format!("watch failed: {e}"))?;
+  *state.fs_watcher.lock().map_err(|_| "watcher lock poisoned")? = Some(watcher);
+  Ok(())
 }
 
 fn validate_relative_path(relative_path: &str) -> Result<PathBuf, String> {
@@ -820,7 +933,8 @@ fn build_tree(root: &Path, path: &Path, max_depth: usize) -> Result<FsEntry, Str
     .strip_prefix(root)
     .unwrap_or(path)
     .to_string_lossy()
-    .to_string();
+    .to_string()
+    .replace('\\', "/");
 
   if meta.is_dir() {
     if max_depth == 0 {

@@ -1,10 +1,13 @@
 import Editor from '@monaco-editor/react'
 import { listen } from '@tauri-apps/api/event'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { confirm, message } from '@tauri-apps/plugin-dialog'
 import type { editor as MonacoEditor } from 'monaco-editor'
 import './App.css'
 import {
   createFile,
+  createDir,
+  deleteEntry,
   getAgents,
   getAppSettings,
   gitCommit,
@@ -17,6 +20,7 @@ import {
   listWorkspaceTree,
   openFolderDialog,
   readText,
+  renameEntry,
   setAgents,
   setAppSettings,
   saveChatSession,
@@ -43,6 +47,24 @@ type ChatItem = {
   streaming?: boolean
 }
 
+type ChatContextMenuState = {
+  x: number
+  y: number
+  message: string
+  selection: string
+}
+
+type ExplorerContextMenuState = {
+  x: number
+  y: number
+  entry: FsEntry
+}
+
+type ExplorerModalState =
+  | { mode: 'newFile'; dirPath: string }
+  | { mode: 'newFolder'; dirPath: string }
+  | { mode: 'rename'; entry: FsEntry; parentDir: string }
+
 function App() {
   // Activity Bar State
   const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'git'>('files')
@@ -56,6 +78,10 @@ function App() {
   const [activePath, setActivePath] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)
+  const [explorerModal, setExplorerModal] = useState<ExplorerModalState | null>(null)
+  const [explorerModalValue, setExplorerModalValue] = useState<string>('')
+  const [explorerQuery, setExplorerQuery] = useState<string>('')
 
   // Editors & Refs
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
@@ -66,6 +92,7 @@ function App() {
   // Chat State
   const [chatMessages, setChatMessages] = useState<ChatItem[]>([])
   const [chatInput, setChatInput] = useState('')
+  const [chatContextMenu, setChatContextMenu] = useState<ChatContextMenuState | null>(null)
   const streamIdRef = useRef<string | null>(null)
   const assistantIdRef = useRef<string | null>(null)
   const chatSessionIdRef = useRef<string>(
@@ -342,26 +369,29 @@ function App() {
     }
   }, [workspaceRoot, gitCommitMsg, refreshGit])
 
-  const filteredTree = useMemo(() => {
-    const allowTop = new Set(['concept', 'outline', 'stories'])
-    const isAllowedPath = (p: string) =>
-      p === 'concept' || p === 'outline' || p === 'stories' || p.startsWith('concept/') || p.startsWith('outline/') || p.startsWith('stories/')
+  const nameCollator = useMemo(() => new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' }), [])
 
-    const walk = (e: FsEntry, depth: number): FsEntry | null => {
-      if (depth === 1 && e.kind === 'file') return null
-      if (depth === 1 && !allowTop.has(e.name)) return null
+  const visibleTree = useMemo(() => {
+    if (!tree) return null
+    const q = explorerQuery.trim().toLowerCase()
+    if (!q) return tree
 
-      if (e.kind === 'file') {
-        if (!isAllowedPath(e.path)) return null
-        return e.name.toLowerCase().endsWith('.md') ? e : null
-      }
-
-      const children = e.children.map((c) => walk(c, depth + 1)).filter(Boolean) as FsEntry[]
-      return { ...e, children }
+    const walk = (e: FsEntry): FsEntry | null => {
+      const name = e.name.toLowerCase()
+      if (e.kind === 'file') return name.includes(q) ? e : null
+      const children = e.children.map(walk).filter(Boolean) as FsEntry[]
+      if (name.includes(q) || children.length > 0) return { ...e, children }
+      return null
     }
 
-    return tree ? walk(tree, 0) : null
-  }, [tree])
+    return walk(tree)
+  }, [tree, explorerQuery])
+
+  const openExplorerContextMenu = useCallback((e: MouseEvent, entry: FsEntry) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setExplorerContextMenu({ x: e.clientX, y: e.clientY, entry })
+  }, [])
 
   const TreeNode = useCallback(
     function TreeNodeInner({ entry, depth }: { entry: FsEntry; depth: number }) {
@@ -369,7 +399,12 @@ function App() {
       const pad = { paddingLeft: `${depth * 12}px` }
       if (entry.kind === 'file') {
         return (
-          <div className="file-tree-item" style={pad} onClick={() => void onOpenFile(entry)}>
+          <div
+            className="file-tree-item"
+            style={pad}
+            onClick={() => void onOpenFile(entry)}
+            onContextMenu={(e) => openExplorerContextMenu(e, entry)}
+          >
             <span className="file-icon file">📄</span>
             {entry.name}
           </div>
@@ -377,15 +412,26 @@ function App() {
       }
       return (
         <div>
-          <div className="file-tree-item" style={pad} onClick={() => setOpen((v) => !v)}>
+          <div
+            className="file-tree-item"
+            style={pad}
+            onClick={() => setOpen((v) => !v)}
+            onContextMenu={(e) => openExplorerContextMenu(e, entry)}
+          >
             <span className="file-icon">{open ? '📂' : '📁'}</span>
             {entry.name}
           </div>
-          {open && entry.children.map((c) => <TreeNodeInner key={c.path} entry={c} depth={depth + 1} />)}
+          {open &&
+            [...entry.children]
+              .sort((a, b) => {
+                if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1
+                return nameCollator.compare(a.name, b.name)
+              })
+              .map((c) => <TreeNodeInner key={c.path} entry={c} depth={depth + 1} />)}
         </div>
       )
     },
-    [onOpenFile],
+    [onOpenFile, openExplorerContextMenu, nameCollator],
   )
 
   const newId = useCallback(() => {
@@ -413,6 +459,74 @@ function App() {
     editor.executeEdits?.('ai-insert', [{ range: sel, text, forceMoveMarkers: true }])
     editor.focus?.()
   }, [])
+
+  const copyText = useCallback(async (text: string) => {
+    const value = text ?? ''
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+      return
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = value
+      el.setAttribute('readonly', 'true')
+      el.style.position = 'fixed'
+      el.style.left = '-9999px'
+      el.style.top = '0'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+  }, [])
+
+  const showConfirm = useCallback(async (text: string): Promise<boolean> => {
+    if (!isTauriApp()) return window.confirm(text)
+    return confirm(text, { title: '确认', kind: 'warning' })
+  }, [])
+
+  const showErrorDialog = useCallback(async (text: string) => {
+    if (!isTauriApp()) {
+      window.alert(text)
+      return
+    }
+    await message(text, { title: '错误', kind: 'error' })
+  }, [])
+
+  const openChatContextMenu = useCallback((e: MouseEvent, message: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const selection = window.getSelection?.()?.toString() ?? ''
+    setChatContextMenu({ x: e.clientX, y: e.clientY, message, selection })
+  }, [])
+
+  useEffect(() => {
+    if (!chatContextMenu) return
+    const onClick = () => setChatContextMenu(null)
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setChatContextMenu(null)
+    }
+    window.addEventListener('click', onClick)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('click', onClick)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [chatContextMenu])
+
+  useEffect(() => {
+    if (!explorerContextMenu) return
+    const onClick = () => setExplorerContextMenu(null)
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExplorerContextMenu(null)
+    }
+    window.addEventListener('click', onClick)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('click', onClick)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [explorerContextMenu])
 
   const onQuoteSelection = useCallback(() => {
     const text = getSelectionText().trim()
@@ -516,11 +630,28 @@ function App() {
   useEffect(() => {
     if (!isTauriApp()) return
     const unlistenFns: Array<() => void> = []
+    const normalizeStreamId = (v: unknown): string | null => {
+      if (typeof v === 'string' && v) return v
+      return null
+    }
+    const parsePayload = (payload: unknown): Record<string, unknown> | null => {
+      if (!payload) return null
+      if (typeof payload === 'string') {
+        try {
+          const v: unknown = JSON.parse(payload)
+          if (v && typeof v === 'object') return v as Record<string, unknown>
+          return null
+        } catch {
+          return null
+        }
+      }
+      if (typeof payload === 'object') return payload as Record<string, unknown>
+      return null
+    }
     void listen('ai_stream_token', (event) => {
-      const payload: unknown = event.payload
-      if (!payload || typeof payload !== 'object') return
-      const p = payload as Record<string, unknown>
-      const streamId = typeof p.streamId === 'string' ? p.streamId : undefined
+      const p = parsePayload(event.payload)
+      if (!p) return
+      const streamId = normalizeStreamId(p.streamId) ?? normalizeStreamId(p.stream_id)
       if (!streamId || streamIdRef.current !== streamId) return
       const token = typeof p.token === 'string' ? p.token : ''
       const assistantId = assistantIdRef.current
@@ -531,20 +662,63 @@ function App() {
     }).then((u) => unlistenFns.push(u))
 
     void listen('ai_stream_done', (event) => {
-      const payload: unknown = event.payload
-      if (!payload || typeof payload !== 'object') return
-      const p = payload as Record<string, unknown>
-      const streamId = typeof p.streamId === 'string' ? p.streamId : undefined
+      const p = parsePayload(event.payload)
+      if (!p) return
+      const streamId = normalizeStreamId(p.streamId) ?? normalizeStreamId(p.stream_id)
       if (!streamId || streamIdRef.current !== streamId) return
       const assistantId = assistantIdRef.current
       if (!assistantId) return
       setChatMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, streaming: false } : m)))
     }).then((u) => unlistenFns.push(u))
 
+    void listen('ai_error', (event) => {
+      const p = parsePayload(event.payload)
+      if (!p) return
+      const streamId = normalizeStreamId(p.streamId) ?? normalizeStreamId(p.stream_id)
+      if (!streamId || streamIdRef.current !== streamId) return
+      const assistantId = assistantIdRef.current
+      if (!assistantId) return
+      const message = typeof p.message === 'string' ? p.message : 'AI 调用失败'
+      const stage = typeof p.stage === 'string' ? p.stage : ''
+      const provider = typeof p.provider === 'string' ? p.provider : ''
+      const extra = [provider ? `provider=${provider}` : '', stage ? `stage=${stage}` : ''].filter(Boolean).join(' ')
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: extra ? `${message}\n(${extra})` : message, streaming: false }
+            : m,
+        ),
+      )
+    }).then((u) => unlistenFns.push(u))
+
     return () => {
       for (const u of unlistenFns) u()
     }
   }, [])
+
+  useEffect(() => {
+    if (!isTauriApp()) return
+    if (!workspaceRoot) return
+    let timer: number | null = null
+    const unlistenFns: Array<() => void> = []
+    const scheduleRefresh = () => {
+      if (timer) window.clearTimeout(timer)
+      timer = window.setTimeout(() => void refreshTree(), 200)
+    }
+    void listen('fs_changed', () => {
+      scheduleRefresh()
+    }).then((u) => unlistenFns.push(u))
+    void listen('fs_watch_error', (event) => {
+      const payload: unknown = event.payload
+      if (payload && typeof payload === 'object' && 'message' in payload && typeof (payload as { message?: unknown }).message === 'string') {
+        setError((payload as { message: string }).message)
+      }
+    }).then((u) => unlistenFns.push(u))
+    return () => {
+      if (timer) window.clearTimeout(timer)
+      for (const u of unlistenFns) u()
+    }
+  }, [workspaceRoot, refreshTree])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -683,7 +857,15 @@ function App() {
                     {workspaceRoot.split(/[/\\]/).pop()}
                   </div>
                   {error ? <div className="error-text">{error}</div> : null}
-                  {filteredTree ? <TreeNode entry={filteredTree} depth={0} /> : <div style={{ padding: 10 }}>加载中...</div>}
+                  <div style={{ padding: '8px 10px', borderBottom: '1px solid #333' }}>
+                    <input
+                      className="explorer-search"
+                      value={explorerQuery}
+                      onChange={(e) => setExplorerQuery(e.target.value)}
+                      placeholder="搜索..."
+                    />
+                  </div>
+                  {visibleTree ? <TreeNode entry={visibleTree} depth={0} /> : <div style={{ padding: 10 }}>加载中...</div>}
                 </>
               ) : (
                 <div style={{ padding: 20, textAlign: 'center' }}>
@@ -885,7 +1067,13 @@ function App() {
                       className="ai-select"
                       value={appSettings?.providers.active ?? 'openai'}
                       onChange={(e) => {
-                        setAppSettingsState((prev) => (prev ? { ...prev, providers: { ...prev.providers, active: e.target.value } } : prev))
+                        const active = e.target.value
+                        setAppSettingsState((prev) => {
+                          if (!prev) return prev
+                          const next = { ...prev, providers: { ...prev.providers, active } }
+                          void setAppSettings(next)
+                          return next
+                        })
                       }}
                     >
                       <option value="openai">OpenAI</option>
@@ -905,7 +1093,9 @@ function App() {
                     chatMessages.map((m) => (
                       <div key={m.id} className={m.role === 'user' ? 'message user' : 'message assistant'}>
                         <div className="message-meta">{m.role === 'user' ? '你' : m.streaming ? 'AI...' : 'AI'}</div>
-                        <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                        <div style={{ whiteSpace: 'pre-wrap' }} onContextMenu={(e) => openChatContextMenu(e, m.content)}>
+                          {m.content}
+                        </div>
                         {m.role === 'assistant' && m.content ? (
                           <div className="ai-actions">
                             <button className="icon-button" disabled={!activeFile} onClick={() => insertAtCursor(m.content)} title="插入">
@@ -1259,6 +1449,174 @@ function App() {
         <div className="status-item">Git：{gitError ? '不可用' : `${gitItems.length} 变更`}</div>
         <div className="status-spacer" />
       </div>
+
+      {chatContextMenu ? (
+        <div className="context-menu" style={{ left: chatContextMenu.x, top: chatContextMenu.y }}>
+          <button
+            className={chatContextMenu.selection ? 'context-menu-item' : 'context-menu-item disabled'}
+            disabled={!chatContextMenu.selection}
+            onClick={() => void copyText(chatContextMenu.selection).finally(() => setChatContextMenu(null))}
+          >
+            复制选中内容
+          </button>
+          <button
+            className="context-menu-item"
+            onClick={() => void copyText(chatContextMenu.message).finally(() => setChatContextMenu(null))}
+          >
+            复制该条消息
+          </button>
+        </div>
+      ) : null}
+
+      {explorerContextMenu ? (
+        <div className="context-menu" style={{ left: explorerContextMenu.x, top: explorerContextMenu.y }}>
+          <button className="context-menu-item" onClick={() => void refreshTree().finally(() => setExplorerContextMenu(null))}>
+            刷新
+          </button>
+          {explorerContextMenu.entry.kind === 'dir' ? (
+            <>
+              <button
+                className="context-menu-item"
+                onClick={() => {
+                  setExplorerModal({ mode: 'newFile', dirPath: explorerContextMenu.entry.path })
+                  setExplorerModalValue('')
+                  setExplorerContextMenu(null)
+                }}
+              >
+                新建文件
+              </button>
+              <button
+                className="context-menu-item"
+                onClick={() => {
+                  setExplorerModal({ mode: 'newFolder', dirPath: explorerContextMenu.entry.path })
+                  setExplorerModalValue('')
+                  setExplorerContextMenu(null)
+                }}
+              >
+                新建文件夹
+              </button>
+            </>
+          ) : null}
+          <button
+            className="context-menu-item"
+            onClick={() => {
+              const parentDir = explorerContextMenu.entry.path.replaceAll('\\', '/').split('/').slice(0, -1).join('/')
+              setExplorerModal({ mode: 'rename', entry: explorerContextMenu.entry, parentDir })
+              setExplorerModalValue(explorerContextMenu.entry.name)
+              setExplorerContextMenu(null)
+            }}
+          >
+            重命名
+          </button>
+          <button
+            className="context-menu-item"
+            onClick={() => {
+              const entry = explorerContextMenu.entry
+              setExplorerContextMenu(null)
+              void (async () => {
+                const ok = await showConfirm(`确认删除：${entry.path} ?`)
+                if (!ok) return
+                try {
+                  await deleteEntry(entry.path)
+                  await refreshTree()
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e)
+                  await showErrorDialog(msg)
+                }
+              })()
+            }}
+          >
+            删除
+          </button>
+        </div>
+      ) : null}
+
+      {explorerModal ? (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setExplorerModal(null)
+          }}
+        >
+          <div
+            className="modal-content"
+            onClick={(e) => {
+              e.stopPropagation()
+            }}
+          >
+            <div className="modal-header">
+              <h2>
+                {explorerModal.mode === 'newFile' ? '新建文件' : explorerModal.mode === 'newFolder' ? '新建文件夹' : '重命名'}
+              </h2>
+              <button className="close-btn" onClick={() => setExplorerModal(null)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>名称</label>
+                <input
+                  value={explorerModalValue}
+                  onChange={(e) => setExplorerModalValue(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setExplorerModal(null)}>
+                取消
+              </button>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  void (async () => {
+                    const name = explorerModalValue.trim()
+                    if (!name) return
+                    if (explorerModal.mode === 'newFile') {
+                      const rel = `${explorerModal.dirPath.replaceAll('\\', '/')}/${name}`.replaceAll('//', '/')
+                      const ok = await showConfirm(`确认新建文件：${rel} ?`)
+                      if (!ok) return
+                      try {
+                        await createFile(rel)
+                        await refreshTree()
+                        setExplorerModal(null)
+                      } catch (e) {
+                        await showErrorDialog(e instanceof Error ? e.message : String(e))
+                      }
+                      return
+                    }
+                    if (explorerModal.mode === 'newFolder') {
+                      const rel = `${explorerModal.dirPath.replaceAll('\\', '/')}/${name}`.replaceAll('//', '/')
+                      const ok = await showConfirm(`确认新建文件夹：${rel} ?`)
+                      if (!ok) return
+                      try {
+                        await createDir(rel)
+                        await refreshTree()
+                        setExplorerModal(null)
+                      } catch (e) {
+                        await showErrorDialog(e instanceof Error ? e.message : String(e))
+                      }
+                      return
+                    }
+                    const next = `${explorerModal.parentDir}/${name}`.replaceAll('//', '/')
+                    const ok = await showConfirm(`确认重命名为：${next} ?`)
+                    if (!ok) return
+                    try {
+                      await renameEntry(explorerModal.entry.path, next)
+                      await refreshTree()
+                      setExplorerModal(null)
+                    } catch (e) {
+                      await showErrorDialog(e instanceof Error ? e.message : String(e))
+                    }
+                  })()
+                }}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

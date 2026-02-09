@@ -1,0 +1,346 @@
+use crate::ai_types::ChatMessage;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::fs;
+use std::future::Future;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
+
+#[derive(Clone)]
+pub struct ToolContext {
+  pub workspace_root: PathBuf,
+}
+
+pub type ToolFn = Box<dyn Fn(&ToolContext, Value) -> Result<Value, String> + Send + Sync>;
+
+pub struct ToolRegistry {
+  tools: HashMap<String, ToolFn>,
+}
+
+impl ToolRegistry {
+  pub fn new() -> Self {
+    Self { tools: HashMap::new() }
+  }
+
+  pub fn register<F>(&mut self, name: &str, f: F)
+  where
+    F: Fn(&ToolContext, Value) -> Result<Value, String> + Send + Sync + 'static,
+  {
+    self.tools.insert(name.to_string(), Box::new(f));
+  }
+
+  pub fn call(&self, ctx: &ToolContext, name: &str, args: Value) -> Result<Value, String> {
+    let f = self.tools.get(name).ok_or_else(|| format!("unknown tool: {name}"))?;
+    f(ctx, args)
+  }
+
+  pub fn list(&self) -> Vec<String> {
+    let mut out = self.tools.keys().cloned().collect::<Vec<_>>();
+    out.sort();
+    out
+  }
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct MemoryItem {
+  pub key: String,
+  pub value: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct MemoryStoreData {
+  pub long_term: Vec<MemoryItem>,
+}
+
+pub struct MemoryStore {
+  path: PathBuf,
+  data: MemoryStoreData,
+}
+
+impl MemoryStore {
+  pub fn load(workspace_root: &Path) -> Self {
+    let path = workspace_root.join(".novel").join(".cache").join("agent_memory.json");
+    let data = fs::read_to_string(&path)
+      .ok()
+      .and_then(|raw| serde_json::from_str::<MemoryStoreData>(&raw).ok())
+      .unwrap_or_default();
+    Self { path, data }
+  }
+
+  pub fn save(&self) -> Result<(), String> {
+    if let Some(parent) = self.path.parent() {
+      fs::create_dir_all(parent).map_err(|e| format!("create memory dir failed: {e}"))?;
+    }
+    let raw = serde_json::to_string_pretty(&self.data).map_err(|e| format!("serialize memory failed: {e}"))?;
+    fs::write(&self.path, raw).map_err(|e| format!("write memory failed: {e}"))
+  }
+
+  pub fn upsert(&mut self, key: &str, value: &str) {
+    if let Some(it) = self.data.long_term.iter_mut().find(|x| x.key == key) {
+      it.value = value.to_string();
+      return;
+    }
+    self.data.long_term.push(MemoryItem {
+      key: key.to_string(),
+      value: value.to_string(),
+    });
+  }
+
+  pub fn search(&self, query: &str, limit: usize) -> Vec<MemoryItem> {
+    let q = query.to_lowercase();
+    self.data
+      .long_term
+      .iter()
+      .filter(|it| it.key.to_lowercase().contains(&q) || it.value.to_lowercase().contains(&q))
+      .take(limit)
+      .cloned()
+      .collect()
+  }
+
+  pub fn render(&self, limit: usize) -> String {
+    let mut out = String::new();
+    for it in self.data.long_term.iter().take(limit) {
+      out.push_str("- ");
+      out.push_str(it.key.trim());
+      out.push_str(": ");
+      out.push_str(it.value.trim());
+      out.push('\n');
+    }
+    out.trim().to_string()
+  }
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct AgentPerf {
+  pub steps: u32,
+  pub model_ms: u128,
+  pub tool_ms: u128,
+}
+
+pub struct AgentRuntime {
+  ctx: ToolContext,
+  tools: ToolRegistry,
+  memory: MemoryStore,
+}
+
+impl AgentRuntime {
+  pub fn new(workspace_root: PathBuf) -> Self {
+    let ctx = ToolContext {
+      workspace_root: workspace_root.clone(),
+    };
+    let memory = MemoryStore::load(&workspace_root);
+    let mut tools = ToolRegistry::new();
+    tools.register("fs_read_text", |ctx, args| {
+      let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "missing args.path".to_string())?;
+      if path.trim().is_empty() {
+        return Err("empty path".to_string());
+      }
+      let rel = PathBuf::from(path);
+      if rel.is_absolute() {
+        return Err("absolute path is not allowed".to_string());
+      }
+      let target = ctx.workspace_root.join(rel);
+      let raw = fs::read_to_string(target).map_err(|e| format!("read failed: {e}"))?;
+      Ok(serde_json::json!({ "text": raw }))
+    });
+    tools.register("fs_list_dir", |ctx, args| {
+      let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+      let rel = PathBuf::from(path);
+      if rel.is_absolute() {
+        return Err("absolute path is not allowed".to_string());
+      }
+      let target = ctx.workspace_root.join(rel);
+      let mut items: Vec<Value> = Vec::new();
+      for e in fs::read_dir(target).map_err(|e| format!("read dir failed: {e}"))? {
+        let e = e.map_err(|e| format!("read entry failed: {e}"))?;
+        let p = e.path();
+        let name = p.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let kind = if p.is_dir() { "dir" } else { "file" };
+        items.push(serde_json::json!({ "name": name, "kind": kind }));
+      }
+      Ok(serde_json::json!({ "items": items }))
+    });
+    Self { ctx, tools, memory }
+  }
+
+  pub fn tools(&self) -> Vec<String> {
+    let mut out = self.tools.list();
+    out.push("memory_upsert".to_string());
+    out.push("memory_search".to_string());
+    out.sort();
+    out
+  }
+
+  pub async fn run_react<F, Fut>(
+    &mut self,
+    base_messages: Vec<ChatMessage>,
+    agent_system_prompt: String,
+    call_model: F,
+  ) -> Result<(String, AgentPerf), String>
+  where
+    F: Fn(Vec<ChatMessage>) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+  {
+    let mut perf = AgentPerf::default();
+    let tool_list = self.tools();
+    let memory_text = self.memory.render(50);
+    let mut messages: Vec<ChatMessage> = Vec::new();
+    let react_prompt = format!(
+      "{sys}\n\n可用工具：{tools}\n\n当你需要调用工具时，严格使用三行格式：\\nACTION: tool_name\\nINPUT: {{...json...}}\\n然后等待 OBSERVATION。若无需工具，直接给出最终回答。",
+      sys = agent_system_prompt.trim(),
+      tools = tool_list.join(", ")
+    );
+    messages.push(ChatMessage {
+      role: "system".to_string(),
+      content: if memory_text.is_empty() {
+        react_prompt
+      } else {
+        format!("{react_prompt}\n\n长期记忆：\n{memory_text}")
+      },
+    });
+    messages.extend(base_messages);
+    let mut step = 0u32;
+    let max_steps = 6u32;
+    loop {
+      if step >= max_steps {
+        let last = messages.iter().rev().find(|m| m.role == "assistant").map(|m| m.content.clone()).unwrap_or_default();
+        return Ok((last, perf));
+      }
+      step += 1;
+      perf.steps = step;
+      let t0 = Instant::now();
+      let out = call_model(messages.clone()).await?;
+      perf.model_ms += t0.elapsed().as_millis();
+      if let Some(call) = parse_tool_call(&out) {
+        let t1 = Instant::now();
+        let result = if call.tool == "memory_upsert" {
+          let key = call
+            .args
+            .get("key")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "missing args.key".to_string())
+            .and_then(|s| if s.trim().is_empty() { Err("empty args.key".to_string()) } else { Ok(s) });
+          let value = call
+            .args
+            .get("value")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "missing args.value".to_string());
+          match (key, value) {
+            (Ok(k), Ok(v)) => {
+              self.memory.upsert(k, v);
+              let _ = self.memory.save();
+              Ok(serde_json::json!({ "ok": true }))
+            }
+            (Err(e), _) | (_, Err(e)) => Err(e),
+          }
+        } else if call.tool == "memory_search" {
+          let query = call
+            .args
+            .get("query")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "missing args.query".to_string())?;
+          let limit = call.args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+          let hits = self.memory.search(query, limit);
+          Ok(serde_json::to_value(hits).unwrap_or_else(|_| serde_json::json!([])))
+        } else {
+          self.tools.call(&self.ctx, &call.tool, call.args.clone())
+        };
+        perf.tool_ms += t1.elapsed().as_millis();
+        let obs = match result {
+          Ok(v) => v,
+          Err(e) => serde_json::json!({ "error": e }),
+        };
+        let obs_text = serde_json::to_string_pretty(&obs).unwrap_or_else(|_| obs.to_string());
+        messages.push(ChatMessage {
+          role: "assistant".to_string(),
+          content: out,
+        });
+        messages.push(ChatMessage {
+          role: "user".to_string(),
+          content: format!("OBSERVATION:\n{obs_text}"),
+        });
+        continue;
+      }
+      return Ok((out, perf));
+    }
+  }
+}
+
+#[derive(Clone)]
+pub struct ParsedToolCall {
+  pub tool: String,
+  pub args: Value,
+}
+
+pub fn parse_tool_call(text: &str) -> Option<ParsedToolCall> {
+  let mut tool: Option<String> = None;
+  let mut input: Option<String> = None;
+  for line in text.lines() {
+    let t = line.trim();
+    if t.to_ascii_uppercase().starts_with("ACTION:") {
+      tool = Some(t.splitn(2, ':').nth(1)?.trim().to_string());
+      continue;
+    }
+    if t.to_ascii_uppercase().starts_with("INPUT:") {
+      input = Some(t.splitn(2, ':').nth(1)?.trim().to_string());
+      continue;
+    }
+  }
+  let tool = tool?;
+  let input = input?;
+  let args: Value = serde_json::from_str(&input).ok().or_else(|| Some(serde_json::json!({ "raw": input })))?;
+  Some(ParsedToolCall { tool, args })
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct SkillDefinition {
+  pub id: String,
+  pub name: String,
+  pub system_prompt: String,
+}
+
+#[allow(dead_code)]
+pub fn default_skills() -> Vec<SkillDefinition> {
+  vec![
+    SkillDefinition {
+      id: "writing.outline".to_string(),
+      name: "生成章节大纲".to_string(),
+      system_prompt: "你是写作教练，产出结构清晰的章节大纲，并给出关键冲突与转折。".to_string(),
+    },
+    SkillDefinition {
+      id: "writing.polish".to_string(),
+      name: "润色改写".to_string(),
+      system_prompt: "你是文字编辑，在不改变含义的前提下优化表达、节奏与语气。".to_string(),
+    },
+  ]
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct McpKnowledgeItem {
+  pub id: String,
+  pub kind: String,
+  pub content: String,
+}
+
+#[allow(dead_code)]
+#[derive(Default)]
+pub struct McpBroker {
+  items: HashMap<String, McpKnowledgeItem>,
+}
+
+#[allow(dead_code)]
+impl McpBroker {
+  pub fn upsert(&mut self, item: McpKnowledgeItem) {
+    self.items.insert(item.id.clone(), item);
+  }
+
+  pub fn list(&self, limit: usize) -> Vec<McpKnowledgeItem> {
+    self.items.values().take(limit).cloned().collect()
+  }
+}

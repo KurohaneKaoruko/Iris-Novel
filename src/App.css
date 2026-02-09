@@ -99,6 +99,21 @@ body {
   padding: 0;
 }
 
+.explorer-search {
+  width: 100%;
+  background-color: #3c3c3c;
+  border: 1px solid #3c3c3c;
+  color: #cccccc;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+}
+
+.explorer-search:focus {
+  border-color: #007fd4;
+}
+
 /* File Explorer */
 .file-tree {
   padding: 5px 0;
@@ -476,6 +491,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  user-select: text;
 }
 
 .message {
@@ -484,6 +500,7 @@ body {
   font-size: 13px;
   line-height: 1.5;
   max-width: 90%;
+  user-select: text;
 }
 
 .message.user {
@@ -713,6 +730,38 @@ body {
 }
 
 .icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 2000;
+  background-color: #252526;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 160px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+.context-menu-item {
+  width: 100%;
+  background: none;
+  border: none;
+  color: #cccccc;
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.context-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.context-menu-item.disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

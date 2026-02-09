@@ -12,9 +12,9 @@ export async function chatGenerateStream(args: {
   agentId?: string | null
 }): Promise<void> {
   return invoke<void>('chat_generate_stream', {
-    stream_id: args.streamId,
+    streamId: args.streamId,
     messages: args.messages,
-    use_markdown: args.useMarkdown,
-    agent_id: args.agentId ?? null,
+    useMarkdown: args.useMarkdown,
+    agentId: args.agentId ?? null,
   })
 }

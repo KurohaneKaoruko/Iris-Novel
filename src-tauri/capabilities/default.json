@@ -13,6 +13,8 @@
     "core:resources:default",
     "core:menu:default",
     "core:tray:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "dialog:allow-confirm",
+    "dialog:allow-message"
   ]
 }

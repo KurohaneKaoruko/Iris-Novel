@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod ai_types;
+mod agent_system;
 mod app_settings;
 mod agents;
 mod chat_history;
@@ -19,6 +21,9 @@ fn main() {
       commands::read_text,
       commands::write_text,
       commands::create_file,
+      commands::create_dir,
+      commands::delete_entry,
+      commands::rename_entry,
       commands::get_app_settings,
       commands::set_app_settings,
       commands::get_agents,

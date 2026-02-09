@@ -68,15 +68,27 @@ export async function listWorkspaceTree(maxDepth = 6): Promise<FsEntry> {
 }
 
 export async function readText(path: string): Promise<string> {
-  return invoke<string>('read_text', { relative_path: path })
+  return invoke<string>('read_text', { relativePath: path })
 }
 
 export async function writeText(path: string, content: string): Promise<void> {
-  return invoke<void>('write_text', { relative_path: path, content })
+  return invoke<void>('write_text', { relativePath: path, content })
 }
 
 export async function createFile(path: string): Promise<void> {
-  return invoke<void>('create_file', { relative_path: path })
+  return invoke<void>('create_file', { relativePath: path })
+}
+
+export async function createDir(path: string): Promise<void> {
+  return invoke<void>('create_dir', { relativePath: path })
+}
+
+export async function deleteEntry(path: string): Promise<void> {
+  return invoke<void>('delete_entry', { relativePath: path })
+}
+
+export async function renameEntry(fromPath: string, toPath: string): Promise<void> {
+  return invoke<void>('rename_entry', { fromRelativePath: fromPath, toRelativePath: toPath })
 }
 
 export async function getAppSettings(): Promise<AppSettings> {
@@ -101,7 +113,7 @@ export async function getAgents(): Promise<Agent[]> {
 }
 
 export async function setAgents(agents_list: Agent[]): Promise<void> {
-  return invoke<void>('set_agents', { agents_list })
+  return invoke<void>('set_agents', { agentsList: agents_list })
 }
 
 export async function exportAgents(): Promise<string> {
@@ -169,7 +181,7 @@ export async function saveChatSession(session: ChatSession): Promise<void> {
 }
 
 export async function listChatSessions(workspace_root?: string | null): Promise<ChatSessionSummary[]> {
-  return invoke<ChatSessionSummary[]>('list_chat_sessions', { workspace_root: workspace_root ?? null })
+  return invoke<ChatSessionSummary[]>('list_chat_sessions', { workspaceRoot: workspace_root ?? null })
 }
 
 export async function getChatSession(id: string): Promise<ChatSession> {
