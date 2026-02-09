@@ -1,4 +1,5 @@
 use crate::ai_types::ChatMessage;
+use crate::commands;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -139,20 +140,18 @@ impl AgentRuntime {
       if path.trim().is_empty() {
         return Err("empty path".to_string());
       }
-      let rel = PathBuf::from(path);
-      if rel.is_absolute() {
-        return Err("absolute path is not allowed".to_string());
-      }
+      let rel = commands::validate_relative_path(path)?;
       let target = ctx.workspace_root.join(rel);
       let raw = fs::read_to_string(target).map_err(|e| format!("read failed: {e}"))?;
       Ok(serde_json::json!({ "text": raw }))
     });
     tools.register("fs_list_dir", |ctx, args| {
       let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-      let rel = PathBuf::from(path);
-      if rel.is_absolute() {
-        return Err("absolute path is not allowed".to_string());
-      }
+      let rel = if path.trim().is_empty() {
+        PathBuf::from("")
+      } else {
+        commands::validate_relative_path(path)?
+      };
       let target = ctx.workspace_root.join(rel);
       let mut items: Vec<Value> = Vec::new();
       for e in fs::read_dir(target).map_err(|e| format!("read dir failed: {e}"))? {
@@ -163,6 +162,75 @@ impl AgentRuntime {
         items.push(serde_json::json!({ "name": name, "kind": kind }));
       }
       Ok(serde_json::json!({ "items": items }))
+    });
+    tools.register("fs_exists", |ctx, args| {
+      let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "missing args.path".to_string())?;
+      if path.trim().is_empty() {
+        return Err("empty path".to_string());
+      }
+      let rel = commands::validate_relative_path(path)?;
+      let target = ctx.workspace_root.join(rel);
+      let md = match fs::metadata(&target) {
+        Ok(v) => v,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+          return Ok(serde_json::json!({ "exists": false }))
+        }
+        Err(e) => return Err(format!("stat failed: {e}")),
+      };
+      let kind = if md.is_dir() { "dir" } else { "file" };
+      Ok(serde_json::json!({ "exists": true, "kind": kind }))
+    });
+    tools.register("fs_create_dir", |ctx, args| {
+      let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "missing args.path".to_string())?;
+      if path.trim().is_empty() {
+        return Err("empty path".to_string());
+      }
+      let rel = commands::validate_relative_path(path)?;
+      let target = ctx.workspace_root.join(rel);
+      fs::create_dir_all(&target).map_err(|e| format!("create dir failed: {e}"))?;
+      Ok(serde_json::json!({ "ok": true }))
+    });
+    tools.register("fs_write_text", |ctx, args| {
+      let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "missing args.path".to_string())?;
+      let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
+      if path.trim().is_empty() {
+        return Err("empty path".to_string());
+      }
+      let rel_norm = path.replace('\\', "/");
+      if (rel_norm.starts_with("concept/") || rel_norm.starts_with("outline/") || rel_norm.starts_with("stories/"))
+        && !rel_norm.to_lowercase().ends_with(".md")
+      {
+        return Err("concept/outline/stories 目录仅允许写入 .md 文件".to_string());
+      }
+      let rel = commands::validate_relative_path(path)?;
+      let target = ctx.workspace_root.join(rel);
+      if rel_norm == ".novel/.cache/outline.json" {
+        let existing = if target.exists() {
+          fs::read_to_string(&target).unwrap_or_default()
+        } else {
+          String::new()
+        };
+        commands::validate_outline(&existing, text)?;
+      }
+      if let Some(parent) = target.parent() {
+        if !parent.exists() {
+          return Err("parent directory does not exist; create it first".to_string());
+        }
+      }
+      fs::write(&target, text).map_err(|e| format!("write failed: {e}"))?;
+      if rel_norm.starts_with("concept/") && rel_norm.to_lowercase().ends_with(".md") {
+        commands::update_concept_index(&ctx.workspace_root, &rel_norm, text)?;
+      }
+      Ok(serde_json::json!({ "ok": true }))
     });
     Self { ctx, tools, memory }
   }
@@ -190,7 +258,7 @@ impl AgentRuntime {
     let memory_text = self.memory.render(50);
     let mut messages: Vec<ChatMessage> = Vec::new();
     let react_prompt = format!(
-      "{sys}\n\n可用工具：{tools}\n\n当你需要调用工具时，严格使用三行格式：\\nACTION: tool_name\\nINPUT: {{...json...}}\\n然后等待 OBSERVATION。若无需工具，直接给出最终回答。",
+      "{sys}\n\n可用工具：{tools}\n\n当你需要调用工具时，严格使用三行格式：\\nACTION: tool_name\\nINPUT: {{...json...}}\\n然后等待 OBSERVATION。若无需工具，直接给出最终回答。\n\n文件系统规则：\n1) 所有 path 必须是相对路径，禁止绝对路径与 ..。\n2) 写文件不会自动创建父目录；若目录不存在，先用 fs_exists 检查，再用 fs_create_dir 创建。\n3) concept/、outline/、stories/ 下仅允许 .md 文件。",
       sys = agent_system_prompt.trim(),
       tools = tool_list.join(", ")
     );

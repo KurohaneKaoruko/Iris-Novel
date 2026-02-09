@@ -195,6 +195,13 @@ function App() {
 
   const saveProjectSettings = useCallback(async () => {
     if (!workspaceRoot) return
+    if (isTauriApp()) {
+      try {
+        await initNovel()
+      } catch {
+        return
+      }
+    }
     const raw = JSON.stringify({ chapter_word_target: chapterWordTarget }, null, 2)
     await writeText('.novel/.settings/project.json', raw)
   }, [workspaceRoot, chapterWordTarget])
@@ -342,7 +349,19 @@ function App() {
       const mm = String(now.getMonth() + 1).padStart(2, '0')
       const dd = String(now.getDate()).padStart(2, '0')
       const fileName = `stories/chapter-${yyyy}${mm}${dd}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.md`
-      await createFile(fileName)
+      try {
+        await createFile(fileName)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (msg.includes("parent directory does not exist")) {
+          const ok = await showConfirm('stories/ 目录不存在，是否创建？')
+          if (!ok) throw e
+          await createDir('stories')
+          await createFile(fileName)
+        } else {
+          throw e
+        }
+      }
       await refreshTree()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -520,6 +539,23 @@ function App() {
     }
     await message(text, { title: '错误', kind: 'error' })
   }, [])
+
+  const persistAppSettings = useCallback(
+    async (next: AppSettings, prev?: AppSettings | null) => {
+      try {
+        await setAppSettings(next)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        await showErrorDialog(`保存设置失败：${msg}`)
+        if (prev) {
+          setAppSettingsState(prev)
+        } else {
+          await reloadAppSettings()
+        }
+      }
+    },
+    [reloadAppSettings, showErrorDialog],
+  )
 
   const openChatContextMenu = useCallback((e: MouseEvent, message: string) => {
     e.preventDefault()
@@ -1079,12 +1115,11 @@ function App() {
                       value={appSettings?.active_agent_id ?? ''}
                       onChange={(e) => {
                         const id = e.target.value
-                        setAppSettingsState((prev) => {
-                          if (!prev) return prev
-                          const next = { ...prev, active_agent_id: id }
-                          void setAppSettings(next)
-                          return next
-                        })
+                        if (!appSettings) return
+                        const prev = appSettings
+                        const next = { ...appSettings, active_agent_id: id }
+                        setAppSettingsState(next)
+                        void persistAppSettings(next, prev)
                       }}
                     >
                       {agentsList.length === 0 ? <option value="">无智能体</option> : null}
@@ -1101,12 +1136,11 @@ function App() {
                       value={effectiveProviderId}
                       onChange={(e) => {
                         const active = e.target.value
-                        setAppSettingsState((prev) => {
-                          if (!prev) return prev
-                          const next = { ...prev, active_provider_id: active }
-                          void setAppSettings(next)
-                          return next
-                        })
+                        if (!appSettings) return
+                        const prev = appSettings
+                        const next = { ...appSettings, active_provider_id: active }
+                        setAppSettingsState(next)
+                        void persistAppSettings(next, prev)
                       }}
                     >
                       {appSettings?.providers.map((p) => (
@@ -1310,12 +1344,10 @@ function App() {
                               className="icon-button"
                               title="设为默认"
                               onClick={() => {
-                                setAppSettingsState((prev) => {
-                                  if (!prev) return prev
-                                  const next = { ...prev, active_provider_id: p.id }
-                                  void setAppSettings(next)
-                                  return next
-                                })
+                                const prev = appSettings
+                                const next = { ...appSettings, active_provider_id: p.id }
+                                setAppSettingsState(next)
+                                void persistAppSettings(next, prev)
                               }}
                             >
                               ★
@@ -1337,19 +1369,19 @@ function App() {
                             title="删除"
                             disabled={appSettings.providers.length <= 1}
                             onClick={() => {
-                              if (!confirm('确定删除该模型配置？')) return
-                              setAppSettingsState((prev) => {
-                                if (!prev) return prev
-                                const nextProviders = prev.providers.filter((x) => x.id !== p.id)
-                                // If we deleted the active one, fallback to the first available
-                                let nextActive = prev.active_provider_id
+                              void (async () => {
+                                const ok = await showConfirm('确定删除该模型配置？')
+                                if (!ok) return
+                                const prev = appSettings
+                                const nextProviders = appSettings.providers.filter((x) => x.id !== p.id)
+                                let nextActive = appSettings.active_provider_id
                                 if (p.id === nextActive) {
                                   nextActive = nextProviders[0]?.id ?? ''
                                 }
-                                const next = { ...prev, providers: nextProviders, active_provider_id: nextActive }
-                                void setAppSettings(next)
-                                return next
-                              })
+                                const next = { ...appSettings, providers: nextProviders, active_provider_id: nextActive }
+                                setAppSettingsState(next)
+                                await persistAppSettings(next, prev)
+                              })()
                             }}
                           >
                             🗑️
@@ -1498,9 +1530,24 @@ function App() {
                 <button
                   className="primary-button"
                   onClick={() => {
-                    void setAppSettings(appSettings)
-                    void setAgents(agentsList)
-                    setShowSettings(false)
+                    void (async () => {
+                      try {
+                        await setAppSettings(appSettings)
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e)
+                        await showErrorDialog(`保存设置失败：${msg}`)
+                        return
+                      }
+                      try {
+                        await setAgents(agentsList)
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : String(e)
+                        await showErrorDialog(`保存智能体失败：${msg}`)
+                        return
+                      }
+                      await reloadAppSettings()
+                      setShowSettings(false)
+                    })()
                   }}
                 >
                   保存并关闭
@@ -1580,19 +1627,28 @@ function App() {
                 className="primary-button"
                 disabled={!editingProvider.name || !editingProvider.model_name}
                 onClick={() => {
-                  setAppSettingsState((prev) => {
-                    if (!prev) return prev
-                    let nextProviders = [...prev.providers]
+                  if (!appSettings) return
+                  void (async () => {
+                    const prev = appSettings
+                    let nextProviders = [...appSettings.providers]
                     if (isNewProvider) {
                       nextProviders.push(editingProvider as ModelProvider)
                     } else {
                       nextProviders = nextProviders.map((p) => (p.id === editingProvider.id ? (editingProvider as ModelProvider) : p))
                     }
-                    const next = { ...prev, providers: nextProviders }
-                    void setAppSettings(next)
-                    return next
-                  })
-                  setShowModelModal(false)
+                    const next = { ...appSettings, providers: nextProviders }
+                    setAppSettingsState(next)
+                    try {
+                      await setAppSettings(next)
+                    } catch (e) {
+                      const msg = e instanceof Error ? e.message : String(e)
+                      await showErrorDialog(`保存设置失败：${msg}`)
+                      setAppSettingsState(prev)
+                      return
+                    }
+                    await reloadAppSettings()
+                    setShowModelModal(false)
+                  })()
                 }}
               >
                 保存

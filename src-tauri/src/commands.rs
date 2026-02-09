@@ -46,9 +46,6 @@ pub fn init_novel(state: State<'_, AppState>) -> Result<(), String> {
   let novel_dir = root.join(".novel");
 
   let dirs = [
-    root.join("concept"),
-    root.join("outline"),
-    root.join("stories"),
     novel_dir.join(".settings"),
     novel_dir.join(".cache"),
   ];
@@ -93,35 +90,6 @@ pub fn init_novel(state: State<'_, AppState>) -> Result<(), String> {
   if !relations_path.exists() {
     let raw = serde_json::json!({ "relations": [] }).to_string();
     fs::write(relations_path, raw).map_err(|e| format!("write relations failed: {e}"))?;
-  }
-
-  let concept_readme = root.join("concept").join("README.md");
-  if !concept_readme.exists() {
-    fs::write(
-      concept_readme,
-      "# Concept\n\n在此目录放置世界观、人物、术语等设定文档（仅 .md）。\n",
-    )
-    .map_err(|e| format!("write concept readme failed: {e}"))?;
-  }
-
-  let characters_md = root.join("concept").join("characters.md");
-  if !characters_md.exists() {
-    fs::write(characters_md, "# Characters\n\n- 主角\n- 配角\n").map_err(|e| format!("write characters.md failed: {e}"))?;
-  }
-
-  let relations_md = root.join("concept").join("relations.md");
-  if !relations_md.exists() {
-    fs::write(relations_md, "# Relations\n\n主角 -> 配角 : 关系\n").map_err(|e| format!("write relations.md failed: {e}"))?;
-  }
-
-  let outline_md = root.join("outline").join("outline.md");
-  if !outline_md.exists() {
-    fs::write(outline_md, "# Outline\n\n- 第1章：\n- 第2章：\n").map_err(|e| format!("write outline.md failed: {e}"))?;
-  }
-
-  let stories_readme = root.join("stories").join("README.md");
-  if !stories_readme.exists() {
-    fs::write(stories_readme, "# Stories\n\n在此目录放置章节正文（仅 .md）。\n").map_err(|e| format!("write stories readme failed: {e}"))?;
   }
 
   Ok(())
@@ -176,7 +144,9 @@ pub fn write_text(
   }
 
   if let Some(parent) = target.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create dir failed: {e}"))?;
+    if !parent.exists() {
+      return Err("parent directory does not exist; create it first".to_string());
+    }
   }
   fs::write(&target, &content).map_err(|e| format!("write failed: {e}"))?;
 
@@ -199,7 +169,9 @@ pub fn create_file(state: State<'_, AppState>, relative_path: String) -> Result<
   }
   let target = root.join(rel);
   if let Some(parent) = target.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create dir failed: {e}"))?;
+    if !parent.exists() {
+      return Err("parent directory does not exist; create it first".to_string());
+    }
   }
   fs::write(target, "").map_err(|e| format!("create file failed: {e}"))
 }
@@ -533,7 +505,21 @@ pub fn chat_generate_stream(
     let payload_start = serde_json::json!({ "streamId": stream_id });
     let _ = window.emit("ai_stream_start", payload_start);
 
-    let settings = app_settings::load(&app).unwrap_or_default();
+    let settings = match app_settings::load(&app) {
+      Ok(v) => v,
+      Err(e) => {
+        let _ = window.emit(
+          "ai_error",
+          serde_json::json!({
+            "streamId": stream_id,
+            "stage": "settings",
+            "message": e
+          }),
+        );
+        let _ = window.emit("ai_stream_done", serde_json::json!({ "streamId": stream_id }));
+        return;
+      }
+    };
     let effective_use_markdown = use_markdown || settings.output.use_markdown;
     let agents_list = agents::load(&app).unwrap_or_else(|_| agents::default_agents());
     let effective_agent_id = agent_id.unwrap_or_else(|| settings.active_agent_id.clone());
@@ -555,7 +541,10 @@ pub fn chat_generate_stream(
       Ok(p) => p.clone(),
       Err(e) => {
         eprintln!("ai_error: {}", e);
-        let _ = window.emit("ai_error", serde_json::json!({ "streamId": stream_id, "message": e }));
+        let _ = window.emit(
+          "ai_error",
+          serde_json::json!({ "streamId": stream_id, "stage": "settings", "message": e }),
+        );
         let _ = window.emit("ai_stream_done", serde_json::json!({ "streamId": stream_id }));
         return;
       }
@@ -661,12 +650,12 @@ async fn call_openai_compatible(
   temperature_override: Option<f32>,
   max_tokens_override: Option<u32>,
 ) -> Result<String, String> {
-  // Try to load secret by ID first (e.g. "openai" or "deepseek"), fallback to cfg.api_key
-  let api_key = secrets::get_api_key(&cfg.id)
-    .ok()
-    .flatten()
-    .unwrap_or_else(|| cfg.api_key.trim().to_string());
-    
+  let api_key = match secrets::get_api_key(&cfg.id) {
+    Ok(Some(v)) => v,
+    Ok(None) => cfg.api_key.trim().to_string(),
+    Err(e) => return Err(format!("keyring read failed: {e}")),
+  };
+
   if api_key.trim().is_empty() {
     return Err("api key is empty".to_string());
   }
@@ -713,10 +702,11 @@ async fn call_anthropic(
   system_prompt: &str,
   max_tokens_override: Option<u32>,
 ) -> Result<String, String> {
-  let api_key = secrets::get_api_key(&cfg.id)
-    .ok()
-    .flatten()
-    .unwrap_or_else(|| cfg.api_key.trim().to_string());
+  let api_key = match secrets::get_api_key(&cfg.id) {
+    Ok(Some(v)) => v,
+    Ok(None) => cfg.api_key.trim().to_string(),
+    Err(e) => return Err(format!("keyring read failed: {e}")),
+  };
   if api_key.trim().is_empty() {
     return Err("api key is empty".to_string());
   }
@@ -797,7 +787,7 @@ fn start_fs_watcher(app: &AppHandle, state: &State<'_, AppState>, root: PathBuf)
   Ok(())
 }
 
-fn validate_relative_path(relative_path: &str) -> Result<PathBuf, String> {
+pub(crate) fn validate_relative_path(relative_path: &str) -> Result<PathBuf, String> {
   let p = PathBuf::from(relative_path);
   if p.is_absolute() {
     return Err("absolute path is not allowed".to_string());
@@ -823,7 +813,7 @@ fn normalize_plaintext(s: &str) -> String {
   out.join("\n").trim().to_string()
 }
 
-fn update_concept_index(root: &Path, rel_path: &str, content: &str) -> Result<(), String> {
+pub(crate) fn update_concept_index(root: &Path, rel_path: &str, content: &str) -> Result<(), String> {
   #[derive(Serialize, Deserialize, Default)]
   struct ConceptIndex {
     revision: u64,
@@ -874,7 +864,7 @@ fn update_concept_index(root: &Path, rel_path: &str, content: &str) -> Result<()
   fs::write(index_path, raw).map_err(|e| format!("write concept index failed: {e}"))
 }
 
-fn validate_outline(existing_json: &str, new_json: &str) -> Result<(), String> {
+pub(crate) fn validate_outline(existing_json: &str, new_json: &str) -> Result<(), String> {
   #[derive(Deserialize, Default)]
   struct Outline {
     #[serde(default)]
