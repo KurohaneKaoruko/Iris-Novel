@@ -5,7 +5,6 @@ import type { editor as MonacoEditor } from 'monaco-editor'
 import './App.css'
 import {
   createFile,
-  exportAgents,
   getAgents,
   getAppSettings,
   gitCommit,
@@ -13,10 +12,10 @@ import {
   gitInit,
   gitLog,
   gitStatus,
-  importAgents,
   initNovel,
   isTauriApp,
   listWorkspaceTree,
+  openFolderDialog,
   readText,
   setAgents,
   setAppSettings,
@@ -45,6 +44,11 @@ type ChatItem = {
 }
 
 function App() {
+  // Activity Bar State
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'git'>('files')
+  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | null>('chat')
+
+  // Workspace & Files
   const [workspaceInput, setWorkspaceInput] = useState('')
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null)
   const [tree, setTree] = useState<FsEntry | null>(null)
@@ -53,11 +57,13 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Editors & Refs
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
-  const chatInputRef = useRef<HTMLInputElement | null>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
   const graphCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
+  // Chat State
   const [chatMessages, setChatMessages] = useState<ChatItem[]>([])
   const [chatInput, setChatInput] = useState('')
   const streamIdRef = useRef<string | null>(null)
@@ -66,12 +72,13 @@ function App() {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
   )
 
+  // Settings & Agents
   const [appSettings, setAppSettingsState] = useState<AppSettings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [agentsList, setAgentsList] = useState<Agent[]>([])
   const [agentEditorId, setAgentEditorId] = useState<string>('')
-  const [agentsJson, setAgentsJson] = useState<string>('')
 
+  // Git State
   const [gitItems, setGitItems] = useState<GitStatusItem[]>([])
   const [gitCommits, setGitCommits] = useState<GitCommitInfo[]>([])
   const [gitCommitMsg, setGitCommitMsg] = useState('')
@@ -79,9 +86,9 @@ function App() {
   const [gitDiffText, setGitDiffText] = useState('')
   const [gitError, setGitError] = useState<string | null>(null)
 
+  // Stats & Visuals
   const [chapterWordTarget, setChapterWordTarget] = useState<number>(2000)
   const [writingSeconds, setWritingSeconds] = useState<number>(0)
-  const [showGraph, setShowGraph] = useState(false)
   const [graphNodes, setGraphNodes] = useState<Array<{ id: string; name: string }>>([])
   const [graphEdges, setGraphEdges] = useState<Array<{ from: string; to: string; type?: string }>>([])
 
@@ -90,6 +97,8 @@ function App() {
     if (!activeFile) return 0
     return activeFile.content.replace(/\s/g, '').length
   }, [activeFile])
+
+  // --- Actions ---
 
   const refreshTree = useCallback(async () => {
     if (!workspaceRoot) return
@@ -181,10 +190,17 @@ function App() {
     setBusy(true)
     try {
       if (!isTauriApp()) {
-        throw new Error('当前未运行在 Tauri 环境（浏览器预览仅展示 UI）')
+        const info = await setWorkspace(workspaceInput.trim())
+        setWorkspaceRoot(info.root)
+      } else {
+        const selected = await openFolderDialog()
+        if (!selected) {
+          setBusy(false)
+          return
+        }
+        const info = await setWorkspace(selected)
+        setWorkspaceRoot(info.root)
       }
-      const info = await setWorkspace(workspaceInput.trim())
-      setWorkspaceRoot(info.root)
       const t = await listWorkspaceTree(6)
       setTree(t)
       await refreshGit()
@@ -353,15 +369,17 @@ function App() {
       const pad = { paddingLeft: `${depth * 12}px` }
       if (entry.kind === 'file') {
         return (
-          <div className="treeRow treeFile" style={pad} onClick={() => void onOpenFile(entry)}>
+          <div className="file-tree-item" style={pad} onClick={() => void onOpenFile(entry)}>
+            <span className="file-icon file">📄</span>
             {entry.name}
           </div>
         )
       }
       return (
         <div>
-          <div className="treeRow treeDir" style={pad} onClick={() => setOpen((v) => !v)}>
-            {open ? '▾' : '▸'} {entry.name}
+          <div className="file-tree-item" style={pad} onClick={() => setOpen((v) => !v)}>
+            <span className="file-icon">{open ? '📂' : '📁'}</span>
+            {entry.name}
           </div>
           {open && entry.children.map((c) => <TreeNodeInner key={c.path} entry={c} depth={depth + 1} />)}
         </div>
@@ -409,7 +427,6 @@ function App() {
     const user: ChatItem = { id: newId(), role: 'user', content }
     const assistantId = newId()
     const assistant: ChatItem = { id: assistantId, role: 'assistant', content: '', streaming: true }
-
     const streamId = newId()
     streamIdRef.current = streamId
     assistantIdRef.current = assistantId
@@ -481,6 +498,8 @@ function App() {
     void onSendChat(prompt)
   }, [activeFile, chapterWordTarget, activeCharCount, onSendChat])
 
+  // --- Effects ---
+
   useEffect(() => {
     if (!isTauriApp()) return
     void getAppSettings()
@@ -496,9 +515,7 @@ function App() {
 
   useEffect(() => {
     if (!isTauriApp()) return
-
     const unlistenFns: Array<() => void> = []
-
     void listen('ai_stream_token', (event) => {
       const payload: unknown = event.payload
       if (!payload || typeof payload !== 'object') return
@@ -561,35 +578,38 @@ function App() {
   }, [activePath])
 
   useEffect(() => {
-    if (!showGraph) return
+    // Only render graph if the tab is active
+    if (activeRightTab !== 'graph') return
     const canvas = graphCanvasRef.current
     if (!canvas) return
-
-    const cssW = 760
-    const cssH = 520
+    // Adjust size based on container? For now use fixed-ish or flexible CSS
+    // We'll rely on ResizeObserver or simple effect
+    const cssW = canvas.clientWidth || 300
+    const cssH = canvas.clientHeight || 500
     const dpr = window.devicePixelRatio || 1
     canvas.width = Math.floor(cssW * dpr)
     canvas.height = Math.floor(cssH * dpr)
-    canvas.style.width = `${cssW}px`
-    canvas.style.height = `${cssH}px`
-
+    // canvas.style.width is handled by CSS (100%)
+    
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, cssW, cssH)
-
+    
     const nodes = graphNodes.slice()
     const n = nodes.length
     const cx = cssW / 2
     const cy = cssH / 2
     const r = Math.min(cssW, cssH) * 0.35
+    
     const placed = nodes.map((node, i) => {
       const a = (Math.PI * 2 * i) / Math.max(1, n)
       return { ...node, x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
     })
+    
     const byId = new Map<string, { id: string; name: string; x: number; y: number }>()
     for (const p of placed) byId.set(p.id, p)
-
+    
     ctx.lineWidth = 1
     ctx.strokeStyle = '#3a3a3a'
     for (const e of graphEdges) {
@@ -601,7 +621,6 @@ function App() {
       ctx.lineTo(b.x, b.y)
       ctx.stroke()
     }
-
     for (const p of placed) {
       ctx.beginPath()
       ctx.fillStyle = '#2a2a2a'
@@ -609,571 +628,637 @@ function App() {
       ctx.fill()
       ctx.strokeStyle = '#4a4a4a'
       ctx.stroke()
-
       ctx.fillStyle = '#d4d4d4'
       ctx.font = '12px system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(p.name, p.x, p.y)
     }
-  }, [showGraph, graphNodes, graphEdges])
+  }, [activeRightTab, graphNodes, graphEdges]) // Re-render when tab changes or data changes
+
+  // --- Render ---
 
   return (
-    <div className="appShell">
-      <header className="appTopbar">
-        <div className="appTitle">Iris-Creation</div>
-        <div className="appTopbarSpacer" />
-        <input
-          className="topbarInput"
-          value={workspaceInput}
-          onChange={(e) => setWorkspaceInput(e.target.value)}
-          placeholder="输入工作区路径，例如 D:\\Novels\\MyBook"
-        />
-        <button className="topbarButton" disabled={busy || !workspaceInput.trim()} onClick={() => void onOpenWorkspace()}>
-          打开
-        </button>
-        <button className="topbarButton" disabled={busy || !workspaceRoot} onClick={() => void refreshTree()}>
-          刷新
-        </button>
-        <button className="topbarButton" disabled={busy || !workspaceRoot} onClick={() => void onNewChapter()}>
-          新建章节
-        </button>
-        <button className="topbarButton" disabled={busy || !activeFile || !activeFile.dirty} onClick={() => void onSaveActive()}>
-          保存
-        </button>
-        <button
-          className="topbarButton"
-          disabled={!workspaceRoot}
-          onClick={() => {
-            setShowGraph(true)
-            void loadGraph()
-          }}
-        >
-          关系图谱
-        </button>
-        {workspaceRoot ? (
-          <>
-            <div className="topbarLabel">章目标</div>
-            <input
-              className="topbarInputSmall"
-              type="number"
-              min={1}
-              value={chapterWordTarget}
-              onChange={(e) => setChapterWordTarget(Number(e.target.value) || 0)}
-              onBlur={() => void saveProjectSettings()}
-            />
-          </>
-        ) : null}
-        <div className="appTopbarRight">Workspace: {workspaceRoot ?? '未打开'}</div>
-      </header>
+    <div className="app-container">
+      <div className="workbench-body">
+        {/* Activity Bar (Left) */}
+        <div className="activity-bar">
+          <div
+            className={`activity-bar-item ${activeSidebarTab === 'files' ? 'active' : ''}`}
+            onClick={() => setActiveSidebarTab('files')}
+            title="资源管理器"
+          >
+            <span className="activity-bar-icon">📁</span>
+          </div>
+          <div
+            className={`activity-bar-item ${activeSidebarTab === 'git' ? 'active' : ''}`}
+            onClick={() => setActiveSidebarTab('git')}
+            title="源代码管理"
+          >
+            <span className="activity-bar-icon">📦</span>
+          </div>
+          <div className="spacer" />
+          <div className="activity-bar-item" onClick={() => setShowSettings(true)} title="设置">
+            <span className="activity-bar-icon">⚙️</span>
+          </div>
+        </div>
 
-      <div className="appBody">
-        <aside className="appSidebar">
-          <div className="panelHeader">资源</div>
-          <div className="panelBody panelScroll">
-            {error ? <div className="errorText">{error}</div> : null}
-            {filteredTree ? <TreeNode entry={filteredTree} depth={0} /> : <div>未加载</div>}
-          </div>
-          <div className="panelHeader">大纲</div>
-          <div className="panelBody">
-            <button className="topbarButton" disabled={!workspaceRoot} onClick={() => void onOpenByPath('outline/outline.md')}>
-              打开 outline.md
-            </button>
-            <div style={{ marginTop: '10px', color: '#9b9b9b', fontSize: '12px' }}>
-              在 outline/ 目录维护章节大纲（仅 .md 文档）。
+        {/* Sidebar Panel (Left) */}
+        <div className="sidebar">
+        {activeSidebarTab === 'files' ? (
+          <>
+            <div className="sidebar-header">
+              <span>资源管理器</span>
+              <div style={{ flex: 1 }} />
+              {workspaceRoot ? (
+                <button className="icon-button" onClick={() => void refreshTree()} title="刷新">
+                  ↻
+                </button>
+              ) : null}
             </div>
-          </div>
-          <div className="panelHeader">Git</div>
-          <div className="panelBody panelScroll">
-            {gitError ? <div className="errorText">{gitError}</div> : null}
-            <div className="gitToolbar">
-              <button className="topbarButton" disabled={busy || !workspaceRoot} onClick={() => void onGitInit()}>
-                初始化
-              </button>
-              <button className="topbarButton" disabled={busy || !workspaceRoot} onClick={() => void refreshGit()}>
-                刷新
-              </button>
-            </div>
-            <div className="gitStatusList">
-              {gitItems.length === 0 ? (
-                <div className="gitEmpty">无变更</div>
-              ) : (
-                gitItems.map((it) => (
-                  <div
-                    key={it.path}
-                    className={gitSelectedPath === it.path ? 'gitRow gitRowActive' : 'gitRow'}
-                    onClick={() => void onGitSelect(it.path)}
-                  >
-                    <span className="gitStatus">{it.status}</span>
-                    <span className="gitPath">{it.path}</span>
+            <div className="sidebar-content">
+              {workspaceRoot ? (
+                <>
+                  <div style={{ padding: '10px 20px', fontSize: '12px', fontWeight: 'bold', borderBottom: '1px solid #333' }}>
+                    {workspaceRoot.split(/[/\\]/).pop()}
                   </div>
-                ))
+                  {error ? <div className="error-text">{error}</div> : null}
+                  {filteredTree ? <TreeNode entry={filteredTree} depth={0} /> : <div style={{ padding: 10 }}>加载中...</div>}
+                </>
+              ) : (
+                <div style={{ padding: 20, textAlign: 'center' }}>
+                  <button className="primary-button" onClick={() => void onOpenWorkspace()}>
+                    打开文件夹
+                  </button>
+                  {error ? <div className="error-text">{error}</div> : null}
+                  {!isTauriApp() && (
+                    <input
+                      style={{ width: '100%', marginTop: 10, padding: 4 }}
+                      value={workspaceInput}
+                      onChange={(e) => setWorkspaceInput(e.target.value)}
+                      placeholder="或输入路径"
+                    />
+                  )}
+                </div>
               )}
             </div>
-            {gitSelectedPath ? <pre className="gitDiff">{gitDiffText}</pre> : null}
-            <div className="gitCommitBox">
-              <input
-                className="gitInput"
-                value={gitCommitMsg}
-                onChange={(e) => setGitCommitMsg(e.target.value)}
-                placeholder="提交信息"
-              />
-              <button className="topbarButton" disabled={busy || !gitCommitMsg.trim()} onClick={() => void onGitCommit()}>
-                提交
-              </button>
+            {workspaceRoot ? (
+              <>
+                <div className="sidebar-header">大纲</div>
+                <div className="sidebar-content" style={{ flex: '0 0 auto', maxHeight: '150px' }}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => void onOpenByPath('outline/outline.md')}
+                    style={{ width: 'calc(100% - 20px)', margin: '10px', display: 'block' }}
+                  >
+                    打开 outline.md
+                  </button>
+                  <div style={{ padding: '0 10px', fontSize: '11px', color: '#888' }}>在 outline/ 目录维护章节大纲。</div>
+                </div>
+              </>
+            ) : null}
+          </>
+        ) : null}
+
+        {activeSidebarTab === 'git' ? (
+          <>
+            <div className="sidebar-header">源代码管理</div>
+            <div className="sidebar-content">
+              {gitError ? <div className="error-text">{gitError}</div> : null}
+              <div className="git-toolbar">
+                <button disabled={busy || !workspaceRoot} onClick={() => void onGitInit()}>
+                  初始化
+                </button>
+                <button disabled={busy || !workspaceRoot} onClick={() => void refreshGit()}>
+                  刷新
+                </button>
+              </div>
+              <div className="git-status-list">
+                {gitItems.length === 0 ? (
+                  <div style={{ padding: 10, color: '#888' }}>无变更</div>
+                ) : (
+                  gitItems.map((it) => (
+                    <div
+                      key={it.path}
+                      className={gitSelectedPath === it.path ? 'git-row active' : 'git-row'}
+                      onClick={() => void onGitSelect(it.path)}
+                    >
+                      <span className={`git-status-icon ${it.status === 'M' ? 'modified' : 'new'}`}>{it.status}</span>
+                      <span className="git-path">{it.path}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+              {gitSelectedPath ? <pre className="git-diff-view">{gitDiffText}</pre> : null}
+              <div className="git-commit-section">
+                <input
+                  className="git-commit-input"
+                  value={gitCommitMsg}
+                  onChange={(e) => setGitCommitMsg(e.target.value)}
+                  placeholder="提交信息 (Ctrl+Enter)"
+                  onKeyDown={(e) => {
+                    if (e.ctrlKey && e.key === 'Enter') void onGitCommit()
+                  }}
+                />
+                <button className="git-commit-btn" disabled={busy || !gitCommitMsg.trim()} onClick={() => void onGitCommit()}>
+                  提交
+                </button>
+              </div>
+              {gitCommits.length > 0 ? (
+                <div style={{ padding: 10, borderTop: '1px solid #333' }}>
+                  {gitCommits.slice(0, 5).map((c) => (
+                    <div key={c.id} style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>
+                      <span style={{ fontFamily: 'monospace', marginRight: 6 }}>{c.id.slice(0, 7)}</span>
+                      <span>{c.summary}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
-            {gitCommits.length > 0 ? (
-              <div className="gitLog">
-                {gitCommits.slice(0, 5).map((c) => (
-                  <div key={c.id} className="gitLogRow">
-                    <span className="gitLogId">{c.id.slice(0, 7)}</span>
-                    <span className="gitLogMsg">{c.summary}</span>
+          </>
+        ) : null}
+      </div>
+
+      {/* Main Content */}
+      <div className="main-content">
+        <div className="editor-tabs">
+          {openFiles.length === 0 ? (
+            <div className="editor-tab">无文件</div>
+          ) : (
+            openFiles.map((f) => (
+              <div
+                key={f.path}
+                className={f.path === activePath ? 'editor-tab active' : 'editor-tab'}
+                onClick={() => setActivePath(f.path)}
+              >
+                {f.name}
+                {f.dirty ? ' *' : ''}
+                <span
+                  style={{ marginLeft: 8 }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setOpenFiles((prev) => prev.filter((p) => p.path !== f.path))
+                    if (activePath === f.path) setActivePath(null)
+                  }}
+                >
+                  ×
+                </span>
+              </div>
+            ))
+          )}
+          <div className="spacer" />
+          <button className="icon-button" disabled={!workspaceRoot} onClick={() => void onNewChapter()} title="新建章节">
+            +
+          </button>
+          <button className="icon-button" disabled={!activeFile || !activeFile.dirty} onClick={() => void onSaveActive()} title="保存">
+            💾
+          </button>
+        </div>
+        <div className="editor-content">
+          {activeFile ? (
+            <Editor
+              theme="vs-dark"
+              language="plaintext"
+              value={activeFile.content}
+              onMount={(editor, monaco) => {
+                editorRef.current = editor
+                monacoRef.current = monaco
+              }}
+              onChange={(v) => {
+                const value = v ?? ''
+                setOpenFiles((prev) => prev.map((f) => (f.path === activeFile.path ? { ...f, content: value, dirty: true } : f)))
+              }}
+              options={{
+                minimap: { enabled: false },
+                wordWrap: 'on',
+                fontSize: 14,
+                lineNumbers: 'off',
+                padding: { top: 16, bottom: 16 },
+              }}
+              className="markdown-editor"
+            />
+          ) : (
+            <div className="welcome-screen">
+              <h1>Iris-Creation</h1>
+              <div className="welcome-actions">
+                <button className="welcome-btn" onClick={() => void onOpenWorkspace()}>
+                  打开文件夹
+                </button>
+              </div>
+              {!workspaceRoot && error ? <div className="error-text">{error}</div> : null}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right Activity Bar & Panel */}
+      <div className="right-panel-container">
+        {activeRightTab ? (
+          <aside className="right-panel-content">
+            {activeRightTab === 'chat' ? (
+              <>
+                <div className="ai-header">
+                  <div className="ai-config-row">
+                    <select
+                      className="ai-select"
+                      value={appSettings?.active_agent_id ?? ''}
+                      onChange={(e) => {
+                        const id = e.target.value
+                        setAppSettingsState((prev) => {
+                          if (!prev) return prev
+                          const next = { ...prev, active_agent_id: id }
+                          void setAppSettings(next)
+                          return next
+                        })
+                      }}
+                    >
+                      {agentsList.length === 0 ? <option value="">无智能体</option> : null}
+                      {agentsList.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          🤖 {a.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                ))}
+                  <div className="ai-config-row">
+                    <select
+                      className="ai-select"
+                      value={appSettings?.providers.active ?? 'openai'}
+                      onChange={(e) => {
+                        setAppSettingsState((prev) => (prev ? { ...prev, providers: { ...prev.providers, active: e.target.value } } : prev))
+                      }}
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="claude">Claude</option>
+                      <option value="wenxin">文心一言</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="ai-messages">
+                  {chatMessages.length === 0 ? (
+                    <div style={{ padding: 20, color: '#888', textAlign: 'center', fontSize: 13 }}>
+                      <div>👋 嗨，我是你的写作助手。</div>
+                      <div style={{ marginTop: 8 }}>我可以帮你续写情节、润色文笔或构思大纲。</div>
+                    </div>
+                  ) : (
+                    chatMessages.map((m) => (
+                      <div key={m.id} className={m.role === 'user' ? 'message user' : 'message assistant'}>
+                        <div className="message-meta">{m.role === 'user' ? '你' : m.streaming ? 'AI...' : 'AI'}</div>
+                        <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                        {m.role === 'assistant' && m.content ? (
+                          <div className="ai-actions">
+                            <button className="icon-button" disabled={!activeFile} onClick={() => insertAtCursor(m.content)} title="插入">
+                              ↵
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="ai-input-area">
+                  <div className="ai-actions" style={{ marginBottom: 6, justifyContent: 'flex-start', gap: 10 }}>
+                    <button className="icon-button" disabled={!activeFile} onClick={() => onQuoteSelection()} title="引用选区">
+                      ❝
+                    </button>
+                    <button className="icon-button" disabled={!activeFile} onClick={() => void onSmartComplete()} title="智能补全">
+                      ⚡
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    <button className="primary-button" disabled={busy || !chatInput.trim()} onClick={() => void onSendChat()}>
+                      发送
+                    </button>
+                  </div>
+                  <textarea
+                    ref={chatInputRef}
+                    className="ai-textarea"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.ctrlKey && e.key === 'Enter') {
+                        e.preventDefault()
+                        void onSendChat()
+                      }
+                    }}
+                    placeholder="输入指令..."
+                  />
+                </div>
+              </>
+            ) : null}
+
+            {activeRightTab === 'graph' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div className="ai-header" style={{ justifyContent: 'center' }}>
+                  <button className="icon-button" onClick={() => void loadGraph()}>
+                    ↻ 刷新图谱
+                  </button>
+                </div>
+                <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                  <canvas ref={graphCanvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+                </div>
+                <div style={{ padding: 10, fontSize: 11, color: '#666', textAlign: 'center' }}>
+                  数据: concept/characters.md & relations.md
+                </div>
               </div>
             ) : null}
-          </div>
-        </aside>
+          </aside>
+        ) : null}
 
-        <main className="appMain">
-          <div className="editorTabs">
-            {openFiles.length === 0 ? (
-              <div className="tabInactive">未打开文件</div>
-            ) : (
-              openFiles.map((f) => (
-                <div
-                  key={f.path}
-                  className={f.path === activePath ? 'tabActive' : 'tabInactive'}
-                  onClick={() => setActivePath(f.path)}
-                >
-                  {f.name}
-                  {f.dirty ? ' *' : ''}
-                </div>
-              ))
-            )}
-            <div className="tabsSpacer" />
-            <button className="topbarButton" disabled={!activeFile} onClick={() => void onSmartComplete()}>
-              智能补全
-            </button>
-            <button className="topbarButton" disabled={!workspaceRoot} onClick={() => void onNewChapter()}>
-              开新章
-            </button>
+        <div className="right-activity-bar">
+          <div
+            className={`right-activity-item ${activeRightTab === 'chat' ? 'active' : ''}`}
+            onClick={() => setActiveRightTab(activeRightTab === 'chat' ? null : 'chat')}
+            title="对话"
+          >
+            💬
           </div>
-          <div className="editorArea">
-            {activeFile ? (
-              <Editor
-                theme="vs-dark"
-                language="plaintext"
-                value={activeFile.content}
-                onMount={(editor, monaco) => {
-                  editorRef.current = editor
-                  monacoRef.current = monaco
-                }}
-                onChange={(v) => {
-                  const value = v ?? ''
-                  setOpenFiles((prev) =>
-                    prev.map((f) => (f.path === activeFile.path ? { ...f, content: value, dirty: true } : f)),
-                  )
-                }}
-                options={{
-                  minimap: { enabled: false },
-                  wordWrap: 'on',
-                  fontSize: 14,
-                }}
-              />
-            ) : (
-              <div className="emptyHint">从左侧文件树打开一个章节文件</div>
-            )}
+          <div
+            className={`right-activity-item ${activeRightTab === 'graph' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveRightTab(activeRightTab === 'graph' ? null : 'graph')
+              if (activeRightTab !== 'graph') void loadGraph()
+            }}
+            title="图谱"
+          >
+            🕸️
           </div>
-        </main>
+        </div>
+      </div>
+    </div>
 
-        <aside className="appRight">
-          <div className="panelHeader">AI</div>
-          <div className="panelBody panelScroll">
-            <div className="aiToolbar">
-              <button className="topbarButton" onClick={() => setShowSettings((v) => !v)}>
-                设置
+      {/* Settings Modal */}
+      {showSettings && appSettings ? (
+        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>设置</h2>
+              <button className="close-btn" onClick={() => setShowSettings(false)}>
+                ×
               </button>
-              <select
-                className="aiSelect"
-                value={appSettings?.active_agent_id ?? ''}
-                onChange={(e) => {
-                  const id = e.target.value
-                  setAppSettingsState((prev) => {
-                    if (!prev) return prev
-                    const next = { ...prev, active_agent_id: id }
-                    void setAppSettings(next)
-                    return next
-                  })
-                }}
-              >
-                {agentsList.length === 0 ? <option value="">智能体未加载</option> : null}
-                {agentsList.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.category} / {a.name}
-                  </option>
-                ))}
-              </select>
-              <div className="aiToolbarInfo">
-                Provider：{appSettings?.providers.active ?? '未加载'}；输出：{appSettings?.output.use_markdown ? 'Markdown' : '纯文本'}
-              </div>
             </div>
-
-            {showSettings && appSettings ? (
-              <div className="aiSettings">
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">是否使用 md 格式</label>
-                  <input
-                    type="checkbox"
-                    checked={appSettings.output.use_markdown}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) => (prev ? { ...prev, output: { ...prev.output, use_markdown: e.target.checked } } : prev))
-                    }
-                  />
+            <div className="modal-body">
+              <div className="settings-form">
+                <div style={{ marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 14, marginBottom: 10, color: '#fff' }}>通用</h3>
+                  <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <label style={{ flex: 1 }}>Markdown 输出</label>
+                    <input
+                      type="checkbox"
+                      checked={appSettings.output.use_markdown}
+                      onChange={(e) =>
+                        setAppSettingsState((prev) => (prev ? { ...prev, output: { ...prev.output, use_markdown: e.target.checked } } : prev))
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>章节目标字数</label>
+                    <input
+                      type="number"
+                      value={chapterWordTarget}
+                      onChange={(e) => setChapterWordTarget(Number(e.target.value) || 0)}
+                      onBlur={() => void saveProjectSettings()}
+                    />
+                  </div>
                 </div>
 
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">Provider</label>
-                  <select
-                    className="aiSelect"
-                    value={appSettings.providers.active}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) => (prev ? { ...prev, providers: { ...prev.providers, active: e.target.value } } : prev))
-                    }
-                  >
-                    <option value="openai">OpenAI（兼容）</option>
-                    <option value="claude">Claude</option>
-                    <option value="wenxin">文心一言（兼容）</option>
-                  </select>
-                </div>
-
-                <div className="aiSettingsGroup">OpenAI（兼容）</div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">Base URL</label>
-                  <input
-                    className="aiInput"
-                    value={appSettings.providers.openai.base_url}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) =>
-                        prev ? { ...prev, providers: { ...prev.providers, openai: { ...prev.providers.openai, base_url: e.target.value } } } : prev,
-                      )
-                    }
-                  />
-                </div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">Model</label>
-                  <input
-                    className="aiInput"
-                    value={appSettings.providers.openai.model}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) =>
-                        prev ? { ...prev, providers: { ...prev.providers, openai: { ...prev.providers.openai, model: e.target.value } } } : prev,
-                      )
-                    }
-                  />
-                </div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">API Key</label>
-                  <input
-                    type="password"
-                    className="aiInput"
-                    value={appSettings.providers.openai.api_key}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) =>
-                        prev ? { ...prev, providers: { ...prev.providers, openai: { ...prev.providers.openai, api_key: e.target.value } } } : prev,
-                      )
-                    }
-                  />
-                </div>
-
-                <div className="aiSettingsGroup">Claude</div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">Model</label>
-                  <input
-                    className="aiInput"
-                    value={appSettings.providers.claude.model}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) =>
-                        prev ? { ...prev, providers: { ...prev.providers, claude: { ...prev.providers.claude, model: e.target.value } } } : prev,
-                      )
-                    }
-                  />
-                </div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">API Key</label>
-                  <input
-                    type="password"
-                    className="aiInput"
-                    value={appSettings.providers.claude.api_key}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) =>
-                        prev ? { ...prev, providers: { ...prev.providers, claude: { ...prev.providers.claude, api_key: e.target.value } } } : prev,
-                      )
-                    }
-                  />
-                </div>
-
-                <div className="aiSettingsGroup">文心一言（兼容）</div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">Base URL</label>
-                  <input
-                    className="aiInput"
-                    value={appSettings.providers.wenxin.base_url}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) =>
-                        prev ? { ...prev, providers: { ...prev.providers, wenxin: { ...prev.providers.wenxin, base_url: e.target.value } } } : prev,
-                      )
-                    }
-                  />
-                </div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">Model</label>
-                  <input
-                    className="aiInput"
-                    value={appSettings.providers.wenxin.model}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) =>
-                        prev ? { ...prev, providers: { ...prev.providers, wenxin: { ...prev.providers.wenxin, model: e.target.value } } } : prev,
-                      )
-                    }
-                  />
-                </div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">API Key</label>
-                  <input
-                    type="password"
-                    className="aiInput"
-                    value={appSettings.providers.wenxin.api_key}
-                    onChange={(e) =>
-                      setAppSettingsState((prev) =>
-                        prev ? { ...prev, providers: { ...prev.providers, wenxin: { ...prev.providers.wenxin, api_key: e.target.value } } } : prev,
-                      )
-                    }
-                  />
-                </div>
-
-                <div className="aiSettingsGroup">智能体</div>
-                <div className="aiSettingsRow">
-                  <label className="aiLabel">编辑</label>
-                  <select className="aiSelect" value={agentEditorId} onChange={(e) => setAgentEditorId(e.target.value)}>
-                    {agentsList.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.category} / {a.name}
-                      </option>
+                <div style={{ marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 14, marginBottom: 10, color: '#fff' }}>模型配置</h3>
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                    {['openai', 'claude', 'wenxin'].map((p) => (
+                      <button
+                        key={p}
+                        className={appSettings.providers.active === p ? 'primary-button' : 'btn btn-secondary'}
+                        onClick={() =>
+                          setAppSettingsState((prev) => (prev ? { ...prev, providers: { ...prev.providers, active: p } } : prev))
+                        }
+                      >
+                        {p.toUpperCase()}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+                  {appSettings.providers.active === 'openai' && (
+                    <>
+                      <div className="form-group">
+                        <label>Base URL</label>
+                        <input
+                          value={appSettings.providers.openai.base_url}
+                          onChange={(e) =>
+                            setAppSettingsState((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    providers: { ...prev.providers, openai: { ...prev.providers.openai, base_url: e.target.value } },
+                                  }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Model</label>
+                        <input
+                          value={appSettings.providers.openai.model}
+                          onChange={(e) =>
+                            setAppSettingsState((prev) =>
+                              prev
+                                ? { ...prev, providers: { ...prev.providers, openai: { ...prev.providers.openai, model: e.target.value } } }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>API Key</label>
+                        <input
+                          type="password"
+                          value={appSettings.providers.openai.api_key}
+                          onChange={(e) =>
+                            setAppSettingsState((prev) =>
+                              prev
+                                ? { ...prev, providers: { ...prev.providers, openai: { ...prev.providers.openai, api_key: e.target.value } } }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                  {appSettings.providers.active === 'claude' && (
+                    <>
+                      <div className="form-group">
+                        <label>Model</label>
+                        <input
+                          value={appSettings.providers.claude.model}
+                          onChange={(e) =>
+                            setAppSettingsState((prev) =>
+                              prev
+                                ? { ...prev, providers: { ...prev.providers, claude: { ...prev.providers.claude, model: e.target.value } } }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>API Key</label>
+                        <input
+                          type="password"
+                          value={appSettings.providers.claude.api_key}
+                          onChange={(e) =>
+                            setAppSettingsState((prev) =>
+                              prev
+                                ? { ...prev, providers: { ...prev.providers, claude: { ...prev.providers.claude, api_key: e.target.value } } }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                  {appSettings.providers.active === 'wenxin' && (
+                    <>
+                      <div className="form-group">
+                        <label>Base URL</label>
+                        <input
+                          value={appSettings.providers.wenxin.base_url}
+                          onChange={(e) =>
+                            setAppSettingsState((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    providers: { ...prev.providers, wenxin: { ...prev.providers.wenxin, base_url: e.target.value } },
+                                  }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Model</label>
+                        <input
+                          value={appSettings.providers.wenxin.model}
+                          onChange={(e) =>
+                            setAppSettingsState((prev) =>
+                              prev
+                                ? { ...prev, providers: { ...prev.providers, wenxin: { ...prev.providers.wenxin, model: e.target.value } } }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>API Key</label>
+                        <input
+                          type="password"
+                          value={appSettings.providers.wenxin.api_key}
+                          onChange={(e) =>
+                            setAppSettingsState((prev) =>
+                              prev
+                                ? { ...prev, providers: { ...prev.providers, wenxin: { ...prev.providers.wenxin, api_key: e.target.value } } }
+                                : prev,
+                            )
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
-                {agentsList.find((a) => a.id === agentEditorId) ? (
-                  <>
-                    <div className="aiSettingsRow">
-                      <label className="aiLabel">名称</label>
+
+                <div style={{ marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 14, marginBottom: 10, color: '#fff' }}>智能体管理</h3>
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                    <select
+                      className="ai-select"
+                      style={{ flex: 1 }}
+                      value={agentEditorId}
+                      onChange={(e) => setAgentEditorId(e.target.value)}
+                    >
+                      <option value="">-- 选择编辑 --</option>
+                      {agentsList.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.category} / {a.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="icon-button"
+                      style={{ border: '1px solid #333' }}
+                      onClick={() => {
+                        const id = newId()
+                        const next: Agent = {
+                          id,
+                          name: '新智能体',
+                          category: '自定义',
+                          system_prompt: '',
+                          temperature: 0.7,
+                          max_tokens: 1024,
+                        }
+                        setAgentsList((prev) => [...prev, next])
+                        setAgentEditorId(id)
+                      }}
+                    >
+                      +
+                    </button>
+                    {agentEditorId && (
+                      <button
+                        className="icon-button"
+                        style={{ border: '1px solid #333' }}
+                        onClick={() => {
+                          setAgentsList((prev) => prev.filter((a) => a.id !== agentEditorId))
+                          setAgentEditorId('')
+                        }}
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                  {agentEditorId && agentsList.find((a) => a.id === agentEditorId) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <input
-                        className="aiInput"
+                        className="ai-select"
+                        placeholder="名称"
                         value={agentsList.find((a) => a.id === agentEditorId)?.name ?? ''}
                         onChange={(e) =>
                           setAgentsList((prev) => prev.map((a) => (a.id === agentEditorId ? { ...a, name: e.target.value } : a)))
                         }
                       />
-                    </div>
-                    <div className="aiSettingsRow">
-                      <label className="aiLabel">分类</label>
-                      <input
-                        className="aiInput"
-                        value={agentsList.find((a) => a.id === agentEditorId)?.category ?? ''}
-                        onChange={(e) =>
-                          setAgentsList((prev) => prev.map((a) => (a.id === agentEditorId ? { ...a, category: e.target.value } : a)))
-                        }
-                      />
-                    </div>
-                    <div className="aiSettingsRow">
-                      <label className="aiLabel">温度</label>
-                      <input
-                        className="aiInput"
-                        type="number"
-                        step="0.05"
-                        value={agentsList.find((a) => a.id === agentEditorId)?.temperature ?? 0.7}
-                        onChange={(e) =>
-                          setAgentsList((prev) =>
-                            prev.map((a) =>
-                              a.id === agentEditorId ? { ...a, temperature: Number(e.target.value) || 0 } : a,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="aiSettingsRow">
-                      <label className="aiLabel">Max Tokens</label>
-                      <input
-                        className="aiInput"
-                        type="number"
-                        value={agentsList.find((a) => a.id === agentEditorId)?.max_tokens ?? 1024}
-                        onChange={(e) =>
-                          setAgentsList((prev) =>
-                            prev.map((a) =>
-                              a.id === agentEditorId ? { ...a, max_tokens: Number(e.target.value) || 0 } : a,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="aiSettingsRow aiSettingsRowFull">
-                      <label className="aiLabel">提示词</label>
                       <textarea
-                        className="aiTextarea"
+                        className="ai-textarea"
+                        placeholder="系统提示词 (System Prompt)"
+                        style={{ height: 120 }}
                         value={agentsList.find((a) => a.id === agentEditorId)?.system_prompt ?? ''}
                         onChange={(e) =>
                           setAgentsList((prev) => prev.map((a) => (a.id === agentEditorId ? { ...a, system_prompt: e.target.value } : a)))
                         }
                       />
                     </div>
-                  </>
-                ) : null}
-
-                <div className="aiSettingsRow aiSettingsRowFull">
-                  <label className="aiLabel">导入/导出</label>
-                  <textarea className="aiTextarea" value={agentsJson} onChange={(e) => setAgentsJson(e.target.value)} />
-                </div>
-
-                <div className="aiSettingsActions">
-                  <button
-                    className="topbarButton"
-                    onClick={() => {
-                      void setAppSettings(appSettings)
-                    }}
-                  >
-                    保存设置
-                  </button>
-                  <button
-                    className="topbarButton"
-                    onClick={() => {
-                      void setAgents(agentsList)
-                    }}
-                  >
-                    保存智能体
-                  </button>
-                  <button
-                    className="topbarButton"
-                    onClick={() => {
-                      const id = newId()
-                      const next: Agent = {
-                        id,
-                        name: '新智能体',
-                        category: '自定义',
-                        system_prompt: '',
-                        temperature: 0.7,
-                        max_tokens: 1024,
-                      }
-                      setAgentsList((prev) => [...prev, next])
-                      setAgentEditorId(id)
-                    }}
-                  >
-                    新增
-                  </button>
-                  <button
-                    className="topbarButton"
-                    disabled={!agentEditorId}
-                    onClick={() => {
-                      setAgentsList((prev) => prev.filter((a) => a.id !== agentEditorId))
-                      setAgentEditorId('')
-                    }}
-                  >
-                    删除
-                  </button>
-                  <button
-                    className="topbarButton"
-                    onClick={() => {
-                      void exportAgents().then((s) => setAgentsJson(s))
-                    }}
-                  >
-                    导出
-                  </button>
-                  <button
-                    className="topbarButton"
-                    onClick={() => {
-                      void importAgents(agentsJson).then(() => getAgents().then((list) => setAgentsList(list)))
-                    }}
-                  >
-                    导入
-                  </button>
+                  )}
                 </div>
               </div>
-            ) : null}
-            <div className="chatList">
-              {chatMessages.length === 0 ? (
-                <div className="chatEmpty">Ctrl+Shift+L 聚焦输入框；可用“引用选区”把编辑器选区发给 AI</div>
-              ) : (
-                chatMessages.map((m) => (
-                  <div key={m.id} className={m.role === 'user' ? 'chatMsg chatUser' : 'chatMsg chatAssistant'}>
-                    <div className="chatMeta">{m.role === 'user' ? '你' : m.streaming ? 'AI（生成中）' : 'AI'}</div>
-                    <div className="chatContent">{m.content}</div>
-                    {m.role === 'assistant' && m.content ? (
-                      <div className="chatActions">
-                        <button className="topbarButton" disabled={!activeFile} onClick={() => insertAtCursor(m.content)}>
-                          插入到光标
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                ))
-              )}
             </div>
-
-            <div className="chatComposer">
-              <div className="chatComposerRow">
-                <button className="topbarButton" disabled={!activeFile} onClick={() => onQuoteSelection()}>
-                  引用选区
-                </button>
-                <button className="topbarButton" disabled={busy || !chatInput.trim()} onClick={() => void onSendChat()}>
-                  发送
-                </button>
-              </div>
-              <input
-                ref={chatInputRef}
-                className="chatInput"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.ctrlKey && e.key === 'Enter') {
-                    e.preventDefault()
-                    void onSendChat()
-                  }
+            <div className="modal-footer">
+              <button
+                className="primary-button"
+                onClick={() => {
+                  void setAppSettings(appSettings)
+                  void setAgents(agentsList)
+                  setShowSettings(false)
                 }}
-                placeholder="输入消息，Ctrl+Enter 发送"
-              />
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      {showGraph ? (
-        <div className="modalOverlay" onClick={() => setShowGraph(false)}>
-          <div className="modalPanel" onClick={(e) => e.stopPropagation()}>
-            <div className="modalHeader">
-              <div className="modalTitle">人物关系图谱</div>
-              <div className="modalSpacer" />
-              <button className="topbarButton" onClick={() => void loadGraph()}>
-                刷新
+              >
+                保存并关闭
               </button>
-              <button className="topbarButton" onClick={() => setShowGraph(false)}>
-                关闭
-              </button>
-            </div>
-            <div className="modalBody">
-              <canvas ref={graphCanvasRef} className="graphCanvas" />
-              <div className="graphHint">
-                数据来自 concept/characters.md（用 - 人名 列表）与 concept/relations.md（A {'->'} B : 关系）。
-              </div>
             </div>
           </div>
         </div>
       ) : null}
 
-      <footer className="appStatusbar">
-        <div className="statusItem">字数：{activeCharCount}</div>
-        <div className="statusItem">写作：{writingSeconds}s</div>
-        <div className="statusItem">会话：{chatMessages.length}</div>
-        <div className="statusItem">Git：{gitError ? '未初始化/不可用' : `${gitItems.length} 变更`}</div>
-      </footer>
+      <div className="status-bar">
+        <div className="status-item">字数：{activeCharCount} / {chapterWordTarget}</div>
+        <div className="status-item">写作：{writingSeconds}s</div>
+        <div className="status-item">Git：{gitError ? '不可用' : `${gitItems.length} 变更`}</div>
+        <div className="status-spacer" />
+      </div>
     </div>
   )
 }
