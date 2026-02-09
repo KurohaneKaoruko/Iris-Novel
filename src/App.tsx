@@ -1804,8 +1804,16 @@ function App() {
                       try {
                         const ok = await getApiKeyStatus(pid)
                         setApiKeyStatus((m) => ({ ...m, [pid]: ok }))
+                        if (rawKey && !ok) {
+                          await showErrorDialog(`API Key 已提交保存，但读取状态仍为“未设置”（provider=${pid}）。可能是系统凭据存储不可用。`)
+                          return
+                        }
                       } catch {
                         setApiKeyStatus((m) => ({ ...m, [pid]: false }))
+                        if (rawKey) {
+                          await showErrorDialog(`API Key 已提交保存，但读取状态失败（provider=${pid}）。可能是系统凭据存储不可用。`)
+                          return
+                        }
                       }
                     }
                     await reloadAppSettings()

@@ -300,22 +300,34 @@ pub fn set_app_settings(app: AppHandle, settings: app_settings::AppSettings) -> 
   app_settings::save(&app, &s)
 }
 
+#[allow(non_snake_case)]
 #[tauri::command]
-pub fn get_api_key_status(provider_id: String) -> Result<bool, String> {
-  match secrets::get_api_key(provider_id.trim()) {
+pub fn get_api_key_status(providerId: Option<String>, provider_id: Option<String>) -> Result<bool, String> {
+  let pid = providerId
+    .or(provider_id)
+    .unwrap_or_default();
+  match secrets::get_api_key(pid.trim()) {
     Ok(Some(v)) => Ok(!v.trim().is_empty()),
     Ok(None) => Ok(false),
     Err(e) => Err(e),
   }
 }
 
+#[allow(non_snake_case)]
 #[tauri::command]
-pub fn set_api_key(provider_id: String, api_key: String) -> Result<(), String> {
-  let pid = provider_id.trim();
+pub fn set_api_key(
+  providerId: Option<String>,
+  provider_id: Option<String>,
+  apiKey: Option<String>,
+  api_key: Option<String>,
+) -> Result<(), String> {
+  let pid = providerId.or(provider_id).unwrap_or_default();
+  let pid = pid.trim();
   if pid.is_empty() {
     return Err("provider_id 不能为空".to_string());
   }
-  let key = api_key.trim();
+  let key = apiKey.or(api_key).unwrap_or_default();
+  let key = key.trim();
   if key.is_empty() {
     return Err("API Key 不能为空".to_string());
   }
