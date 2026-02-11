@@ -45,6 +45,8 @@ import DiffView from './components/DiffView'
 import EditorContextMenu from './components/EditorContextMenu'
 import { ChapterManager } from './components/ChapterManager'
 import { CharacterManager } from './components/CharacterManager'
+import { PlotLineManager } from './components/PlotLineManager'
+import { WritingGoalPanel } from './components/WritingGoalPanel'
 
 type OpenFile = {
   path: string
@@ -96,8 +98,8 @@ function App() {
   const [activeDiffTab, setActiveDiffTab] = useState<string | null>(null)
   
   // Activity Bar State
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'git' | 'chapters' | 'characters'>('files')
-  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | null>('chat')
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'git' | 'chapters' | 'characters' | 'plotlines'>('files')
+  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | 'writing-goal' | null>('chat')
 
   // Workspace & Files
   const [workspaceInput, setWorkspaceInput] = useState('')
@@ -1373,6 +1375,13 @@ function App() {
           >
             <span className="activity-bar-icon">👤</span>
           </div>
+          <div
+            className={`activity-bar-item ${activeSidebarTab === 'plotlines' ? 'active' : ''}`}
+            onClick={() => setActiveSidebarTab('plotlines')}
+            title="情节线管理"
+          >
+            <span className="activity-bar-icon">📈</span>
+          </div>
           <div className="spacer" />
           <div
             className="activity-bar-item"
@@ -1539,6 +1548,21 @@ function App() {
             onCharacterClick={(character) => {
               // Optionally handle character click (e.g., show details)
               console.log('Character clicked:', character)
+            }}
+          />
+        ) : null}
+
+        {activeSidebarTab === 'plotlines' ? (
+          <PlotLineManager
+            onPlotLineClick={(plotLine) => {
+              // Optionally handle plot line click (e.g., show details)
+              console.log('Plot line clicked:', plotLine)
+            }}
+            onPlotLineUpdate={() => {
+              // Optionally refresh the file tree or perform other updates
+              if (workspaceRoot) {
+                void refreshTree()
+              }
             }}
           />
         ) : null}
@@ -1905,6 +1929,15 @@ function App() {
                 </div>
               </div>
             ) : null}
+
+            {activeRightTab === 'writing-goal' ? (
+              <WritingGoalPanel
+                onGoalUpdate={() => {
+                  // Optionally refresh or perform other updates
+                  console.log('Writing goal updated')
+                }}
+              />
+            ) : null}
           </aside>
         ) : null}
 
@@ -1925,6 +1958,13 @@ function App() {
             title="图谱"
           >
             🕸️
+          </div>
+          <div
+            className={`right-activity-item ${activeRightTab === 'writing-goal' ? 'active' : ''}`}
+            onClick={() => setActiveRightTab(activeRightTab === 'writing-goal' ? null : 'writing-goal')}
+            title="写作目标"
+          >
+            🎯
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type * as monaco from 'monaco-editor';
+import { writingGoalService } from '../services';
 
 /**
  * Represents an open file in the editor
@@ -58,6 +59,9 @@ interface EditorContextValue extends EditorContextState {
   getEditorState: (filePath: string) => EditorState | undefined;
   clearEditorState: (filePath: string) => void;
   
+  // Word count tracking
+  getTotalWordCount: () => number;
+  
   // Utility methods
   hasOpenFiles: () => boolean;
   getOpenFileCount: () => number;
@@ -83,6 +87,74 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
   const [decorations, setDecorationsState] = useState<Map<string, monaco.editor.IEditorDecorationsCollection>>(new Map());
   const [editorStates, setEditorStates] = useState<Map<string, EditorState>>(new Map());
+  
+  // Word count tracking
+  const wordCountTimerRef = useRef<number | null>(null);
+  const lastWordCountRef = useRef<number>(0);
+
+  /**
+   * Calculate total word count from all open files
+   */
+  const calculateTotalWordCount = useCallback(() => {
+    let totalWords = 0;
+    
+    for (const file of openFiles) {
+      // Only count words in text files (stories, concept, outline)
+      if (file.path.includes('stories/') || file.path.includes('concept/') || file.path.includes('outline/')) {
+        const words = file.content.trim().split(/\s+/).filter(w => w.length > 0);
+        totalWords += words.length;
+      }
+    }
+    
+    return totalWords;
+  }, [openFiles]);
+
+  /**
+   * Get total word count
+   */
+  const getTotalWordCount = useCallback(() => {
+    return calculateTotalWordCount();
+  }, [calculateTotalWordCount]);
+
+  /**
+   * Record progress to writing goal service (debounced)
+   */
+  const recordProgressDebounced = useCallback(() => {
+    // Clear existing timer
+    if (wordCountTimerRef.current) {
+      clearTimeout(wordCountTimerRef.current);
+    }
+
+    // Set new timer to record progress after 2 seconds of inactivity
+    wordCountTimerRef.current = setTimeout(async () => {
+      try {
+        const currentWordCount = calculateTotalWordCount();
+        
+        // Only record if word count has changed
+        if (currentWordCount !== lastWordCountRef.current) {
+          await writingGoalService.recordProgress(currentWordCount);
+          lastWordCountRef.current = currentWordCount;
+        }
+      } catch (error) {
+        console.error('Failed to record writing progress:', error);
+      }
+    }, 2000);
+  }, [calculateTotalWordCount]);
+
+  /**
+   * Effect to track word count changes
+   */
+  useEffect(() => {
+    // Record progress when files change
+    recordProgressDebounced();
+
+    // Cleanup timer on unmount
+    return () => {
+      if (wordCountTimerRef.current) {
+        clearTimeout(wordCountTimerRef.current);
+      }
+    };
+  }, [openFiles, recordProgressDebounced]);
 
   /**
    * Open a file in the editor
@@ -298,6 +370,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     saveEditorState,
     getEditorState,
     clearEditorState,
+    getTotalWordCount,
     hasOpenFiles,
     getOpenFileCount,
     getDirtyFiles,

@@ -12,3 +12,9 @@ export type { Chapter, ChapterStatus, ChapterStats } from './ChapterService';
 
 export { CharacterService, characterService } from './CharacterService';
 export type { Character, CharacterData } from './CharacterService';
+
+export { PlotLineService, plotLineService } from './PlotLineService';
+export type { PlotLine, PlotLineData, PlotLineStatus } from './PlotLineService';
+
+export { WritingGoalService, writingGoalService } from './WritingGoalService';
+export type { WritingGoal, DailyStats, WritingHistory } from './WritingGoalService';

@@ -1,0 +1,326 @@
+.plot-line-manager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--bg-primary, #1e1e1e);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.plot-line-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #3e3e3e);
+}
+
+.plot-line-manager-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.btn-create {
+  padding: 8px 16px;
+  background-color: var(--primary-color, #007acc);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-create:hover {
+  background-color: var(--primary-hover, #005a9e);
+}
+
+.plot-line-manager-loading,
+.plot-line-manager-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-secondary, #888);
+  font-size: 14px;
+}
+
+.plot-line-manager-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background-color: var(--error-bg, #5a1a1a);
+  color: var(--error-text, #ff6b6b);
+  border-bottom: 1px solid var(--error-border, #8a2a2a);
+}
+
+.plot-line-manager-error button {
+  padding: 4px 12px;
+  background-color: transparent;
+  color: var(--error-text, #ff6b6b);
+  border: 1px solid var(--error-text, #ff6b6b);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.plot-line-form-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.plot-line-form {
+  background-color: var(--bg-secondary, #252525);
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.plot-line-form h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: var(--input-bg, #1e1e1e);
+  color: var(--text-primary, #e0e0e0);
+  border: 1px solid var(--border-color, #3e3e3e);
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-color, #007acc);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn-submit,
+.btn-cancel {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-submit {
+  background-color: var(--primary-color, #007acc);
+  color: white;
+}
+
+.btn-submit:hover {
+  background-color: var(--primary-hover, #005a9e);
+}
+
+.btn-cancel {
+  background-color: var(--bg-tertiary, #3e3e3e);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.btn-cancel:hover {
+  background-color: var(--bg-hover, #4e4e4e);
+}
+
+.plot-line-manager-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.plot-line-visualization-section,
+.plot-line-list-section {
+  margin-bottom: 32px;
+}
+
+.plot-line-visualization-section h3,
+.plot-line-list-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.plot-line-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.plot-line-item {
+  background-color: var(--bg-secondary, #252525);
+  border: 1px solid var(--border-color, #3e3e3e);
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.plot-line-item:hover {
+  border-color: var(--primary-color, #007acc);
+  background-color: var(--bg-hover, #2a2a2a);
+}
+
+.plot-line-item.selected {
+  border-color: var(--primary-color, #007acc);
+  background-color: var(--bg-selected, #2a3a4a);
+}
+
+.plot-line-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.plot-line-item-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.plot-line-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-ongoing {
+  background-color: rgba(33, 150, 243, 0.2);
+  color: #2196f3;
+}
+
+.status-completed {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.status-paused {
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}
+
+.plot-line-item-info {
+  margin-bottom: 12px;
+}
+
+.plot-line-item-info p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: var(--text-secondary, #b0b0b0);
+}
+
+.plot-line-item-info strong {
+  color: var(--text-primary, #e0e0e0);
+}
+
+.plot-line-description {
+  margin-top: 8px;
+  font-style: italic;
+}
+
+.plot-line-item-chapters {
+  margin-bottom: 12px;
+}
+
+.plot-line-item-chapters strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.chapter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chapter-tag {
+  padding: 4px 10px;
+  background-color: var(--bg-tertiary, #3e3e3e);
+  color: var(--text-secondary, #b0b0b0);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.plot-line-item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #3e3e3e);
+}
+
+.btn-edit,
+.btn-delete {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s;
+}
+
+.btn-edit {
+  background-color: var(--bg-tertiary, #3e3e3e);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.btn-edit:hover {
+  background-color: var(--bg-hover, #4e4e4e);
+}
+
+.btn-delete {
+  background-color: var(--error-bg, #5a1a1a);
+  color: var(--error-text, #ff6b6b);
+}
+
+.btn-delete:hover {
+  background-color: var(--error-hover, #6a2a2a);
+}
