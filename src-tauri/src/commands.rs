@@ -470,7 +470,7 @@ pub fn git_commit(state: State<'_, AppState>, message: String) -> Result<String,
 
   let sig = repo
     .signature()
-    .or_else(|_| git2::Signature::now("Iris-Creation", "iris-creation@local"))
+    .or_else(|_| git2::Signature::now("Iris-Creation", "novel-studio@local"))
     .map_err(|e| format!("signature failed: {e}"))?;
 
   let parent = repo

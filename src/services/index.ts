@@ -18,3 +18,9 @@ export type { PlotLine, PlotLineData, PlotLineStatus } from './PlotLineService';
 
 export { WritingGoalService, writingGoalService } from './WritingGoalService';
 export type { WritingGoal, DailyStats, WritingHistory } from './WritingGoalService';
+
+export { SensitiveWordService, sensitiveWordService } from './SensitiveWordService';
+export type { SensitiveWordMatch } from './SensitiveWordService';
+
+export { editorManager } from './EditorManager';
+export type { EditorInstance } from '../types/editor';

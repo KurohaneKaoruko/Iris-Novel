@@ -1,12 +1,14 @@
-import Editor from '@monaco-editor/react'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { confirm, message } from '@tauri-apps/plugin-dialog'
-import type { editor as MonacoEditor } from 'monaco-editor'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
+import type { LexicalEditor as LexicalEditorType } from 'lexical'
+import { $getSelection, $isRangeSelection } from 'lexical'
 import './App.css'
+import { LexicalEditor } from './components/LexicalEditor'
+import type { EditorConfig } from './types/editor'
 import {
   createFile,
   createDir,
@@ -40,13 +42,14 @@ import {
   type ModelProvider,
 } from './tauri'
 import { useDiff } from './contexts/DiffContext'
-import { modificationService, aiAssistanceService, characterService } from './services'
+import { modificationService, aiAssistanceService, editorManager } from './services'
 import DiffView from './components/DiffView'
 import EditorContextMenu from './components/EditorContextMenu'
 import { ChapterManager } from './components/ChapterManager'
 import { CharacterManager } from './components/CharacterManager'
 import { PlotLineManager } from './components/PlotLineManager'
 import { WritingGoalPanel } from './components/WritingGoalPanel'
+import './styles/sensitiveWord.css'
 
 type OpenFile = {
   path: string
@@ -125,8 +128,7 @@ function App() {
   const [explorerQuery, setExplorerQuery] = useState<string>('')
 
   // Editors & Refs
-  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
-  const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
+  const editorRef = useRef<LexicalEditorType | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
   const graphCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const autoOpenedRef = useRef(false)
@@ -156,6 +158,25 @@ function App() {
   const [gitCommitMsg, setGitCommitMsg] = useState('')
   const [gitSelectedPath, setGitSelectedPath] = useState<string | null>(null)
   const [gitDiffText, setGitDiffText] = useState('')
+
+  // Sensitive Word Detection State
+  const [sensitiveWordEnabled, setSensitiveWordEnabled] = useState(true)
+  const [sensitiveWordDictionary, setSensitiveWordDictionary] = useState<string[]>([
+    // Default sensitive words (example - should be loaded from config)
+    '暴力', '血腥', '色情', '政治', '敏感',
+  ])
+  const [newSensitiveWord, setNewSensitiveWord] = useState('')
+
+  // Sensitive Word Detection Hook
+  // TODO: Re-implement for Lexical in task 9
+  // const { sensitiveWordCount, isDetecting: isSensitiveWordDetecting } = useSensitiveWordDetection({
+  //   editor: editorRef.current,
+  //   enabled: sensitiveWordEnabled && activePath !== null,
+  //   dictionary: sensitiveWordDictionary,
+  //   debounceMs: 500,
+  // })
+  const sensitiveWordCount = 0
+  const isSensitiveWordDetecting = false
   const [gitError, setGitError] = useState<string | null>(null)
 
   // Stats & Visuals
@@ -177,6 +198,24 @@ function App() {
     if (active && appSettings.providers.some((p) => p.id === active)) return active
     return appSettings.providers[0]?.id ?? ''
   }, [appSettings])
+
+  // Editor configuration for Lexical
+  const editorConfig: EditorConfig = useMemo(() => ({
+    namespace: 'NovelStudioEditor',
+    theme: {
+      paragraph: 'editor-paragraph',
+      text: {
+        bold: 'editor-text-bold',
+        italic: 'editor-text-italic',
+        underline: 'editor-text-underline',
+      },
+    },
+    onError: (error: Error) => {
+      console.error('Lexical Editor Error:', error)
+      setError(error.message)
+    },
+    nodes: [],
+  }), [])
 
   // --- Actions ---
 
@@ -262,6 +301,46 @@ function App() {
     const raw = JSON.stringify({ chapter_word_target: chapterWordTarget }, null, 2)
     await writeText('.novel/.settings/project.json', raw)
   }, [workspaceRoot, chapterWordTarget])
+
+  const loadSensitiveWordSettings = useCallback(async () => {
+    if (!workspaceRoot) return
+    try {
+      const raw = await readText('.novel/.settings/sensitive-words.json')
+      const v: unknown = JSON.parse(raw)
+      if (typeof v === 'object' && v) {
+        const data = v as { enabled?: boolean; dictionary?: string[] }
+        if (typeof data.enabled === 'boolean') {
+          setSensitiveWordEnabled(data.enabled)
+        }
+        if (Array.isArray(data.dictionary)) {
+          setSensitiveWordDictionary(data.dictionary)
+        }
+      }
+    } catch {
+      // File doesn't exist or is invalid, use defaults
+      return
+    }
+  }, [workspaceRoot])
+
+  const saveSensitiveWordSettings = useCallback(async () => {
+    if (!workspaceRoot) return
+    if (isTauriApp()) {
+      try {
+        await initNovel()
+      } catch {
+        return
+      }
+    }
+    const raw = JSON.stringify(
+      {
+        enabled: sensitiveWordEnabled,
+        dictionary: sensitiveWordDictionary,
+      },
+      null,
+      2
+    )
+    await writeText('.novel/.settings/sensitive-words.json', raw)
+  }, [workspaceRoot, sensitiveWordEnabled, sensitiveWordDictionary])
 
   const loadGraph = useCallback(async () => {
     if (!workspaceRoot) return
@@ -465,6 +544,22 @@ function App() {
     }
   }, [workspaceRoot, gitCommitMsg, refreshGit])
 
+  // Sensitive Word Handlers
+  const onAddSensitiveWord = useCallback(() => {
+    const word = newSensitiveWord.trim()
+    if (!word) return
+    if (sensitiveWordDictionary.includes(word)) {
+      setNewSensitiveWord('')
+      return
+    }
+    setSensitiveWordDictionary((prev) => [...prev, word])
+    setNewSensitiveWord('')
+  }, [newSensitiveWord, sensitiveWordDictionary])
+
+  const onRemoveSensitiveWord = useCallback((word: string) => {
+    setSensitiveWordDictionary((prev) => prev.filter((w) => w !== word))
+  }, [])
+
   const nameCollator = useMemo(() => new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' }), [])
 
   const visibleTree = useMemo(() => {
@@ -540,20 +635,34 @@ function App() {
   const getSelectionText = useCallback((): string => {
     const editor = editorRef.current
     if (!editor) return ''
-    const model = editor.getModel?.()
-    const sel = editor.getSelection?.()
-    if (!model || !sel) return ''
-    const text = model.getValueInRange(sel) as string
-    return text ?? ''
+    
+    // Use Lexical's getSelectedText method from AIAssistPlugin
+    const extendedEditor = editor as any
+    if (extendedEditor.getSelectedText && typeof extendedEditor.getSelectedText === 'function') {
+      return extendedEditor.getSelectedText()
+    }
+    
+    return ''
   }, [])
 
   const insertAtCursor = useCallback((text: string) => {
     const editor = editorRef.current
     if (!editor || !text) return
-    const sel = editor.getSelection?.()
-    if (!sel) return
-    editor.executeEdits?.('ai-insert', [{ range: sel, text, forceMoveMarkers: true }])
-    editor.focus?.()
+    
+    // Use Lexical's insertTextAtCursor method from AIAssistPlugin
+    const extendedEditor = editor as any
+    if (extendedEditor.insertTextAtCursor && typeof extendedEditor.insertTextAtCursor === 'function') {
+      extendedEditor.insertTextAtCursor(text)
+    } else {
+      // Fallback to direct update
+      editor.update(() => {
+        const selection = $getSelection()
+        if ($isRangeSelection(selection)) {
+          selection.insertText(text)
+        }
+      })
+      editor.focus()
+    }
   }, [])
 
   const copyText = useCallback(async (text: string) => {
@@ -785,14 +894,19 @@ function App() {
   const onSmartComplete = useCallback(() => {
     if (!activeFile) return
     const editor = editorRef.current
-    const model = editor?.getModel?.()
-    const full: string = model?.getValue?.() ?? activeFile.content
-    let snippet = full.slice(Math.max(0, full.length - 1200))
-    const pos = editor?.getPosition?.()
-    if (pos && model?.getOffsetAt) {
-      const offset = model.getOffsetAt(pos)
-      snippet = full.slice(Math.max(0, offset - 1200), offset)
+    
+    // Use getContextBeforeCursor from AIAssistPlugin to get last 1200 characters
+    const extendedEditor = editor as any
+    let snippet = ''
+    
+    if (extendedEditor?.getContextBeforeCursor && typeof extendedEditor.getContextBeforeCursor === 'function') {
+      snippet = extendedEditor.getContextBeforeCursor(1200)
+    } else {
+      // Fallback: get content from editor or activeFile
+      const full: string = extendedEditor?.getContent?.() ?? activeFile.content
+      snippet = full.slice(Math.max(0, full.length - 1200))
     }
+    
     const nearing = chapterWordTarget > 0 && activeCharCount >= Math.floor(chapterWordTarget * 0.9)
     const prompt =
       `续写补全：本章目标字数 ${chapterWordTarget}，当前 ${activeCharCount}。\n` +
@@ -874,21 +988,22 @@ function App() {
 
   // --- Editor Context Menu Handlers ---
 
-  const openEditorContextMenu = useCallback((e: MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    const selectedText = getSelectionText()
-    if (!selectedText || selectedText.trim().length === 0) {
-      return
-    }
-    
-    setEditorContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      selectedText,
-    })
-  }, [getSelectionText])
+  // TODO: Re-implement for Lexical in task 13
+  // const openEditorContextMenu = useCallback((e: MouseEvent) => {
+  //   e.preventDefault()
+  //   e.stopPropagation()
+  //   
+  //   const selectedText = getSelectionText()
+  //   if (!selectedText || selectedText.trim().length === 0) {
+  //     return
+  //   }
+  //   
+  //   setEditorContextMenu({
+  //     x: e.clientX,
+  //     y: e.clientY,
+  //     selectedText,
+  //   })
+  // }, [getSelectionText])
 
   const closeEditorContextMenu = useCallback(() => {
     setEditorContextMenu(null)
@@ -898,10 +1013,6 @@ function App() {
     if (!editorContextMenu || !activeFile) return
     
     const selectedText = editorContextMenu.selectedText
-    const editor = editorRef.current
-    const selection = editor?.getSelection()
-    
-    if (!selection) return
     
     setBusy(true)
     setError(null)
@@ -913,17 +1024,13 @@ function App() {
         activeFile.path
       )
       
-      // Get selection line numbers
-      const startLine = selection.startLineNumber
-      const endLine = selection.endLineNumber
-      
-      // Convert to ChangeSet
+      // Convert to ChangeSet (without line numbers for now - will be improved in task 7)
       const changeSet = aiAssistanceService.convertToChangeSet(
         response,
         activeFile.path,
         activeFile.content,
-        startLine,
-        endLine
+        1, // placeholder
+        1  // placeholder
       )
       
       // Add to diff context and open diff view
@@ -940,10 +1047,6 @@ function App() {
     if (!editorContextMenu || !activeFile) return
     
     const selectedText = editorContextMenu.selectedText
-    const editor = editorRef.current
-    const selection = editor?.getSelection()
-    
-    if (!selection) return
     
     setBusy(true)
     setError(null)
@@ -955,17 +1058,13 @@ function App() {
         activeFile.path
       )
       
-      // Get selection line numbers
-      const startLine = selection.startLineNumber
-      const endLine = selection.endLineNumber
-      
-      // Convert to ChangeSet
+      // Convert to ChangeSet (without line numbers for now - will be improved in task 7)
       const changeSet = aiAssistanceService.convertToChangeSet(
         response,
         activeFile.path,
         activeFile.content,
-        startLine,
-        endLine
+        1, // placeholder
+        1  // placeholder
       )
       
       // Add to diff context and open diff view
@@ -982,10 +1081,6 @@ function App() {
     if (!editorContextMenu || !activeFile) return
     
     const selectedText = editorContextMenu.selectedText
-    const editor = editorRef.current
-    const selection = editor?.getSelection()
-    
-    if (!selection) return
     
     setBusy(true)
     setError(null)
@@ -997,17 +1092,13 @@ function App() {
         activeFile.path
       )
       
-      // Get selection line numbers
-      const startLine = selection.startLineNumber
-      const endLine = selection.endLineNumber
-      
-      // Convert to ChangeSet
+      // Convert to ChangeSet (without line numbers for now - will be improved in task 7)
       const changeSet = aiAssistanceService.convertToChangeSet(
         response,
         activeFile.path,
         activeFile.content,
-        startLine,
-        endLine
+        1, // placeholder
+        1  // placeholder
       )
       
       // Add to diff context and open diff view
@@ -1021,6 +1112,20 @@ function App() {
   }, [editorContextMenu, activeFile, diffContext, onOpenDiffView])
 
   // --- Effects ---
+
+  // Handle tab switching with state save/restore
+  useEffect(() => {
+    if (!activePath || !editorRef.current) return
+    
+    // Save state of previous tab
+    const previousPath = openFiles.find(f => f.path !== activePath)?.path
+    if (previousPath) {
+      editorManager.saveState(previousPath)
+    }
+    
+    // Restore state of current tab
+    editorManager.restoreState(activePath)
+  }, [activePath, openFiles])
 
   useEffect(() => {
     if (!showPreview || !activeFile) {
@@ -1113,7 +1218,18 @@ function App() {
     })()
     void refreshGit()
     void loadProjectSettings()
-  }, [loadProjectSettings, refreshGit, workspaceRoot])
+    void loadSensitiveWordSettings()
+  }, [loadProjectSettings, loadSensitiveWordSettings, refreshGit, workspaceRoot])
+
+  // Auto-save sensitive word settings when they change
+  useEffect(() => {
+    if (!workspaceRoot) return
+    // Debounce the save to avoid too many writes
+    const timer = setTimeout(() => {
+      void saveSensitiveWordSettings()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [sensitiveWordEnabled, sensitiveWordDictionary, saveSensitiveWordSettings, workspaceRoot])
 
   useEffect(() => {
     if (!isTauriApp()) return
@@ -1591,6 +1707,9 @@ function App() {
                         const ok = await showConfirm(`文件“${f.name}”未保存，确认关闭吗？`)
                         if (!ok) return
                       }
+                      // Destroy editor instance in EditorManager
+                      editorManager.destroyEditor(f.path)
+                      
                       setOpenFiles((prev) => {
                         const next = prev.filter((p) => p.path !== f.path)
                         if (activePath === f.path) {
@@ -1626,106 +1745,27 @@ function App() {
           {activeFile ? (
             <>
               <div className="editor-pane" style={showPreview ? { width: '50%', maxWidth: '50%' } : undefined}>
-                <Editor
-                  theme="vs-dark"
-                  language="plaintext"
-                  value={activeFile.content}
-                  onMount={(editor, monaco) => {
-                    editorRef.current = editor
-                    monacoRef.current = monaco
-                    
-                    // Add context menu handler
-                    editor.onContextMenu((e) => {
-                      const selectedText = getSelectionText()
-                      if (selectedText && selectedText.trim().length > 0) {
-                        openEditorContextMenu(e.event.browserEvent as unknown as MouseEvent)
-                      }
-                    })
-                    
-                    // Register character hover provider
-                    const hoverProvider = monaco.languages.registerHoverProvider('plaintext', {
-                      provideHover: async (model, position) => {
-                        // Get the word at the current position
-                        const word = model.getWordAtPosition(position)
-                        if (!word) return null
-                        
-                        const characterName = word.word
-                        
-                        try {
-                          // Search for the character by name
-                          const characters = await characterService.searchCharacters(characterName)
-                          
-                          // Find exact match (case-insensitive)
-                          const character = characters.find(
-                            c => c.name.toLowerCase() === characterName.toLowerCase()
-                          )
-                          
-                          if (!character) return null
-                          
-                          // Build hover content with character information
-                          const lines: string[] = [
-                            `**${character.name}**`,
-                            '',
-                          ]
-                          
-                          if (character.data.appearance) {
-                            lines.push(`**外貌**: ${character.data.appearance}`)
-                          }
-                          
-                          if (character.data.personality) {
-                            lines.push(`**性格**: ${character.data.personality}`)
-                          }
-                          
-                          if (character.data.background) {
-                            lines.push(`**背景**: ${character.data.background}`)
-                          }
-                          
-                          if (character.data.relationships) {
-                            lines.push(`**关系**: ${character.data.relationships}`)
-                          }
-                          
-                          if (character.data.notes) {
-                            lines.push(`**备注**: ${character.data.notes}`)
-                          }
-                          
-                          return {
-                            range: new monaco.Range(
-                              position.lineNumber,
-                              word.startColumn,
-                              position.lineNumber,
-                              word.endColumn
-                            ),
-                            contents: [
-                              { value: lines.join('\n\n') }
-                            ]
-                          }
-                        } catch (error) {
-                          console.error('Failed to fetch character data:', error)
-                          return null
-                        }
-                      }
-                    })
-                    
-                    // Clean up hover provider when editor is disposed
-                    editor.onDidDispose(() => {
-                      hoverProvider.dispose()
-                    })
-                  }}
-                  onChange={(v) => {
-                    const value = v ?? ''
+                <LexicalEditor
+                  initialContent={activeFile.content}
+                  onChange={(content) => {
+                    // Update file content and mark as dirty
                     setOpenFiles((prev) =>
-                      prev.map((f) => (f.path === activeFile.path ? { ...f, content: value, dirty: true } : f)),
+                      prev.map((f) => (f.path === activeFile.path ? { ...f, content, dirty: true } : f)),
                     )
                   }}
-                  options={{
-                    minimap: { enabled: false },
-                    wordWrap: 'on',
-                    fontSize: 14,
-                    lineNumbers: 'off',
-                    padding: { top: 16, bottom: 16 },
-                    unicodeHighlight: { ambiguousCharacters: false },
+                  config={editorConfig}
+                  readOnly={false}
+                  placeholder="开始写作..."
+                  editorRef={editorRef}
+                  fileType={activeFile.path.split('.').pop() || 'txt'}
+                  className="novel-editor"
+                  onReady={(editor) => {
+                    // Register editor with EditorManager
+                    editorManager.createEditor(activeFile.path, editor)
+                    
+                    // TODO: Add context menu handler for Lexical (task 13)
+                    // TODO: Add character hover provider for Lexical (task 7)
                   }}
-                  className="markdown-editor"
                 />
               </div>
               {showPreview ? (
@@ -2098,6 +2138,118 @@ function App() {
                       onChange={(e) => setChapterWordTarget(Number(e.target.value) || 0)}
                       onBlur={() => void saveProjectSettings()}
                     />
+                  </div>
+                </div>
+
+                {/* Sensitive Word Configuration Section */}
+                <div style={{ marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 14, marginBottom: 10, color: '#fff' }}>敏感词检测</h3>
+                  
+                  {/* Enable/Disable Toggle */}
+                  <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <label style={{ flex: 1 }}>启用敏感词检测</label>
+                    <input
+                      type="checkbox"
+                      checked={sensitiveWordEnabled}
+                      onChange={(e) => setSensitiveWordEnabled(e.target.checked)}
+                    />
+                  </div>
+
+                  {/* Custom Words Management */}
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ fontSize: 12, color: '#ccc', marginBottom: 6, display: 'block' }}>
+                      自定义敏感词词库
+                    </label>
+                    
+                    {/* Add Word Input */}
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                      <input
+                        type="text"
+                        value={newSensitiveWord}
+                        onChange={(e) => setNewSensitiveWord(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            onAddSensitiveWord()
+                          }
+                        }}
+                        placeholder="输入敏感词..."
+                        style={{
+                          flex: 1,
+                          padding: '6px 10px',
+                          background: '#333',
+                          border: '1px solid #555',
+                          borderRadius: 4,
+                          color: '#fff',
+                          fontSize: 13,
+                        }}
+                      />
+                      <button
+                        className="primary-button"
+                        style={{ fontSize: 12, padding: '6px 12px' }}
+                        onClick={onAddSensitiveWord}
+                        disabled={!newSensitiveWord.trim()}
+                      >
+                        添加
+                      </button>
+                    </div>
+
+                    {/* Word List */}
+                    <div
+                      style={{
+                        maxHeight: 200,
+                        overflowY: 'auto',
+                        background: '#2d2d2d',
+                        border: '1px solid #444',
+                        borderRadius: 4,
+                        padding: 8,
+                      }}
+                    >
+                      {sensitiveWordDictionary.length === 0 ? (
+                        <div style={{ fontSize: 12, color: '#666', fontStyle: 'italic', textAlign: 'center', padding: 10 }}>
+                          暂无自定义敏感词
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {sensitiveWordDictionary.map((word) => (
+                            <div
+                              key={word}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                background: '#444',
+                                padding: '4px 8px',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                color: '#fff',
+                              }}
+                            >
+                              <span>{word}</span>
+                              <button
+                                onClick={() => onRemoveSensitiveWord(word)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#ff6b6b',
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  fontSize: 14,
+                                  lineHeight: 1,
+                                }}
+                                title="删除"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>
+                      共 {sensitiveWordDictionary.length} 个敏感词
+                    </div>
                   </div>
                 </div>
 
@@ -2492,6 +2644,11 @@ function App() {
         <div className="status-item">字数：{activeCharCount} / {chapterWordTarget}</div>
         <div className="status-item">写作：{writingSeconds}s</div>
         <div className="status-item">Git：{gitError ? '不可用' : `${gitItems.length} 变更`}</div>
+        {sensitiveWordEnabled && (
+          <div className="status-item" title={isSensitiveWordDetecting ? '检测中...' : `检测到 ${sensitiveWordCount} 个敏感词`}>
+            敏感词：{isSensitiveWordDetecting ? '...' : sensitiveWordCount}
+          </div>
+        )}
         <div className="status-spacer" />
       </div>
 
