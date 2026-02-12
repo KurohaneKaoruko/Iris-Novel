@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::Manager;
 
+use crate::app_data;
 use crate::secrets;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,9 +247,5 @@ pub fn save(app: &tauri::AppHandle, settings: &AppSettings) -> Result<(), String
 }
 
 fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  let base = app
-    .path()
-    .app_data_dir()
-    .map_err(|e| format!("app data dir failed: {e}"))?;
-  Ok(base.join("Iris-Creation").join("settings.json"))
+  app_data::data_file_path(app, "settings.json")
 }

@@ -9,6 +9,7 @@ import { $getSelection, $isRangeSelection } from 'lexical'
 import './App.css'
 import { LexicalEditor } from './components/LexicalEditor'
 import type { EditorConfig } from './types/editor'
+import { EDITOR_NAMESPACE } from './branding'
 import {
   createFile,
   createDir,
@@ -211,7 +212,7 @@ function App() {
 
   // Editor configuration for Lexical
   const editorConfig: EditorConfig = useMemo(() => ({
-    namespace: 'NovelStudioEditor',
+    namespace: EDITOR_NAMESPACE,
     theme: {
       paragraph: 'editor-paragraph',
       text: {
@@ -1972,7 +1973,7 @@ function App() {
             </>
           ) : (
             <div className="welcome-screen">
-              <h1>Iris-Creation</h1>
+              <h1>Iris Creation</h1>
               <div className="welcome-actions">
                 <button className="welcome-btn" onClick={() => void onOpenWorkspace()}>
                   打开文件夹

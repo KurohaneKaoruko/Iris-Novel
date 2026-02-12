@@ -3,9 +3,11 @@
 mod commands;
 mod ai_types;
 mod agent_system;
+mod app_data;
 mod app_settings;
 mod agents;
 mod chat_history;
+mod branding;
 mod secrets;
 mod state;
 mod modification_types;

@@ -1,9 +1,12 @@
 {
-  "name": "novel-studio",
+  "name": "iris-creation",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "sync:branding": "node ./scripts/sync-branding.mjs",
+    "predev": "npm run sync:branding",
+    "prebuild": "npm run sync:branding",
     "dev": "vite --port 1420 --strictPort",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

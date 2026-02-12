@@ -1,0 +1,17 @@
+{
+  "displayName": "Iris-Creation",
+  "npmName": "iris-creation",
+  "crateName": "iris-creation",
+  "tauriIdentifier": "com.iris-creation.app",
+  "dataDirName": "Iris-Creation",
+  "gitSignature": {
+    "name": "Iris-Creation",
+    "email": "iris-creation@local"
+  },
+  "editor": {
+    "namespace": "IrisCreationEditor",
+    "configStorageKey": "iris-creation-editor-config",
+    "legacyConfigStorageKey": "iris-creation-editor-config"
+  },
+  "legacyDataDirName": "Iris Creation"
+}

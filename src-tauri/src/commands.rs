@@ -2,6 +2,8 @@ use crate::app_settings;
 use crate::agents;
 use crate::agent_system;
 use crate::ai_types::ChatMessage;
+use crate::app_data;
+use crate::branding;
 use crate::chat_history;
 use crate::secrets;
 use crate::state::AppState;
@@ -67,11 +69,7 @@ pub fn get_last_workspace(app: AppHandle) -> Result<Option<String>, String> {
 }
 
 fn last_workspace_path(app: &AppHandle) -> Result<PathBuf, String> {
-  let base = app
-    .path()
-    .app_data_dir()
-    .map_err(|e| format!("app data dir failed: {e}"))?;
-  Ok(base.join("Iris-Creation").join("last_workspace.json"))
+  app_data::data_file_path(app, "last_workspace.json")
 }
 
 fn save_last_workspace(app: &AppHandle, root: &Path) -> Result<(), String> {
@@ -470,7 +468,7 @@ pub fn git_commit(state: State<'_, AppState>, message: String) -> Result<String,
 
   let sig = repo
     .signature()
-    .or_else(|_| git2::Signature::now("Iris-Creation", "novel-studio@local"))
+    .or_else(|_| git2::Signature::now(branding::GIT_SIGNATURE_NAME, branding::GIT_SIGNATURE_EMAIL))
     .map_err(|e| format!("signature failed: {e}"))?;
 
   let parent = repo

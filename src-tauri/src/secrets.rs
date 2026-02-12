@@ -1,11 +1,10 @@
 use base64::{engine::general_purpose, Engine as _};
+use crate::app_data;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
-
-const DATA_DIR_NAME: &str = "Iris-Creation";
+use tauri::AppHandle;
 
 #[derive(Default, Serialize, Deserialize)]
 struct SecretsFile {
@@ -13,11 +12,7 @@ struct SecretsFile {
 }
 
 fn secrets_path(app: &AppHandle) -> Result<PathBuf, String> {
-  let base = app
-    .path()
-    .app_data_dir()
-    .map_err(|e| format!("app data dir failed: {e}"))?;
-  Ok(base.join(DATA_DIR_NAME).join("secrets.json"))
+  app_data::data_file_path(app, "secrets.json")
 }
 
 fn read_secrets_file(app: &AppHandle) -> Result<SecretsFile, String> {

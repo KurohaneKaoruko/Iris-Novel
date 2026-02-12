@@ -1,7 +1,7 @@
-# Clean Build Script for Iris-Creation
+# Clean Build Script for Iris Creation
 # This script cleans all build artifacts and caches to fix path reference issues
 
-Write-Host "🧹 Cleaning Iris-Creation build artifacts..." -ForegroundColor Cyan
+Write-Host "🧹 Cleaning Iris Creation build artifacts..." -ForegroundColor Cyan
 Write-Host ""
 
 # Clean Rust/Cargo build cache

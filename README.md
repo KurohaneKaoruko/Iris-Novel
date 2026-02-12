@@ -106,7 +106,7 @@ Iris-Creation 认为"小说本身"只由三个主目录构成，且这三个目�
 
 - Node.js（建议 18+）
 - Rust（stable，含 cargo）
-- Visual Studio Build Tools（勾选 Desktop development with C++ / MSVC 工具链）
+- Visual IDE Build Tools（勾选 Desktop development with C++ / MSVC 工具链）
 - WebView2 Runtime（Win10/11 通常已自带；没有请安装 Evergreen Runtime）
 
 ### 启动开发模式

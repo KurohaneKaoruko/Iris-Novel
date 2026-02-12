@@ -1,7 +1,7 @@
+use crate::app_data;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::Manager;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -68,9 +68,5 @@ pub fn save(app: &tauri::AppHandle, sessions: &[ChatSession]) -> Result<(), Stri
 }
 
 fn history_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  let base = app
-    .path()
-    .app_data_dir()
-    .map_err(|e| format!("app data dir failed: {e}"))?;
-  Ok(base.join("Iris-Creation").join("chat_history.json"))
+  app_data::data_file_path(app, "chat_history.json")
 }

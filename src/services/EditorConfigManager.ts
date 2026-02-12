@@ -4,6 +4,8 @@
  * Provides read/write operations for editor configuration
  */
 
+import { EDITOR_CONFIG_STORAGE_KEY, LEGACY_EDITOR_CONFIG_STORAGE_KEY } from '../branding'
+
 export interface EditorUserConfig {
   // Font settings
   fontFamily: string
@@ -35,7 +37,8 @@ const DEFAULT_CONFIG: EditorUserConfig = {
 }
 
 // LocalStorage key for editor configuration
-const STORAGE_KEY = 'novel-studio-editor-config'
+const STORAGE_KEY = EDITOR_CONFIG_STORAGE_KEY
+const LEGACY_STORAGE_KEY = LEGACY_EDITOR_CONFIG_STORAGE_KEY
 
 class EditorConfigManager {
   private config: EditorUserConfig
@@ -207,7 +210,7 @@ class EditorConfigManager {
    */
   private loadFromStorage(): void {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
+      const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY)
       if (!stored) {
         return
       }
@@ -223,6 +226,10 @@ class EditorConfigManager {
         this.config = {
           ...DEFAULT_CONFIG,
           ...config,
+        }
+        if (!localStorage.getItem(STORAGE_KEY) && localStorage.getItem(LEGACY_STORAGE_KEY)) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(this.config))
+          localStorage.removeItem(LEGACY_STORAGE_KEY)
         }
       }
     } catch (error) {

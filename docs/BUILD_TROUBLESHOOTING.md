@@ -2,7 +2,7 @@
 
 ## Common Build Issues and Solutions
 
-### Issue: Path Reference Error (Iris-Creation vs Novel-Studio)
+### Issue: Path Reference Error (Project Rename)
 
 **Error Message:**
 ```

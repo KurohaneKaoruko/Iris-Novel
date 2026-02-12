@@ -1,8 +1,8 @@
 #!/bin/bash
-# Clean Build Script for Iris-Creation
+# Clean Build Script for Iris Creation
 # This script cleans all build artifacts and caches to fix path reference issues
 
-echo "🧹 Cleaning Iris-Creation build artifacts..."
+echo "🧹 Cleaning Iris Creation build artifacts..."
 echo ""
 
 # Clean Rust/Cargo build cache

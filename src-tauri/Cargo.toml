@@ -1,5 +1,5 @@
 [package]
-name = "novel-studio"
+name = "iris-creation"
 version = "0.1.0"
 description = "Iris-Creation"
 authors = ["you"]
@@ -37,3 +37,12 @@ incremental = true
 panic = "abort"
 lto = true
 codegen-units = 1
+
+
+
+
+
+
+
+
+

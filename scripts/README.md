@@ -29,7 +29,7 @@ chmod +x scripts/clean-build.sh
 ### When to use
 
 Run this script when you encounter:
-- Build errors referencing old paths (e.g., `Iris-Creation` instead of `Novel-Studio`)
+- Build errors referencing old paths (e.g., previous project folder name)
 - Cached build artifacts causing issues
 - After renaming the project
 - After major dependency updates
