@@ -263,4 +263,4 @@ npm run test
 
 ## License
 
-待定（根据你的开源/闭源选择再补充）。
+GPL-3.0
