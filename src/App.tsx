@@ -1656,7 +1656,12 @@ function App() {
                 </button>
               ) : null}
             </div>
-            <div className="sidebar-content">
+            <div className="sidebar-content" style={{ flex: 1 }} onContextMenu={(e) => {
+              e.preventDefault()
+              if (workspaceRoot) {
+                setExplorerContextMenu({ x: e.clientX, y: e.clientY, entry: { kind: 'dir', path: workspaceRoot, name: workspaceRoot.split('/').pop() || '', children: [] } })
+              }
+            }}>
               {workspaceRoot ? (
                 <>
                   {error ? <div className="error-text">{error}</div> : null}
