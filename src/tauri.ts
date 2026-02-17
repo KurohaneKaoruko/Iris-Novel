@@ -17,7 +17,7 @@ export type AppSettings = {
 export type ModelProvider = {
   id: string
   name: string
-  kind: 'OpenAI' | 'Anthropic' | 'OpenAICompatible'
+  kind: 'OpenAI' | 'Anthropic' | 'OpenAICompatible' | 'Minimax' | 'ZAI' | 'Custom'
   api_key: string
   base_url: string
   model_name: string
