@@ -2674,6 +2674,15 @@ function App() {
                           padding: '8px 12px',
                           borderRadius: 4,
                           border: appSettings.active_provider_id === p.id ? '1px solid #007acc' : '1px solid transparent',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => {
+                          if (appSettings.active_provider_id !== p.id) {
+                            const prev = appSettings
+                            const next = { ...appSettings, active_provider_id: p.id }
+                            setAppSettingsState(next)
+                            void persistAppSettings(next, prev)
+                          }
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
@@ -2690,7 +2699,8 @@ function App() {
                             <button
                               className="icon-button"
                               title="设为默认"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 const prev = appSettings
                                 const next = { ...appSettings, active_provider_id: p.id }
                                 setAppSettingsState(next)
@@ -2703,7 +2713,8 @@ function App() {
                           <button
                             className="icon-button"
                             title="编辑"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               setEditingProvider(p)
                               setIsNewProvider(false)
                               setShowModelModal(true)
@@ -2715,7 +2726,8 @@ function App() {
                             className="icon-button"
                             title="删除"
                             disabled={appSettings.providers.length <= 1}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               void (async () => {
                                 const ok = await showConfirm('确定删除该模型配置？')
                                 if (!ok) return
