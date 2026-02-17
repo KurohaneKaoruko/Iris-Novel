@@ -1190,7 +1190,15 @@ function App() {
       let changed = false
       const next = prev.map((f) => {
         if (f.path !== activePath) return f
-        if (f.content === content) return f
+        // Only mark as dirty if content actually changed from saved version
+        if (f.content === content) {
+          // Content matches saved version, ensure dirty is false
+          if (f.dirty) {
+            changed = true
+            return { ...f, dirty: false }
+          }
+          return f
+        }
         changed = true
         return { ...f, content, dirty: true }
       })
