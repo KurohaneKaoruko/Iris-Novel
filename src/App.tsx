@@ -2564,13 +2564,14 @@ function App() {
                   <h3 style={{ fontSize: 14, marginBottom: 10, color: '#fff', writingMode: 'horizontal-tb' }}>敏感词检测</h3>
                   
                   {/* Enable/Disable Toggle */}
-                  <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <label style={{ flex: 1, writingMode: 'horizontal-tb' }}>启用敏感词检测</label>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 8 }}>
                     <input
                       type="checkbox"
                       checked={sensitiveWordEnabled}
                       onChange={(e) => setSensitiveWordEnabled(e.target.checked)}
+                      style={{ width: 16, height: 16 }}
                     />
+                    <span style={{ color: '#ccc', fontSize: 13 }}>启用敏感词检测</span>
                   </div>
 
                   {/* Custom Words Management */}
