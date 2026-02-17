@@ -148,6 +148,9 @@ function App() {
   const chatSessionIdRef = useRef<string>(
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
   )
+  // Chat session management (future feature)
+  // const [chatSessions, setChatSessions] = useState<Array<{ id: string; name: string; updatedAt: number }>>([])
+  // const [showSessionManager, setShowSessionManager] = useState(false)
 
   // Settings & Agents
   const [appSettings, setAppSettingsState] = useState<AppSettings | null>(null)
@@ -1187,7 +1190,15 @@ function App() {
       let changed = false
       const next = prev.map((f) => {
         if (f.path !== activePath) return f
-        if (f.content === content) return f
+        // Only mark as dirty if content actually changed from saved version
+        if (f.content === content) {
+          // Content matches saved version, ensure dirty is false
+          if (f.dirty) {
+            changed = true
+            return { ...f, dirty: false }
+          }
+          return f
+        }
         changed = true
         return { ...f, content, dirty: true }
       })
@@ -1596,13 +1607,6 @@ function App() {
             <span className="activity-bar-icon">📁</span>
           </div>
           <div
-            className={`activity-bar-item ${activeSidebarTab === 'git' ? 'active' : ''}`}
-            onClick={() => setActiveSidebarTab('git')}
-            title="源代码管理"
-          >
-            <span className="activity-bar-icon">📦</span>
-          </div>
-          <div
             className={`activity-bar-item ${activeSidebarTab === 'chapters' ? 'active' : ''}`}
             onClick={() => setActiveSidebarTab('chapters')}
             title="章节管理"
@@ -1630,6 +1634,13 @@ function App() {
           >
             <span className="activity-bar-icon">🧩</span>
           </div>
+          <div
+            className={`activity-bar-item ${activeSidebarTab === 'git' ? 'active' : ''}`}
+            onClick={() => setActiveSidebarTab('git')}
+            title="源代码管理"
+          >
+            <span className="activity-bar-icon">📦</span>
+          </div>
           <div className="spacer" />
           <div
             className="activity-bar-item"
@@ -1656,7 +1667,12 @@ function App() {
                 </button>
               ) : null}
             </div>
-            <div className="sidebar-content">
+            <div className="sidebar-content" style={{ flex: 1 }} onContextMenu={(e) => {
+              e.preventDefault()
+              if (workspaceRoot) {
+                setExplorerContextMenu({ x: e.clientX, y: e.clientY, entry: { kind: 'dir', path: workspaceRoot, name: workspaceRoot.split('/').pop() || '', children: [] } })
+              }
+            }}>
               {workspaceRoot ? (
                 <>
                   {error ? <div className="error-text">{error}</div> : null}
@@ -2030,6 +2046,21 @@ function App() {
             {activeRightTab === 'chat' ? (
               <>
                 <div className="ai-header">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, color: '#888', fontWeight: 500 }}>AI 对话</span>
+                    <button 
+                      className="icon-button" 
+                      style={{ fontSize: 12, padding: '4px 8px' }}
+                      onClick={() => {
+                        const newId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+                        chatSessionIdRef.current = newId
+                        setChatMessages([])
+                      }}
+                      title="新建对话"
+                    >
+                      ➕ 新会话
+                    </button>
+                  </div>
                   <div className="ai-config-row">
                     <select
                       className="ai-select"
@@ -2674,6 +2705,15 @@ function App() {
                           padding: '8px 12px',
                           borderRadius: 4,
                           border: appSettings.active_provider_id === p.id ? '1px solid #007acc' : '1px solid transparent',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => {
+                          if (appSettings.active_provider_id !== p.id) {
+                            const prev = appSettings
+                            const next = { ...appSettings, active_provider_id: p.id }
+                            setAppSettingsState(next)
+                            void persistAppSettings(next, prev)
+                          }
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
@@ -2690,7 +2730,8 @@ function App() {
                             <button
                               className="icon-button"
                               title="设为默认"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 const prev = appSettings
                                 const next = { ...appSettings, active_provider_id: p.id }
                                 setAppSettingsState(next)
@@ -2703,7 +2744,8 @@ function App() {
                           <button
                             className="icon-button"
                             title="编辑"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               setEditingProvider(p)
                               setIsNewProvider(false)
                               setShowModelModal(true)
@@ -2715,7 +2757,8 @@ function App() {
                             className="icon-button"
                             title="删除"
                             disabled={appSettings.providers.length <= 1}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               void (async () => {
                                 const ok = await showConfirm('确定删除该模型配置？')
                                 if (!ok) return
