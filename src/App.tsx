@@ -3301,6 +3301,7 @@ function App() {
             { id: 'newChapter', label: '新建章节', category: '文件', action: () => void onNewChapter() },
             { id: 'toggleTheme', label: '切换主题', category: '视图', action: () => setTheme(t => t === 'light' ? 'dark' : 'light') },
             { id: 'toggleSidebar', label: '切换侧边栏', category: '视图', shortcut: 'Ctrl+B', action: () => {} },
+            { id: 'openSettings', label: '打开设置', category: '设置', shortcut: 'Ctrl+,', action: () => setShowSettings(true) },
             { id: 'aiChat', label: 'AI 对话', category: 'AI', shortcut: 'Ctrl+Shift+L', action: () => {} },
             { id: 'smartComplete', label: '智能补全', category: 'AI', action: () => void onSmartComplete() },
             { id: 'gitCommit', label: 'Git 提交', category: 'Git', action: () => {} },
