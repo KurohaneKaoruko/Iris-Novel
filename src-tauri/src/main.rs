@@ -62,9 +62,8 @@ fn main() {
       commands::get_skill_categories,
       commands::get_skills_by_category,
       commands::apply_skill,
-      commands::analyze_book,
-      commands::split_book,
-      commands::extract_chapters
+      commands::拆书_analyze,
+      commands::拆书_extract_ Techniques
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

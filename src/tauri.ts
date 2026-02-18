@@ -327,3 +327,103 @@ export async function splitBook(content: string, title: string, config: BookSpli
 export async function extractChapters(content: string): Promise<ChapterInfo[]> {
   return invoke<ChapterInfo[]>('extract_chapters', { content })
 }
+
+// ============ 拆书 Types ============
+
+export type BookStructure = {
+  type: string
+  acts: Array<{ id: number; name: string; chapters: number[]; description: string }>
+  pacing: string
+  audience: string
+}
+
+export type PlotArc = {
+  name: string
+  main: boolean
+  chapters: number[]
+  description: string
+}
+
+export type RhythmAnalysis = {
+  average_chapter_length: number
+  conflict_density: string
+  turning_points: Array<{ chapter: number; type: string; description: string }>
+  chapter_hooks: string[]
+}
+
+export type ClimaxPoint = {
+  chapter: number
+  type: string
+  intensity: number
+  description: string
+}
+
+export type 爽点 = {
+  chapter: number
+  type: string
+  description: string
+  frequency: string
+}
+
+export type CharacterAnalysis = {
+  name: string
+  role: string
+  archetype: string
+  growth: string
+  main_moments: string[]
+  relationships: string[]
+}
+
+export type CharacterRelationship = {
+  from: string
+  to: string
+  type: string
+  description: string
+}
+
+export type WorldSetting = {
+  name: string
+  category: string
+  importance: string
+  description: string
+}
+
+export type PowerSystem = {
+  name: string
+  levels: string[]
+  cultivation_method: string
+  resources: string[]
+}
+
+export type WritingTechnique = {
+  category: string
+  technique: string
+  example: string
+  application: string
+}
+
+export type Book拆书Result = {
+  title: string
+  author: string | null
+  source: string
+  structure: BookStructure
+  plot_arcs: PlotArc[]
+  rhythm: RhythmAnalysis
+  climax_points: ClimaxPoint[]
+  爽点列表: 爽点[]
+  characters: CharacterAnalysis[]
+  character_relationships: CharacterRelationship[]
+  world_settings: WorldSetting[]
+  power_system: PowerSystem[]
+  techniques: WritingTechnique[]
+  summary: string
+  learnable_points: string[]
+}
+
+export async function 拆书Analyze(content: string, title: string): Promise<Book拆书Result> {
+  return invoke<Book拆书Result>('拆书_analyze', { content, title })
+}
+
+export async function 拆书ExtractTechniques(content: string): Promise<WritingTechnique[]> {
+  return invoke<WritingTechnique[]>('拆书_extract__echniques', { content })
+}

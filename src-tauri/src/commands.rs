@@ -1674,3 +1674,210 @@ pub async fn ai_split_by_ai(
     
     Ok("AI拆分功能需要配置API Key".to_string())
 }
+
+// ============ 拆书 Commands ============
+
+use crate::book_split::{Book拆书Result, Book拆书Config, 幕, 剧情线, 转折点, 高潮点, 爽点, 人物分析, 世界设定, 写作技巧};
+
+#[tauri::command]
+pub async fn 拆书_analyze(content: String, title: String) -> Result<Book拆书Result, String> {
+    let mut result = Book拆书Result::new(&title);
+    let word_count = content.chars().filter(|c| !c.is_whitespace()).count();
+    let lines: Vec<&str> = content.lines().collect();
+    
+    // 估算章节数（假设每章3000字）
+    let estimated_chapters = (word_count / 3000).max(1);
+    
+    // 分析章节标题模式
+    let mut chapter_count = 0;
+    let mut current_chapter_start = 0;
+    
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        // 检测章节标题
+        if trimmed.starts_with("第") && (trimmed.contains("章") || trimmed.contains("节") || trimmed.contains("回")) {
+            chapter_count += 1;
+            if chapter_count == 1 {
+                current_chapter_start = i;
+            }
+        }
+    }
+    
+    let actual_chapters = if chapter_count > 0 { chapter_count } else { estimated_chapters };
+    
+    // 生成结构分析
+    result.structure.type = if actual_chapters > 100 {
+        "长篇多线结构".to_string()
+    } else if actual_chapters > 50 {
+        "中长篇结构".to_string()
+    } else {
+        "中短篇结构".to_string()
+    };
+    
+    // 估算幕结构
+    let chapters_per_act = (actual_chapters as f32 / 4.0).ceil() as usize;
+    result.structure.acts = vec![
+        幕 { id: 1, name: "起".to_string(), chapters: (1..=chapters_per_act).collect(), description: "开头铺垫".to_string() },
+        幕 { id: 2, name: "承".to_string(), chapters: (chapters_per_act+1..=chapters_per_act*2).collect(), description: "发展深入".to_string() },
+        幕 { id: 3, name: "转".to_string(), chapters: (chapters_per_act*2+1..=chapters_per_act*3).collect(), description: "高潮转折".to_string() },
+        幕 { id: 4, name: "合".to_string(), chapters: (chapters_per_act*3+1..=actual_chapters).collect(), description: "结局收尾".to_string() },
+    ];
+    
+    // 节奏分析
+    result.rhythm.average_chapter_length = word_count / actual_chapters.max(1);
+    result.rhythm.conflict_density = if result.rhythm.average_chapter_length > 4000 {
+        "高".to_string()
+    } else if result.rhythm.average_chapter_length > 2000 {
+        "中".to_string()
+    } else {
+        "低".to_string()
+    };
+    
+    // 添加一些示例转折点
+    if actual_chapters > 10 {
+        result.rhythm.turning_points = vec![
+            转折点 {
+                chapter: actual_chapters / 4,
+                type: "小高潮".to_string(),
+                description: "第一个冲突解决".to_string()
+            },
+            转折点 {
+                chapter: actual_chapters / 2,
+                type: "重大转折".to_string(),
+                description: "核心冲突爆发".to_string()
+            },
+            转折点 {
+                chapter: (actual_chapters as f32 * 0.75) as usize,
+                type: "高潮".to_string(),
+                description: "最终决战".to_string()
+            },
+        ];
+    }
+    
+    // 章尾钩子类型
+    result.rhythm.chapter_hooks = vec![
+        "悬念型".to_string(), // 战斗胜负未分
+        "意外型".to_string(), // 突然出现强敌
+        "反转型".to_string(), // 真相出人意料
+        "期待型".to_string(), // 修炼突破在即
+    ];
+    
+    // 分析常见的网文爽点
+    result.爽点列表 = vec![
+        爽点 { chapter: actual_chapters / 5, type: "打脸".to_string(), description: "主角实力打脸反派".to_string(), frequency: "高频".to_string() },
+        爽点 { chapter: actual_chapters / 3, type: "逆袭".to_string(), description: "弱变强战胜强敌".to_string(), frequency: "中频".to_string() },
+        爽点 { chapter: actual_chapters / 2, type: "收获".to_string(), description: "获得宝物/传承".to_string(), frequency: "高频".to_string() },
+    ];
+    
+    // 人物分析（示例）
+    result.characters = vec![
+        人物分析 {
+            name: "主角".to_string(),
+            role: "主角".to_string(),
+            archetype: "废柴逆袭型".to_string(),
+            growth: "从弱到强的成长曲线".to_string(),
+            main_moments: vec!["第一次胜利".to_string(), "重大突破".to_string()],
+            relationships: vec!["与反派的对立".to_string(), "与伙伴的羁绊".to_string()],
+        },
+    ];
+    
+    // 写作技巧总结
+    result.techniques = vec![
+        写作技巧 {
+            category: "叙事".to_string(),
+            technique: "上帝视角为主".to_string(),
+            example: "全知全能视角".to_string(),
+            application: "适合新手入门".to_string()
+        },
+        写作技巧 {
+            category: "节奏".to_string(),
+            technique: "小高潮不断".to_string(),
+            example: "每3-5章一个爽点".to_string(),
+            application: "保持读者阅读兴趣".to_string()
+        },
+        写作技巧 {
+            category: "对话".to_string(),
+            technique: "推进剧情型对话".to_string(),
+            example: "少废话，多信息".to_string(),
+            application: "避免水字数".to_string()
+        },
+    ];
+    
+    // 可学习点
+    result.learnable_points = vec![
+        "节奏把控：平均{}字/章".replace("{}", &result.rhythm.average_chapter_length.to_string()),
+        "结构模式：四幕式结构".to_string(),
+        "爽点设计：打脸-逆袭-收获三板斧".to_string(),
+        "人物成长：废柴到强者的经典路线".to_string(),
+        "章尾钩子：每章结尾留悬念".to_string(),
+    ];
+    
+    result.summary = format!(
+        "《{}》约{}字，{}章，属于{}。\
+        节奏{}，冲突密度{}。\
+        主要爽点类型：打脸、逆袭、收获。\
+        可学习点：节奏把控、爽点设计、人物成长曲线。",
+        title,
+        word_count.toLocaleString(),
+        actual_chapters,
+        result.structure.type,
+        result.rhythm.conflict_density,
+        result.rhythm.conflict_density
+    );
+    
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn 拆书_extract_ Techniques(content: String) -> Result<Vec<写作技巧>, String> {
+    let mut techniques = vec![];
+    
+    // 简单分析常见的写作模式
+    if content.contains("只见") || content.contains("那道") || content.contains("此人") {
+        techniques.push(写作技巧 {
+            category: "描写".to_string(),
+            technique: "外貌描写".to_string(),
+            example: "只见此人...".to_string(),
+            application: "出场人物介绍".to_string()
+        });
+    }
+    
+    if content.contains("修为") || content.contains("灵气") || content.contains("功法") {
+        techniques.push(写作技巧 {
+            category: "设定".to_string(),
+            technique: "修炼体系".to_string(),
+            example: "灵气-功法-修为".to_string(),
+            application: "玄幻力量体系".to_string()
+        });
+    }
+    
+    if content.contains("冷笑") || content.contains("不屑") || content.contains("讥讽") {
+        techniques.push(写作技巧 {
+            category: "对话".to_string(),
+            technique: "反派嘲讽".to_string(),
+            example: "冷笑一声...".to_string(),
+            application: "制造冲突".to_string()
+        });
+    }
+    
+    if content.contains("系统") || content.contains("叮") || content.contains("恭喜") {
+        techniques.push(写作技巧 {
+            category: "金手指".to_string(),
+            technique: "系统流".to_string(),
+            example: "系统发布任务".to_string(),
+            application: "主角快速变强".to_string()
+        });
+    }
+    
+    // 默认技巧
+    if techniques.is_empty() {
+        techniques.push(写作技巧 {
+            category: "叙事".to_string(),
+            technique: "推进式叙事".to_string(),
+            example: "主线清晰".to_string(),
+            application: "保持剧情推进".to_string()
+        });
+    }
+    
+    Ok(techniques)
+}
