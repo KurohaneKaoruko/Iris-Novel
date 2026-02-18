@@ -53,6 +53,10 @@ import { PlotLineManager } from './components/PlotLineManager'
 import { WritingGoalPanel } from './components/WritingGoalPanel'
 import { SpecKitPanel } from './components/SpecKitPanel'
 import { SpecKitLintPanel } from './components/SpecKitLintPanel'
+import { DiffReviewPanel } from './components/DiffReviewPanel'
+import { StatusBar } from './components/StatusBar'
+import { CommandPalette, type Command } from './components/CommandPalette'
+import { TabBar, type TabItem } from './components/TabBar'
 import { handleFileSaveError, clearBackupContent } from './utils/fileSaveErrorHandler'
 import { useAutoSave, clearAutoSavedContent, getAutoSavedContent } from './hooks/useAutoSave'
 import { logError } from './utils/errorLogger'
@@ -106,6 +110,10 @@ function App() {
   // DiffView State
   const [showDiffPanel, setShowDiffPanel] = useState(false)
   const [activeDiffTab, setActiveDiffTab] = useState<string | null>(null)
+  
+  // Modern UI State
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
   
   // Activity Bar State
   const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'git' | 'chapters' | 'characters' | 'plotlines' | 'specKit'>('files')
