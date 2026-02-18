@@ -1498,6 +1498,11 @@ function App() {
         e.preventDefault()
         chatInputRef.current?.focus()
       }
+      // Command Palette: Ctrl+Shift+P
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        setShowCommandPalette(true)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -3291,6 +3296,23 @@ function App() {
             )
           }}
           onClose={() => setShowRecoveryDialog(false)}
+        />
+      )}
+
+      {/* Command Palette */}
+      {showCommandPalette && (
+        <CommandPalette
+          commands={[
+            { id: 'save', label: '保存文件', category: '文件', shortcut: 'Ctrl+S', action: () => void onSaveActive() },
+            { id: 'newChapter', label: '新建章节', category: '文件', action: () => void onNewChapter() },
+            { id: 'toggleTheme', label: '切换主题', category: '视图', action: () => setTheme(t => t === 'light' ? 'dark' : 'light') },
+            { id: 'toggleSidebar', label: '切换侧边栏', category: '视图', shortcut: 'Ctrl+B', action: () => {} },
+            { id: 'aiChat', label: 'AI 对话', category: 'AI', shortcut: 'Ctrl+Shift+L', action: () => {} },
+            { id: 'smartComplete', label: '智能补全', category: 'AI', action: () => void onSmartComplete() },
+            { id: 'gitCommit', label: 'Git 提交', category: 'Git', action: () => {} },
+            { id: 'gitPush', label: 'Git 推送', category: 'Git', action: () => {} },
+          ]}
+          onClose={() => setShowCommandPalette(false)}
         />
       )}
     </div>
