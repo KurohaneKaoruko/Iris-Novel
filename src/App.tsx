@@ -3089,17 +3089,17 @@ function App() {
         </div>
       )}
 
-      <div className="status-bar">
-        <div className="status-item">字数：{activeCharCount} / {chapterWordTarget}</div>
-        <div className="status-item">写作：{writingSeconds}s</div>
-        <div className="status-item">Git：{gitError ? '不可用' : `${gitItems.length} 变更`}</div>
-        {sensitiveWordEnabled && (
-          <div className="status-item" title={isSensitiveWordDetecting ? '检测中...' : `检测到 ${sensitiveWordCount} 个敏感词`}>
-            敏感词：{isSensitiveWordDetecting ? '...' : sensitiveWordCount}
-          </div>
-        )}
-        <div className="status-spacer" />
-      </div>
+      <StatusBar
+        info={{
+          charCount: activeCharCount,
+          chapterTarget: chapterWordTarget,
+          gitStatus: gitItems.length > 0 ? 'modified' : 'clean',
+          gitBranch: 'main',
+          theme,
+        }}
+        onThemeToggle={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+        onGitClick={() => setActiveSidebarTab('git')}
+      />
 
       {chatContextMenu ? (
         <div className="context-menu" style={{ left: chatContextMenu.x, top: chatContextMenu.y }}>
