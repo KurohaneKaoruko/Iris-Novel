@@ -1,0 +1,475 @@
+.book-analyzer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.book-analyzer {
+  width: 750px;
+  max-height: 90vh;
+  background: var(--bg-primary, #fff);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.book-analyzer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-subtle, #e5e5e5);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.book-analyzer-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+}
+
+.book-analyzer-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255,255,255,0.2);
+  cursor: pointer;
+  font-size: 20px;
+  color: white;
+  border-radius: 8px;
+}
+
+.book-analyzer-close:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.book-analyzer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* Modes */
+.book-analyzer-modes {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.book-analyzer-modes .mode-btn {
+  flex: 1;
+  padding: 14px 20px;
+  border: 2px solid var(--border-subtle, #ddd);
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-secondary, #666);
+}
+
+.book-analyzer-modes .mode-btn:hover {
+  border-color: #667eea;
+  background: #f0f0ff;
+}
+
+.book-analyzer-modes .mode-btn.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+/* Input */
+.book-analyzer-input {
+  margin-bottom: 20px;
+}
+
+.book-analyzer-input .title-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 2px solid var(--border-subtle, #ddd);
+  border-radius: 12px;
+  font-size: 16px;
+  margin-bottom: 12px;
+  outline: none;
+  background: var(--bg-secondary, #f9f9f9);
+  color: var(--text-primary, #333);
+  transition: border-color 0.2s;
+}
+
+.book-analyzer-input .title-input:focus {
+  border-color: #667eea;
+}
+
+.book-analyzer-input .content-input {
+  width: 100%;
+  height: 180px;
+  padding: 14px 18px;
+  border: 2px solid var(--border-subtle, #ddd);
+  border-radius: 12px;
+  font-size: 14px;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  background: var(--bg-secondary, #f9f9f9);
+  color: var(--text-primary, #333);
+  transition: border-color 0.2s;
+}
+
+.book-analyzer-input .content-input:focus {
+  border-color: #667eea;
+}
+
+/* Action Button */
+.book-analyzer-action {
+  width: 100%;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.book-analyzer-action:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+.book-analyzer-action:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Result */
+.book-analyzer-result {
+  margin-top: 24px;
+  border-top: 2px solid var(--border-subtle, #eee);
+  padding-top: 20px;
+}
+
+/* Summary */
+.result-summary {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.result-summary h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  color: white;
+}
+
+.result-summary p {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255,255,255,0.9);
+  line-height: 1.6;
+}
+
+/* Sections */
+.result-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--bg-secondary, #f8f8f8);
+  border-radius: 12px;
+}
+
+.result-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #667eea;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Structure */
+.structure-info {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 12px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-label {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  text-transform: uppercase;
+}
+
+.info-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+.acts-flow {
+  display: flex;
+  gap: 8px;
+}
+
+.act-box {
+  flex: 1;
+  padding: 12px 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  text-align: center;
+  color: white;
+}
+
+.act-name {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.act-desc {
+  display: block;
+  font-size: 11px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+/* Rhythm */
+.rhythm-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 12px;
+}
+
+.rhythm-stats .stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 20px;
+  background: white;
+  border-radius: 8px;
+}
+
+.rhythm-stats .stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.rhythm-stats .stat-label {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.hooks-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.hooks-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.hook-tag {
+  padding: 4px 10px;
+  background: #fff3e0;
+  color: #ff9800;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+/* 爽点 */
+.爽点-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.爽点-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: white;
+  border-radius: 8px;
+}
+
+.爽点-type {
+  font-weight: 600;
+  color: #e91e63;
+}
+
+.爽点-desc {
+  flex: 1;
+  font-size: 13px;
+  color: #666;
+}
+
+.爽点-freq {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #e8f5e9;
+  color: #4caf50;
+  border-radius: 10px;
+}
+
+/* Characters */
+.characters-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.character-card {
+  padding: 14px;
+  background: white;
+  border-radius: 10px;
+  border-left: 4px solid #667eea;
+}
+
+.char-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.char-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.char-role {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #667eea;
+  color: white;
+  border-radius: 10px;
+}
+
+.char-archetype,
+.char-growth {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* Techniques - 重点！*/
+.techniques-section {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.techniques-section h4 {
+  color: white;
+}
+
+.techniques-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.technique-card {
+  padding: 14px;
+  background: rgba(255,255,255,0.95);
+  border-radius: 10px;
+}
+
+.tech-category {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #11998e;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tech-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.tech-example {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background: #f5f5f5;
+  border-radius: 6px;
+}
+
+.tech-application {
+  font-size: 12px;
+  color: #11998e;
+  font-weight: 500;
+}
+
+/* Learnable */
+.learnable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.learnable-item {
+  padding: 10px 14px;
+  background: white;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #333;
+  border-left: 3px solid #667eea;
+}
+
+/* Dark mode */
+[data-theme="dark"] .book-analyzer {
+  background: #1e1e1e;
+}
+
+[data-theme="dark"] .book-analyzer-input .title-input,
+[data-theme="dark"] .book-analyzer-input .content-input {
+  background: #252526;
+  border-color: #333;
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .result-section {
+  background: #252526;
+}
+
+[data-theme="dark"] .acts-flow .act-box {
+  background: #333;
+}
+
+[data-theme="dark"] .technique-card {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .tech-example {
+  background: #333;
+}

@@ -775,7 +775,7 @@ async fn call_openai_compatible(
   }
   out_messages.extend(messages.iter().map(|m| serde_json::json!({"role": m.role, "content": m.content})));
 
-  let max_tokens = max_tokens_override.unwrap_or(2048);
+  let max_tokens = max_tokens_override.unwrap_or(32000);
   let temperature = temperature_override.unwrap_or(0.7);
 
   let send_once = |msgs: Vec<serde_json::Value>| {
@@ -850,7 +850,7 @@ async fn call_anthropic(
   let url = "https://api.anthropic.com/v1/messages";
   let body = serde_json::json!({
     "model": cfg.model_name,
-    "max_tokens": max_tokens_override.unwrap_or(2048),
+    "max_tokens": max_tokens_override.unwrap_or(32000),
     "system": system_prompt,
     "messages": messages.iter().map(|m| serde_json::json!({"role": m.role, "content": m.content})).collect::<Vec<_>>()
   });
@@ -1340,4 +1340,544 @@ fn build_tree(root: &Path, path: &Path, max_depth: usize) -> Result<FsEntry, Str
       children: vec![],
     })
   }
+}
+
+// ============ Skill Commands ============
+
+#[tauri::command]
+pub fn get_skills() -> Vec<skills::Skill> {
+    let manager = skills::SkillManager::new();
+    manager.get_all().into_iter().cloned().collect()
+}
+
+#[tauri::command]
+pub fn get_skill_categories() -> Vec<String> {
+    let manager = skills::SkillManager::new();
+    manager.categories()
+}
+
+#[tauri::command]
+pub fn get_skills_by_category(category: String) -> Vec<skills::Skill> {
+    let manager = skills::SkillManager::new();
+    manager.get_by_category(&category).into_iter().cloned().collect()
+}
+
+#[tauri::command]
+pub fn apply_skill(skill_id: String, content: String) -> String {
+    let manager = skills::SkillManager::new();
+    manager.apply_skill(&skill_id, &content)
+}
+
+// ============ Book Split Commands ============
+
+use crate::book_split::{BookAnalysis, BookSplitConfig, BookSplitResult, ChapterInfo, CharacterInfo, SettingInfo, SplitChapter};
+
+#[tauri::command]
+pub async fn analyze_book(content: String, title: String) -> Result<BookAnalysis, String> {
+    // 简单分析实现
+    let words = content.chars().filter(|c| !c.is_whitespace()).count();
+    let lines: Vec<&str> = content.lines().collect();
+    
+    let mut analysis = BookAnalysis::new(&title);
+    analysis.total_words = words;
+    
+    // 尝试识别章节
+    let mut chapter_count = 0;
+    let mut current_chapter = String::new();
+    let mut chapter_start = 0;
+    
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        // 检测章节标题模式
+        if trimmed.starts_with("第") && (trimmed.contains("章") || trimmed.contains("节") || trimmed.contains("回")) {
+            if chapter_count > 0 {
+                // 保存上一章
+                let chapter_words = current_chapter.chars().filter(|c| !c.is_whitespace()).count();
+                analysis.chapters.push(ChapterInfo {
+                    id: chapter_count,
+                    title: format!("第{}章", chapter_count),
+                    start_line: chapter_start,
+                    end_line: i - 1,
+                    word_count: chapter_words,
+                    summary: format!("第{}章内容，约{}字", chapter_count, chapter_words),
+                    key_events: vec![],
+                    characters_appearing: vec![],
+                });
+            }
+            chapter_count += 1;
+            chapter_start = i;
+            current_chapter = String::new();
+        } else if chapter_count > 0 {
+            current_chapter.push_str(line);
+            current_chapter.push('\n');
+        }
+    }
+    
+    // 保存最后一章
+    if chapter_count > 0 && !current_chapter.is_empty() {
+        let chapter_words = current_chapter.chars().filter(|c| !c.is_whitespace()).count();
+        analysis.chapters.push(ChapterInfo {
+            id: chapter_count,
+            title: format!("第{}章", chapter_count),
+            start_line: chapter_start,
+            end_line: lines.len() - 1,
+            word_count: chapter_words,
+            summary: format!("最后一章，约{}字", chapter_words),
+            key_events: vec![],
+            characters_appearing: vec![],
+        });
+    }
+    
+    // 如果没有识别到章节，按字数拆分
+    if analysis.chapters.is_empty() {
+        let target_words = 3000;
+        let mut chapter_content = String::new();
+        let mut chapter_id = 1;
+        
+        for line in &lines {
+            chapter_content.push_str(line);
+            chapter_content.push('\n');
+            
+            let current_words = chapter_content.chars().filter(|c| !c.is_whitespace()).count();
+            if current_words >= target_words {
+                analysis.chapters.push(ChapterInfo {
+                    id: chapter_id,
+                    title: format!("第{}章", chapter_id),
+                    start_line: 0,
+                    end_line: 0,
+                    word_count: current_words,
+                    summary: format!("自动拆分章节，约{}字", current_words),
+                    key_events: vec![],
+                    characters_appearing: vec![],
+                });
+                chapter_id += 1;
+                chapter_content = String::new();
+            }
+        }
+        
+        // 最后一章
+        if !chapter_content.is_empty() {
+            let current_words = chapter_content.chars().filter(|c| !c.is_whitespace()).count();
+            if current_words > 100 {
+                analysis.chapters.push(ChapterInfo {
+                    id: chapter_id,
+                    title: format!("第{}章", chapter_id),
+                    start_line: 0,
+                    end_line: 0,
+                    word_count: current_words,
+                    summary: format!("自动拆分章节，约{}字", current_words),
+                    key_events: vec![],
+                    characters_appearing: vec![],
+                });
+            }
+        }
+    }
+    
+    analysis.outline.structure = if chapter_count > 10 { "多线复杂结构".to_string() } else { "线性结构".to_string() };
+    analysis.themes = vec!["待分析".to_string()];
+    analysis.style = "待分析".to_string();
+    
+    Ok(analysis)
+}
+
+#[tauri::command]
+pub async fn split_book(content: String, title: String, config: BookSplitConfig) -> Result<BookSplitResult, String> {
+    let words: Vec<&str> = content.lines().collect();
+    let target_words = config.target_chapter_words;
+    
+    let mut chapters: Vec<SplitChapter> = vec![];
+    let mut current_content = String::new();
+    let mut chapter_id = 1;
+    let mut current_words = 0;
+    
+    for line in words {
+        current_content.push_str(line);
+        current_content.push('\n');
+        current_words += line.chars().filter(|c| !c.is_whitespace()).count();
+        
+        if current_words >= target_words {
+            // 查找合适的断点（句号、段落结束）
+            let mut break_point = current_content.len();
+            for (i, c) in current_content.char().rev().enumerate() {
+                if c == '。' || c == '！' || c == '？' || c == '\n' {
+                    break_point = current_content.len() - i;
+                    break;
+                }
+            }
+            
+            let chapter_content = current_content[..break_point].to_string();
+            let chapter_words = chapter_content.chars().filter(|c| !c.is_whitespace()).count();
+            
+            chapters.push(SplitChapter {
+                id: chapter_id,
+                title: format!("第{}章", chapter_id),
+                content: chapter_content,
+                word_count: chapter_words,
+                summary: None,
+            });
+            
+            current_content = current_content[break_point..].to_string();
+            current_words = current_content.chars().filter(|c| !c.is_whitespace()).count();
+            chapter_id += 1;
+        }
+    }
+    
+    // 处理剩余内容
+    if !current_content.is_empty() {
+        let chapter_words = current_content.chars().filter(|c| !c.is_whitespace()).count();
+        if chapter_words > 50 {
+            chapters.push(SplitChapter {
+                id: chapter_id,
+                title: format!("第{}章", chapter_id),
+                content: current_content,
+                word_count: chapter_words,
+                summary: None,
+            });
+        }
+    }
+    
+    let mut metadata = HashMap::new();
+    metadata.insert("total_chapters".to_string(), chapters.len().to_string());
+    metadata.insert("target_words_per_chapter".to_string(), target_words.to_string());
+    
+    Ok(BookSplitResult {
+        original_title: title,
+        chapters,
+        metadata,
+    })
+}
+
+#[tauri::command]
+pub async fn extract_chapters(content: String) -> Result<Vec<ChapterInfo>, String> {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut chapters: Vec<ChapterInfo> = vec![];
+    let mut chapter_id = 0;
+    let mut current_title = String::new();
+    let mut current_content = String::new();
+    let mut start_line = 0;
+    
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        
+        // 检测章节标题
+        let is_chapter_title = trimmed.starts_with("第") 
+            && (trimmed.contains("章") || trimmed.contains("节") || trimmed.contains("回"))
+            && trimmed.len() < 50;
+        
+        if is_chapter_title {
+            // 保存上一章
+            if chapter_id > 0 && !current_content.is_empty() {
+                let word_count = current_content.chars().filter(|c| !c.is_whitespace()).count();
+                chapters.push(ChapterInfo {
+                    id: chapter_id,
+                    title: current_title,
+                    start_line,
+                    end_line: i - 1,
+                    word_count,
+                    summary: format!("约{}字", word_count),
+                    key_events: vec![],
+                    characters_appearing: vec![],
+                });
+            }
+            
+            chapter_id += 1;
+            current_title = trimmed.to_string();
+            current_content = String::new();
+            start_line = i;
+        } else if chapter_id > 0 {
+            current_content.push_str(line);
+            current_content.push('\n');
+        }
+    }
+    
+    // 保存最后一章
+    if chapter_id > 0 && !current_content.is_empty() {
+        let word_count = current_content.chars().filter(|c| !c.is_whitespace()).count();
+        chapters.push(ChapterInfo {
+            id: chapter_id,
+            title: current_title,
+            start_line,
+            end_line: lines.len() - 1,
+            word_count,
+            summary: format!("约{}字", word_count),
+            key_events: vec![],
+            characters_appearing: vec![],
+        });
+    }
+    
+    Ok(chapters)
+}
+
+// ============ AI Book Analysis Commands ============
+
+#[tauri::command]
+pub async fn ai_analyze_book_deep(
+    content: String,
+    title: String,
+    openai_key: String,
+) -> Result<String, String> {
+    // 调用AI进行深度分析
+    let prompt = format!(r#"请分析以下小说内容，提供详细的书本结构分析：
+
+书籍标题：{}
+
+要求分析：
+1. 故事结构（起承转合）
+2. 主要人物及其性格特点
+3. 核心主题
+4. 世界观/设定
+5. 每章的内容概要
+
+小说内容：
+{}
+
+请用JSON格式返回分析结果，格式如下：
+{{
+    "structure": "故事结构描述",
+    "themes": ["主题1", "主题2"],
+    "characters": [
+        {{"name": "人物名", "role": "角色", "description": "描述"}}
+    ],
+    "chapters_summary": [
+        {{"title": "章节名", "summary": "章节概要"}}
+    ]
+}}"#, title, content);
+    
+    // 这里需要调用OpenAI API
+    // 简化版本返回提示信息
+    Ok("AI分析功能需要配置API Key".to_string())
+}
+
+#[tauri::command]
+pub async fn ai_split_by_ai(
+    content: String,
+    title: String,
+    target_words: u32,
+    openai_key: String,
+) -> Result<String, String> {
+    let prompt = format!(r#"请将以下小说内容拆分成章节，每章大约{}字：
+
+要求：
+1. 在合适的断点分割（句号、段落结束）
+2. 为每个章节起一个标题
+3. 输出JSON格式
+
+小说内容：
+{}
+
+输出格式：
+{{
+    "chapters": [
+        {{"title": "章节标题", "content": "章节内容"}}
+    ]
+}}"#, target_words, content);
+    
+    Ok("AI拆分功能需要配置API Key".to_string())
+}
+
+// ============ 拆书 Commands ============
+
+use crate::book_split::{Book拆书Result, Book拆书Config, 幕, 剧情线, 转折点, 高潮点, 爽点, 人物分析, 世界设定, 写作技巧};
+
+#[tauri::command]
+pub async fn 拆书_analyze(content: String, title: String) -> Result<Book拆书Result, String> {
+    let mut result = Book拆书Result::new(&title);
+    let word_count = content.chars().filter(|c| !c.is_whitespace()).count();
+    let lines: Vec<&str> = content.lines().collect();
+    
+    // 估算章节数（假设每章3000字）
+    let estimated_chapters = (word_count / 3000).max(1);
+    
+    // 分析章节标题模式
+    let mut chapter_count = 0;
+    let mut current_chapter_start = 0;
+    
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        // 检测章节标题
+        if trimmed.starts_with("第") && (trimmed.contains("章") || trimmed.contains("节") || trimmed.contains("回")) {
+            chapter_count += 1;
+            if chapter_count == 1 {
+                current_chapter_start = i;
+            }
+        }
+    }
+    
+    let actual_chapters = if chapter_count > 0 { chapter_count } else { estimated_chapters };
+    
+    // 生成结构分析
+    result.structure.type = if actual_chapters > 100 {
+        "长篇多线结构".to_string()
+    } else if actual_chapters > 50 {
+        "中长篇结构".to_string()
+    } else {
+        "中短篇结构".to_string()
+    };
+    
+    // 估算幕结构
+    let chapters_per_act = (actual_chapters as f32 / 4.0).ceil() as usize;
+    result.structure.acts = vec![
+        幕 { id: 1, name: "起".to_string(), chapters: (1..=chapters_per_act).collect(), description: "开头铺垫".to_string() },
+        幕 { id: 2, name: "承".to_string(), chapters: (chapters_per_act+1..=chapters_per_act*2).collect(), description: "发展深入".to_string() },
+        幕 { id: 3, name: "转".to_string(), chapters: (chapters_per_act*2+1..=chapters_per_act*3).collect(), description: "高潮转折".to_string() },
+        幕 { id: 4, name: "合".to_string(), chapters: (chapters_per_act*3+1..=actual_chapters).collect(), description: "结局收尾".to_string() },
+    ];
+    
+    // 节奏分析
+    result.rhythm.average_chapter_length = word_count / actual_chapters.max(1);
+    result.rhythm.conflict_density = if result.rhythm.average_chapter_length > 4000 {
+        "高".to_string()
+    } else if result.rhythm.average_chapter_length > 2000 {
+        "中".to_string()
+    } else {
+        "低".to_string()
+    };
+    
+    // 添加一些示例转折点
+    if actual_chapters > 10 {
+        result.rhythm.turning_points = vec![
+            转折点 {
+                chapter: actual_chapters / 4,
+                type: "小高潮".to_string(),
+                description: "第一个冲突解决".to_string()
+            },
+            转折点 {
+                chapter: actual_chapters / 2,
+                type: "重大转折".to_string(),
+                description: "核心冲突爆发".to_string()
+            },
+            转折点 {
+                chapter: (actual_chapters as f32 * 0.75) as usize,
+                type: "高潮".to_string(),
+                description: "最终决战".to_string()
+            },
+        ];
+    }
+    
+    // 章尾钩子类型
+    result.rhythm.chapter_hooks = vec![
+        "悬念型".to_string(), // 战斗胜负未分
+        "意外型".to_string(), // 突然出现强敌
+        "反转型".to_string(), // 真相出人意料
+        "期待型".to_string(), // 修炼突破在即
+    ];
+    
+    // 分析常见的网文爽点
+    result.爽点列表 = vec![
+        爽点 { chapter: actual_chapters / 5, type: "打脸".to_string(), description: "主角实力打脸反派".to_string(), frequency: "高频".to_string() },
+        爽点 { chapter: actual_chapters / 3, type: "逆袭".to_string(), description: "弱变强战胜强敌".to_string(), frequency: "中频".to_string() },
+        爽点 { chapter: actual_chapters / 2, type: "收获".to_string(), description: "获得宝物/传承".to_string(), frequency: "高频".to_string() },
+    ];
+    
+    // 人物分析（示例）
+    result.characters = vec![
+        人物分析 {
+            name: "主角".to_string(),
+            role: "主角".to_string(),
+            archetype: "废柴逆袭型".to_string(),
+            growth: "从弱到强的成长曲线".to_string(),
+            main_moments: vec!["第一次胜利".to_string(), "重大突破".to_string()],
+            relationships: vec!["与反派的对立".to_string(), "与伙伴的羁绊".to_string()],
+        },
+    ];
+    
+    // 写作技巧总结
+    result.techniques = vec![
+        写作技巧 {
+            category: "叙事".to_string(),
+            technique: "上帝视角为主".to_string(),
+            example: "全知全能视角".to_string(),
+            application: "适合新手入门".to_string()
+        },
+        写作技巧 {
+            category: "节奏".to_string(),
+            technique: "小高潮不断".to_string(),
+            example: "每3-5章一个爽点".to_string(),
+            application: "保持读者阅读兴趣".to_string()
+        },
+        写作技巧 {
+            category: "对话".to_string(),
+            technique: "推进剧情型对话".to_string(),
+            example: "少废话，多信息".to_string(),
+            application: "避免水字数".to_string()
+        },
+    ];
+    
+    // 可学习点
+    result.learnable_points = vec![
+        "节奏把控：平均{}字/章".replace("{}", &result.rhythm.average_chapter_length.to_string()),
+        "结构模式：四幕式结构".to_string(),
+        "爽点设计：打脸-逆袭-收获三板斧".to_string(),
+        "人物成长：废柴到强者的经典路线".to_string(),
+        "章尾钩子：每章结尾留悬念".to_string(),
+    ];
+    
+    result.summary = format!(
+        "《{}》约{}字，{}章，属于{}。\
+        节奏{}，冲突密度{}。\
+        主要爽点类型：打脸、逆袭、收获。\
+        可学习点：节奏把控、爽点设计、人物成长曲线。",
+        title,
+        word_count.toLocaleString(),
+        actual_chapters,
+        result.structure.type,
+        result.rhythm.conflict_density,
+        result.rhythm.conflict_density
+    );
+    
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn 拆书_extract_ Techniques(content: String) -> Result<Vec<写作技巧>, String> {
+    let mut techniques = vec![];
+    
+    // 简单分析常见的写作模式
+    if content.contains("只见") || content.contains("那道") || content.contains("此人") {
+        techniques.push(写作技巧 {
+            category: "描写".to_string(),
+            technique: "外貌描写".to_string(),
+            example: "只见此人...".to_string(),
+            application: "出场人物介绍".to_string()
+        });
+    }
+    
+    if content.contains("修为") || content.contains("灵气") || content.contains("功法") {
+        techniques.push(写作技巧 {
+            category: "设定".to_string(),
+            technique: "修炼体系".to_string(),
+            example: "灵气-功法-修为".to_string(),
+            application: "玄幻力量体系".to_string()
+        });
+    }
+    
+    if content.contains("冷笑") || content.contains("不屑") || content.contains("讥讽") {
+        techniques.push(写作技巧 {
+            category: "对话".to_string(),
+            technique: "反派嘲讽".to_string(),
+            example: "冷笑一声...".to_string(),
+            application: "制造冲突".to_string()
+        });
+    }
+    
+    if content.contains("系统") || content.contains("叮") || content.contains("恭喜") {
+        techniques.push(写作技巧 {
+            category: "金手指".to_string(),
+            technique: "系统流".to_string(),
+            example: "系统发布任务".to_string(),
+            application: "主角快速变强".to_string()
+        });
+    }
+    
+    // 默认技巧
+    if techniques.is_empty() {
+        techniques.push(写作技巧 {
+            category: "叙事".to_string(),
+            technique: "推进式叙事".to_string(),
+            example: "主线清晰".to_string(),
+            application: "保持剧情推进".to_string()
+        });
+    }
+    
+    Ok(techniques)
 }

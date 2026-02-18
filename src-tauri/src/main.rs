@@ -14,6 +14,9 @@ mod modification_types;
 mod ai_response_parser;
 mod spec_kit;
 mod spec_kit_export;
+mod skills;
+mod mcp;
+mod book_split;
 
 fn main() {
   tauri::Builder::default()
@@ -54,7 +57,13 @@ fn main() {
       commands::spec_kit_match_character_arcs,
       commands::spec_kit_export_markdown,
       commands::spec_kit_export_epub,
-      commands::spec_kit_export_pdf
+      commands::spec_kit_export_pdf,
+      commands::get_skills,
+      commands::get_skill_categories,
+      commands::get_skills_by_category,
+      commands::apply_skill,
+      commands::拆书_analyze,
+      commands::拆书_extract_ Techniques
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
