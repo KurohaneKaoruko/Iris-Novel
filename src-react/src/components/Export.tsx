@@ -22,12 +22,12 @@ type ExportPanelProps = {
 }
 
 const formatLabels: Record<ExportFormat, { label: string; icon: string; desc: string }> = {
-  txt: { label: '纯文本', icon: '📄', desc: '.txt 格式，简单通用' },
-  md: { label: 'Markdown', icon: '📝', desc: '.md 格式，保留格式' },
-  html: { label: '网页', icon: '🌐', desc: '.html 格式，可分享' },
-  pdf: { label: 'PDF', icon: '📕', desc: '.pdf 格式，打印友好' },
-  docx: { label: 'Word', icon: '📘', desc: '.docx 格式，便于编辑' },
-  epub: { label: 'Epub', icon: '📖', desc: '.epub 格式，电子书' },
+  txt: { label: 'Plain Text', icon: 'TXT', desc: '.txt format, simple and portable' },
+  md: { label: 'Markdown', icon: 'MD', desc: '.md format, keeps basic formatting' },
+  html: { label: 'Web Page', icon: 'HTML', desc: '.html format, easy to share' },
+  pdf: { label: 'PDF', icon: 'PDF', desc: '.pdf format, print-friendly' },
+  docx: { label: 'Word', icon: 'DOCX', desc: '.docx format, editable' },
+  epub: { label: 'EPUB', icon: 'EPUB', desc: '.epub format, ebook ready' },
 }
 
 export function ExportPanel({ isOpen, onClose, onExport, workspaceName = '小说' }: ExportPanelProps) {
@@ -57,7 +57,7 @@ export function ExportPanel({ isOpen, onClose, onExport, workspaceName = '小说
       <div className="export-panel" onClick={(e) => e.stopPropagation()}>
         <div className="export-header">
           <h2>导出小说</h2>
-          <button className="export-close" onClick={onClose}>×</button>
+              <button className="export-close" onClick={onClose}>x</button>
         </div>
 
         <div className="export-content">
@@ -99,7 +99,7 @@ export function ExportPanel({ isOpen, onClose, onExport, workspaceName = '小说
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="小说标题"
+                    placeholder="Novel title"
               />
             </div>
             <div className="export-field">
@@ -108,7 +108,7 @@ export function ExportPanel({ isOpen, onClose, onExport, workspaceName = '小说
                 type="text"
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
-                placeholder="作者名"
+                    placeholder="Author name"
               />
             </div>
           </div>
@@ -144,7 +144,7 @@ export function ExportPanel({ isOpen, onClose, onExport, workspaceName = '小说
         </div>
 
         <div className="export-footer">
-          <button className="export-btn secondary" onClick={onClose}>取消</button>
+            <button className="export-btn secondary" onClick={onClose}>Cancel</button>
           <button className="export-btn primary" onClick={handleExport}>
             导出 {formatLabels[format].label}
           </button>

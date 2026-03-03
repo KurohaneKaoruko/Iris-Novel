@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Character, CharacterData } from '../services';
+import { useI18n } from '../i18n';
 import './CharacterCard.css';
 
 export interface CharacterCardProps {
@@ -20,6 +21,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
   onDelete,
   initialMode = 'view',
 }) => {
+  const { t } = useI18n();
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode);
   const [editData, setEditData] = useState<CharacterData>(character.data);
   const [isSaving, setIsSaving] = useState(false);
@@ -43,7 +45,6 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
       setMode('view');
     } catch (error) {
       console.error('Failed to save character:', error);
-      // Keep in edit mode on error
     } finally {
       setIsSaving(false);
     }
@@ -51,14 +52,14 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
 
   const handleDelete = () => {
     if (!onDelete) return;
-    
-    if (window.confirm(`确定要删除人物 "${character.name}" 吗？`)) {
+
+    if (window.confirm(t('character.card.confirmDelete', { name: character.name }))) {
       onDelete(character.id);
     }
   };
 
   const handleFieldChange = (field: keyof CharacterData, value: string) => {
-    setEditData(prev => ({
+    setEditData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -67,7 +68,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
   const renderField = (
     label: string,
     field: keyof CharacterData,
-    multiline: boolean = false
+    multiline = false,
   ) => {
     const value = character.data[field] || '';
     const editValue = editData[field] || '';
@@ -77,7 +78,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
         <div className="character-field">
           <div className="field-label">{label}</div>
           <div className="field-value">
-            {value || <span className="field-empty">未填写</span>}
+            {value || <span className="field-empty">{t('character.card.empty')}</span>}
           </div>
         </div>
       );
@@ -94,7 +95,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
             className="field-input field-textarea"
             value={editValue}
             onChange={(e) => handleFieldChange(field, e.target.value)}
-            placeholder={`请输入${label}`}
+            placeholder={t('character.card.enterField', { label })}
             rows={4}
           />
         ) : (
@@ -104,7 +105,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
             className="field-input"
             value={editValue}
             onChange={(e) => handleFieldChange(field, e.target.value)}
-            placeholder={`请输入${label}`}
+            placeholder={t('character.card.enterField', { label })}
           />
         )}
       </div>
@@ -121,17 +122,17 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
               <button
                 className="action-button action-edit"
                 onClick={handleEdit}
-                title="编辑"
+                title={t('character.card.action.edit')}
               >
-                ✏️
+                {t('character.card.action.edit')}
               </button>
               {onDelete && (
                 <button
                   className="action-button action-delete"
                   onClick={handleDelete}
-                  title="删除"
+                  title={t('character.card.action.delete')}
                 >
-                  🗑️
+                  {t('character.card.action.delete')}
                 </button>
               )}
             </>
@@ -141,17 +142,17 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
                 className="action-button action-save"
                 onClick={handleSave}
                 disabled={isSaving}
-                title="保存"
+                title={t('character.card.action.save')}
               >
-                {isSaving ? '⏳' : '💾'}
+                {isSaving ? t('character.card.action.saving') : t('character.card.action.save')}
               </button>
               <button
                 className="action-button action-cancel"
                 onClick={handleCancel}
                 disabled={isSaving}
-                title="取消"
+                title={t('character.card.action.cancel')}
               >
-                ❌
+                {t('character.card.action.cancel')}
               </button>
             </>
           )}
@@ -159,12 +160,12 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
       </div>
 
       <div className="character-card-body">
-        {renderField('姓名', 'name')}
-        {renderField('外貌', 'appearance', true)}
-        {renderField('性格', 'personality', true)}
-        {renderField('背景', 'background', true)}
-        {renderField('关系', 'relationships', true)}
-        {renderField('备注', 'notes', true)}
+        {renderField(t('character.card.field.name'), 'name')}
+        {renderField(t('character.card.field.appearance'), 'appearance', true)}
+        {renderField(t('character.card.field.personality'), 'personality', true)}
+        {renderField(t('character.card.field.background'), 'background', true)}
+        {renderField(t('character.card.field.relationships'), 'relationships', true)}
+        {renderField(t('character.card.field.notes'), 'notes', true)}
       </div>
     </div>
   );

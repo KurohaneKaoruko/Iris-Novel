@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import './index.css'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
+import { I18nProvider } from './i18n'
 
 type PrismLike = Record<string, unknown>
 
@@ -51,9 +52,11 @@ async function bootstrap(root: Root): Promise<void> {
   root.render(
     <StrictMode>
       <AppErrorBoundary>
-        <DiffProvider>
-          <App />
-        </DiffProvider>
+        <I18nProvider>
+          <DiffProvider>
+            <App />
+          </DiffProvider>
+        </I18nProvider>
       </AppErrorBoundary>
     </StrictMode>,
   )

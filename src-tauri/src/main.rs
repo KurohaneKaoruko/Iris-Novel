@@ -7,7 +7,6 @@ mod app_data;
 mod app_settings;
 mod agents;
 mod chat_history;
-mod branding;
 mod secrets;
 mod state;
 mod modification_types;
@@ -26,6 +25,7 @@ fn main() {
       commands::set_workspace,
       commands::get_last_workspace,
       commands::get_project_picker_state,
+      commands::create_novel_project,
       commands::remember_external_project,
       commands::forget_external_project,
       commands::set_launch_mode,
@@ -54,11 +54,10 @@ fn main() {
       commands::save_chat_session,
       commands::list_chat_sessions,
       commands::get_chat_session,
-      commands::git_init,
-      commands::git_status,
-      commands::git_diff,
-      commands::git_commit,
-      commands::git_log,
+      commands::list_history_entries,
+      commands::create_history_snapshot,
+      commands::read_history_snapshot,
+      commands::restore_history_snapshot,
       commands::chat_generate_stream,
       commands::chat_cancel_stream,
       commands::ai_assistance_generate,

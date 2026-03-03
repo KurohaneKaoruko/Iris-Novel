@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useState, type DragEvent, type MouseEvent } from 'react'
+import { useI18n } from '../i18n'
 import './TabBar.css'
 
 export type TabItem = {
@@ -19,6 +20,7 @@ type TabBarProps = {
 }
 
 export function TabBar({ tabs, activeTab, onTabSelect, onTabClose, onTabsReorder }: TabBarProps) {
+  const { t } = useI18n()
   const [dragStartIndex, setDragStartIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
@@ -62,7 +64,7 @@ export function TabBar({ tabs, activeTab, onTabSelect, onTabClose, onTabsReorder
   if (tabs.length === 0) {
     return (
       <div className="tab-bar empty">
-        <span className="tab-bar-placeholder">无文件打开</span>
+        <span className="tab-bar-placeholder">{t('tabBar.empty')}</span>
       </div>
     )
   }
@@ -84,13 +86,13 @@ export function TabBar({ tabs, activeTab, onTabSelect, onTabClose, onTabsReorder
           title={tab.path}
         >
           <span className="tab-bar-item-title">{tab.title}</span>
-          {tab.dirty && <span className="tab-bar-item-dirty">●</span>}
+          {tab.dirty && <span className="tab-bar-item-dirty">*</span>}
           <button
             className="tab-bar-item-close"
             onClick={(e) => handleCloseClick(e, tab.id)}
-            title="关闭"
+            title={t('tabBar.close')}
           >
-            ✕
+            x
           </button>
         </div>
       ))}

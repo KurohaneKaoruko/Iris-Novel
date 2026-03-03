@@ -75,7 +75,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={() => formatText('bold')}
-          title="粗体 (Ctrl+B)"
+          title="Bold (Ctrl+B)"
           aria-label="粗体"
         >
           <strong>B</strong>
@@ -83,7 +83,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={() => formatText('italic')}
-          title="斜体 (Ctrl+I)"
+          title="Italic (Ctrl+I)"
           aria-label="斜体"
         >
           <em>I</em>
@@ -91,7 +91,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={() => formatText('underline')}
-          title="下划线 (Ctrl+U)"
+          title="Underline (Ctrl+U)"
           aria-label="下划线"
         >
           <u>U</u>
@@ -99,7 +99,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={() => formatText('strikethrough')}
-          title="删除线"
+          title="Strikethrough"
           aria-label="删除线"
         >
           <s>S</s>
@@ -112,7 +112,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={() => insertHeading('h1')}
-          title="标题 1"
+          title="Heading 1"
           aria-label="标题 1"
         >
           H1
@@ -120,7 +120,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={() => insertHeading('h2')}
-          title="标题 2"
+          title="Heading 2"
           aria-label="标题 2"
         >
           H2
@@ -128,7 +128,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={() => insertHeading('h3')}
-          title="标题 3"
+          title="Heading 3"
           aria-label="标题 3"
         >
           H3
@@ -141,7 +141,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={insertQuote}
-          title="引用"
+          title="Quote"
           aria-label="引用"
         >
           &ldquo;&rdquo;
@@ -149,7 +149,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={insertUnorderedList}
-          title="无序列表"
+          title="Bullet List"
           aria-label="无序列表"
         >
           • List
@@ -157,7 +157,7 @@ export function MarkdownToolbar() {
         <button
           className="toolbar-button"
           onClick={insertOrderedList}
-          title="有序列表"
+          title="Numbered List"
           aria-label="有序列表"
         >
           1. List

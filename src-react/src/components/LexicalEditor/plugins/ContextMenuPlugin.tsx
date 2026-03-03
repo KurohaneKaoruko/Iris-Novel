@@ -193,7 +193,7 @@ export function ContextMenuPlugin({
           role="menuitem"
           onClick={handleCopy}
           disabled={!hasSelection}
-          title="复制选中的文本"
+          title="Copy selected text"
           aria-label="复制"
         >
           <span className="menu-icon">📋</span>
@@ -205,7 +205,7 @@ export function ContextMenuPlugin({
           role="menuitem"
           onClick={handleCut}
           disabled={!hasSelection}
-          title="剪切选中的文本"
+          title="Cut selected text"
           aria-label="剪切"
         >
           <span className="menu-icon">✂️</span>
@@ -216,7 +216,7 @@ export function ContextMenuPlugin({
           className="context-menu-item"
           role="menuitem"
           onClick={handlePaste}
-          title="粘贴文本"
+          title="Paste text"
           aria-label="粘贴"
         >
           <span className="menu-icon">📄</span>
@@ -227,7 +227,7 @@ export function ContextMenuPlugin({
           className="context-menu-item"
           role="menuitem"
           onClick={handleSelectAll}
-          title="选择全部文本"
+          title="Select all text"
           aria-label="全选"
         >
           <span className="menu-icon">🔲</span>

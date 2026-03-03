@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { riskScanContent, type RiskScanResult } from '../tauri'
+import { useI18n } from '../i18n'
 import './RiskPanel.css'
 
 type RiskPanelProps = {
   activeFile: { path: string; content: string } | null
 }
 
-const levelLabel: Record<string, string> = {
-  high: '高风险',
-  medium: '中风险',
-  low: '低风险',
-}
-
 export function RiskPanel({ activeFile }: RiskPanelProps) {
+  const { t } = useI18n()
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<RiskScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const levelLabel: Record<string, string> = {
+    high: t('risk.level.high'),
+    medium: t('risk.level.medium'),
+    low: t('risk.level.low'),
+  }
 
   const canScan = useMemo(
     () => !!activeFile && activeFile.content.trim().length > 0 && !running,
@@ -43,25 +45,25 @@ export function RiskPanel({ activeFile }: RiskPanelProps) {
 
   return (
     <>
-      <div className="sidebar-header">风险检测</div>
+      <div className="sidebar-header">{t('risk.title')}</div>
       <div className="sidebar-content risk-panel">
         <div className="risk-panel-toolbar">
           <button className="primary-button risk-panel-run" disabled={!canScan} onClick={() => void onScan()}>
-            {running ? '检测中...' : '检测当前文件'}
+            {running ? t('risk.running') : t('risk.run')}
           </button>
           <div className="risk-panel-meta">
-            {activeFile ? activeFile.path : '未打开文件'}
+            {activeFile ? activeFile.path : t('risk.noFileOpen')}
           </div>
         </div>
 
         {error ? <div className="error-text risk-panel-error">{error}</div> : null}
 
         {!activeFile ? (
-          <div className="risk-panel-empty">请先打开要检测的章节文件。</div>
+          <div className="risk-panel-empty">{t('risk.empty.noFile')}</div>
         ) : null}
 
         {activeFile && !result && !running ? (
-          <div className="risk-panel-empty">点击“检测当前文件”后，AI 会给出风险项与改写建议。</div>
+          <div className="risk-panel-empty">{t('risk.empty.hint')}</div>
         ) : null}
 
         {result ? (
@@ -72,9 +74,9 @@ export function RiskPanel({ activeFile }: RiskPanelProps) {
               </div>
               <div className="risk-summary-text">{result.summary}</div>
             </div>
-            <div className="risk-count">共 {result.findings.length} 项，扫描 {result.scanned_chars} 字符</div>
+            <div className="risk-count">{t('risk.summaryCount', { findings: result.findings.length, scanned: result.scanned_chars })}</div>
             {result.findings.length === 0 ? (
-              <div className="risk-panel-empty">未检出明显风险项。</div>
+              <div className="risk-panel-empty">{t('risk.noFindings')}</div>
             ) : (
               <div className="risk-findings">
                 {result.findings.map((item, idx) => (
@@ -83,15 +85,17 @@ export function RiskPanel({ activeFile }: RiskPanelProps) {
                       <span className={`risk-level-badge level-${item.level}`}>
                         {levelLabel[item.level] ?? item.level}
                       </span>
-                      <span className="risk-category">{item.category || 'other'}</span>
+                      <span className="risk-category">{item.category || t('risk.otherCategory')}</span>
                     </div>
-                    {item.excerpt ? <div className="risk-excerpt">“{item.excerpt}”</div> : null}
+                    {item.excerpt ? <div className="risk-excerpt">"{item.excerpt}"</div> : null}
                     <div className="risk-reason">{item.reason}</div>
-                    {item.suggestion ? <div className="risk-suggestion">建议：{item.suggestion}</div> : null}
+                    {item.suggestion ? <div className="risk-suggestion">{t('risk.suggestion', { suggestion: item.suggestion })}</div> : null}
                     {item.line_start ? (
                       <div className="risk-line">
-                        行号：{item.line_start}
-                        {item.line_end && item.line_end !== item.line_start ? ` - ${item.line_end}` : ''}
+                        {t('risk.line', {
+                          start: item.line_start,
+                          end: item.line_end && item.line_end !== item.line_start ? ` - ${item.line_end}` : '',
+                        })}
                       </div>
                     ) : null}
                   </div>

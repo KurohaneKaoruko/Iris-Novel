@@ -157,7 +157,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
               onClick={onClose}
               title="Close diff view"
             >
-              ×
+              x
             </button>
           )}
         </div>

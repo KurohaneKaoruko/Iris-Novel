@@ -109,7 +109,7 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
         <button
           className="editor-context-menu-item"
           onClick={handlePolish}
-          title="使用 AI 润色选中的文本，提升文字质量"
+                title="Use AI to polish selected text"
         >
           <span className="menu-icon">✨</span>
           <span className="menu-label">AI 润色</span>
@@ -117,7 +117,7 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
         <button
           className="editor-context-menu-item"
           onClick={handleExpand}
-          title="使用 AI 扩写选中的文本，增加更多细节"
+                title="Use AI to expand selected text"
         >
           <span className="menu-icon">📝</span>
           <span className="menu-label">AI 扩写</span>
@@ -125,7 +125,7 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
         <button
           className="editor-context-menu-item"
           onClick={handleCondense}
-          title="使用 AI 缩写选中的文本，使其更简洁"
+                title="Use AI to condense selected text"
         >
           <span className="menu-icon">✂️</span>
           <span className="menu-label">AI 缩写</span>

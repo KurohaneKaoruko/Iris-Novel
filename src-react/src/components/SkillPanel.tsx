@@ -60,7 +60,7 @@ export function SkillPanel({ isOpen, onClose, onApplySkill, currentContent = '' 
       <div className="skill-panel" onClick={(e) => e.stopPropagation()}>
         <div className="skill-header">
           <h2>技能市场</h2>
-          <button className="skill-close" onClick={onClose}>×</button>
+        <button className="skill-close" onClick={onClose}>x</button>
         </div>
 
         <div className="skill-content">

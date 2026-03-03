@@ -85,7 +85,7 @@ function NotificationItem({
         )}
         <div className="notification-message">{notification.message}</div>
       </div>
-      <button className="notification-close" onClick={onRemove}>×</button>
+          <button className="notification-close" onClick={onRemove}>x</button>
     </div>
   )
 }

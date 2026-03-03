@@ -37,10 +37,10 @@ export function BottomPanel({ tabs, activeTab, onTabChange, isCollapsed, onToggl
           ))}
         </div>
         <div className="bottom-panel-actions">
-          <button className="bottom-panel-action" onClick={onToggleCollapse} title={isCollapsed ? '展开' : '收起'}>
+            <button className="bottom-panel-action" onClick={onToggleCollapse} title={isCollapsed ? 'Expand' : 'Collapse'}>
             {isCollapsed ? '▲' : '▼'}
           </button>
-          <button className="bottom-panel-action" title="关闭">✕</button>
+            <button className="bottom-panel-action" title="Close">x</button>
         </div>
       </div>
       {!isCollapsed && (

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { plotLineService, chapterService } from '../services';
 import type { PlotLine, PlotLineData, PlotLineStatus } from '../services';
 import type { Chapter } from '../services';
+import { useI18n } from '../i18n';
 import { PlotLineVisualization } from './PlotLineVisualization';
 import './PlotLineManager.css';
 
@@ -19,6 +20,7 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
   onPlotLineClick,
   onPlotLineUpdate,
 }) => {
+  const { t } = useI18n();
   const [plotLines, setPlotLines] = useState<PlotLine[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +29,6 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
   const [editingPlotLine, setEditingPlotLine] = useState<PlotLine | null>(null);
   const [selectedPlotLine, setSelectedPlotLine] = useState<PlotLine | null>(null);
 
-  // Form state
   const [formData, setFormData] = useState<PlotLineData>({
     name: '',
     startChapter: '',
@@ -36,9 +37,8 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
     description: '',
   });
 
-  // Load plot lines and chapters on mount
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const loadData = async () => {
@@ -52,7 +52,7 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
       setPlotLines(plotLineList);
       setChapters(chapterList);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setError(err instanceof Error ? err.message : t('plotLine.error.loadDataFailed'));
     } finally {
       setLoading(false);
     }
@@ -103,59 +103,54 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       if (editingPlotLine) {
-        // Update existing plot line
         await plotLineService.updatePlotLine(editingPlotLine.id, formData);
       } else {
-        // Create new plot line
         await plotLineService.createPlotLine(formData);
       }
-      
-      // Reload data
+
       await loadData();
-      
-      // Reset form
       handleCancelForm();
-      
+
       if (onPlotLineUpdate) {
         onPlotLineUpdate();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save plot line');
+      setError(err instanceof Error ? err.message : t('plotLine.error.saveFailed'));
     }
   };
 
   const handleDeleteClick = async (plotLineId: string) => {
-    if (!confirm('确定要删除这条情节线吗？')) {
+    if (!window.confirm(t('plotLine.confirmDelete'))) {
       return;
     }
-    
+
     try {
       await plotLineService.deletePlotLine(plotLineId);
       await loadData();
-      
+
       if (selectedPlotLine?.id === plotLineId) {
         setSelectedPlotLine(null);
       }
-      
+
       if (onPlotLineUpdate) {
         onPlotLineUpdate();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete plot line');
+      setError(err instanceof Error ? err.message : t('plotLine.error.deleteFailed'));
     }
   };
 
   const getStatusText = (status: PlotLineStatus) => {
     switch (status) {
       case 'ongoing':
-        return '进行中';
+        return t('plotLine.status.ongoing');
       case 'completed':
-        return '已完结';
+        return t('plotLine.status.completed');
       case 'paused':
-        return '暂停';
+        return t('plotLine.status.paused');
       default:
         return status;
     }
@@ -175,14 +170,14 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
   };
 
   const getChapterTitle = (chapterId: string) => {
-    const chapter = chapters.find(c => c.id === chapterId);
+    const chapter = chapters.find((c) => c.id === chapterId);
     return chapter ? chapter.title : chapterId;
   };
 
   if (loading) {
     return (
       <div className="plot-line-manager-loading">
-        <p>加载中...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -190,46 +185,46 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
   return (
     <div className="plot-line-manager">
       <div className="plot-line-manager-header">
-        <h2>情节线管理</h2>
+        <h2>{t('plotLine.title')}</h2>
         <button className="btn-create" onClick={handleCreateClick}>
-          + 新建情节线
+          + {t('plotLine.new')}
         </button>
       </div>
 
       {error && (
         <div className="plot-line-manager-error">
           <p>{error}</p>
-          <button onClick={() => setError(null)}>关闭</button>
+          <button onClick={() => setError(null)}>{t('common.close')}</button>
         </div>
       )}
 
       {showCreateForm && (
         <div className="plot-line-form-overlay">
           <div className="plot-line-form">
-            <h3>{editingPlotLine ? '编辑情节线' : '新建情节线'}</h3>
+            <h3>{editingPlotLine ? t('plotLine.form.editTitle') : t('plotLine.form.newTitle')}</h3>
             <form onSubmit={handleSubmitForm}>
               <div className="form-group">
-                <label htmlFor="name">名称 *</label>
+                <label htmlFor="name">{t('plotLine.form.name')}</label>
                 <input
                   id="name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
-                  placeholder="输入情节线名称"
+                  placeholder={t('plotLine.form.namePlaceholder')}
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="startChapter">起始章节 *</label>
+                <label htmlFor="startChapter">{t('plotLine.form.startChapter')}</label>
                 <select
                   id="startChapter"
                   value={formData.startChapter}
                   onChange={(e) => setFormData({ ...formData, startChapter: e.target.value })}
                   required
                 >
-                  <option value="">选择章节</option>
-                  {chapters.map(chapter => (
+                  <option value="">{t('plotLine.form.selectChapter')}</option>
+                  {chapters.map((chapter) => (
                     <option key={chapter.id} value={chapter.id}>
                       {chapter.title}
                     </option>
@@ -238,17 +233,17 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
               </div>
 
               <div className="form-group">
-                <label htmlFor="endChapter">结束章节</label>
+                <label htmlFor="endChapter">{t('plotLine.form.endChapter')}</label>
                 <select
                   id="endChapter"
                   value={formData.endChapter || ''}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    endChapter: e.target.value || undefined 
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    endChapter: e.target.value || undefined,
                   })}
                 >
-                  <option value="">未定</option>
-                  {chapters.map(chapter => (
+                  <option value="">{t('plotLine.form.endUndecided')}</option>
+                  {chapters.map((chapter) => (
                     <option key={chapter.id} value={chapter.id}>
                       {chapter.title}
                     </option>
@@ -257,39 +252,39 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
               </div>
 
               <div className="form-group">
-                <label htmlFor="status">状态 *</label>
+                <label htmlFor="status">{t('plotLine.form.status')}</label>
                 <select
                   id="status"
                   value={formData.status}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    status: e.target.value as PlotLineStatus 
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    status: e.target.value as PlotLineStatus,
                   })}
                   required
                 >
-                  <option value="ongoing">进行中</option>
-                  <option value="completed">已完结</option>
-                  <option value="paused">暂停</option>
+                  <option value="ongoing">{t('plotLine.status.ongoing')}</option>
+                  <option value="completed">{t('plotLine.status.completed')}</option>
+                  <option value="paused">{t('plotLine.status.paused')}</option>
                 </select>
               </div>
 
               <div className="form-group">
-                <label htmlFor="description">描述</label>
+                <label htmlFor="description">{t('plotLine.form.description')}</label>
                 <textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="输入情节线描述"
+                  placeholder={t('plotLine.form.descriptionPlaceholder')}
                   rows={4}
                 />
               </div>
 
               <div className="form-actions">
                 <button type="submit" className="btn-submit">
-                  {editingPlotLine ? '保存' : '创建'}
+                  {editingPlotLine ? t('common.save') : t('plotLine.form.create')}
                 </button>
                 <button type="button" className="btn-cancel" onClick={handleCancelForm}>
-                  取消
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>
@@ -300,12 +295,12 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
       <div className="plot-line-manager-content">
         {plotLines.length === 0 ? (
           <div className="plot-line-manager-empty">
-            <p>暂无情节线，点击"新建情节线"开始创建</p>
+            <p>{t('plotLine.empty')}</p>
           </div>
         ) : (
           <>
             <div className="plot-line-visualization-section">
-              <h3>情节线可视化</h3>
+              <h3>{t('plotLine.visualization')}</h3>
               <PlotLineVisualization
                 plotLines={plotLines}
                 chapters={chapters}
@@ -314,9 +309,9 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
             </div>
 
             <div className="plot-line-list-section">
-              <h3>情节线列表</h3>
+              <h3>{t('plotLine.list')}</h3>
               <div className="plot-line-list">
-                {plotLines.map(plotLine => (
+                {plotLines.map((plotLine) => (
                   <div
                     key={plotLine.id}
                     className={`plot-line-item ${selectedPlotLine?.id === plotLine.id ? 'selected' : ''}`}
@@ -328,29 +323,28 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
                         {getStatusText(plotLine.status)}
                       </span>
                     </div>
-                    
+
                     <div className="plot-line-item-info">
                       <p>
-                        <strong>起始章节:</strong> {getChapterTitle(plotLine.startChapter)}
+                        <strong>{t('plotLine.startChapter')}:</strong> {getChapterTitle(plotLine.startChapter)}
                       </p>
                       <p>
-                        <strong>结束章节:</strong> {
-                          plotLine.endChapter 
-                            ? getChapterTitle(plotLine.endChapter) 
-                            : '未定'
-                        }
+                        <strong>{t('plotLine.endChapter')}:</strong>{' '}
+                        {plotLine.endChapter
+                          ? getChapterTitle(plotLine.endChapter)
+                          : t('plotLine.form.endUndecided')}
                       </p>
                       {plotLine.description && (
                         <p className="plot-line-description">
-                          <strong>描述:</strong> {plotLine.description}
+                          <strong>{t('plotLine.description')}:</strong> {plotLine.description}
                         </p>
                       )}
                     </div>
 
                     <div className="plot-line-item-chapters">
-                      <strong>涉及章节:</strong>
+                      <strong>{t('plotLine.involvedChapters')}:</strong>
                       <div className="chapter-tags">
-                        {plotLine.chapters.map(chapterId => (
+                        {plotLine.chapters.map((chapterId) => (
                           <span key={chapterId} className="chapter-tag">
                             {getChapterTitle(chapterId)}
                           </span>
@@ -366,16 +360,16 @@ export const PlotLineManager: React.FC<PlotLineManagerProps> = ({
                           handleEditClick(plotLine);
                         }}
                       >
-                        编辑
+                        {t('plotLine.edit')}
                       </button>
                       <button
                         className="btn-delete"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteClick(plotLine.id);
+                          void handleDeleteClick(plotLine.id);
                         }}
                       >
-                        删除
+                        {t('plotLine.delete')}
                       </button>
                     </div>
                   </div>

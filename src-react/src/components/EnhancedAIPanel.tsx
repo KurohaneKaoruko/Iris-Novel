@@ -167,7 +167,7 @@ export function EnhancedAIPanel({
                     className="ai-action-btn"
                     disabled={!hasActiveFile}
                     onClick={() => {}}
-                    title={hasActiveFile ? '插入到光标' : '请先打开一个文件'}
+              title={hasActiveFile ? 'Insert at cursor' : 'Open a file first'}
                   >
                     ↵ 插入
                   </button>
@@ -221,7 +221,7 @@ export function EnhancedAIPanel({
               className="ai-input-btn"
               disabled={!hasActiveFile}
               onClick={onQuoteSelection}
-              title={hasActiveFile ? '引用选区 (Ctrl+Shift+L)' : '请先打开一个文件'}
+              title={hasActiveFile ? 'Quote Selection (Ctrl+Shift+L)' : 'Open a file first'}
             >
               ❝
             </button>
@@ -231,7 +231,7 @@ export function EnhancedAIPanel({
               className="ai-input-btn"
               disabled={!hasActiveFile}
               onClick={onSmartComplete}
-              title={hasActiveFile ? '智能补全' : '请先打开一个文件'}
+              title={hasActiveFile ? 'Smart Complete' : 'Open a file first'}
             >
               ⚡
             </button>
@@ -251,7 +251,7 @@ export function EnhancedAIPanel({
           className="ai-send-btn"
           onClick={() => onSend()}
           disabled={disabled || !input.trim()}
-          title="发送 (Ctrl+Enter)"
+              title="Send (Ctrl+Enter)"
         >
           ➤
         </button>

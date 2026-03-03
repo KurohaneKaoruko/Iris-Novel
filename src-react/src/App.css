@@ -47,11 +47,11 @@
   --status-red: #aaaaaa;
   --status-purple: #cecece;
   
-  /* Git Colors */
-  --git-added: #cfcfcf;
-  --git-modified: #bfbfbf;
-  --git-deleted: #a8a8a8;
-  --git-new: #d5d5d5;
+  /* Delta Colors */
+  --delta-added: #cfcfcf;
+  --delta-modified: #bfbfbf;
+  --delta-deleted: #a8a8a8;
+  --delta-new: #d5d5d5;
   
   /* Borders */
   --border-subtle: #333333;
@@ -160,10 +160,10 @@
   --status-orange: #5e5e5e;
   --status-red: #4a4a4a;
   --status-purple: #505050;
-  --git-added: #2d2d2d;
-  --git-modified: #3d3d3d;
-  --git-deleted: #535353;
-  --git-new: #252525;
+  --delta-added: #2d2d2d;
+  --delta-modified: #3d3d3d;
+  --delta-deleted: #535353;
+  --delta-new: #252525;
   --border-subtle: #d8d8d8;
   --border-color: #d8d8d8;
   --border-hover: #b8b8b8;
@@ -569,145 +569,6 @@ body {
 .file-icon .app-icon {
   width: 14px;
   height: 14px;
-}
-
-/* Git View */
-.git-toolbar {
-  padding: 10px;
-  display: flex;
-  gap: var(--space-sm);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.git-toolbar button {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all var(--transition-fast);
-}
-
-.git-toolbar button:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--accent-primary);
-}
-
-.git-status-list {
-  padding: var(--space-sm) 0;
-}
-
-.git-empty {
-  padding: 8px 10px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.git-row {
-  display: flex;
-  align-items: center;
-  padding: 5px var(--space-md);
-  cursor: pointer;
-  font-size: 12px;
-  transition: background var(--transition-fast);
-}
-
-.git-row:hover {
-  background: var(--bg-hover);
-}
-
-.git-row.active {
-  background: var(--bg-active);
-}
-
-.git-status-icon {
-  width: 18px;
-  font-weight: bold;
-  margin-right: 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-.git-status-icon.modified { color: var(--git-modified); }
-.git-status-icon.new { color: var(--git-new); }
-.git-status-icon.deleted { color: var(--git-deleted); }
-
-.git-path {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-secondary);
-}
-
-.git-diff-view {
-  border-top: 1px solid var(--border-subtle);
-  padding: 10px;
-  background: var(--bg-primary);
-  height: 200px;
-  overflow: auto;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.git-commit-section {
-  padding: 10px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.git-commits {
-  padding: 8px 10px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.git-commit-item {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
-.git-commit-hash {
-  font-family: var(--font-mono);
-  margin-right: 6px;
-}
-
-.git-commit-input {
-  width: 100%;
-  padding: 8px 10px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  border-radius: var(--radius-sm);
-  margin-bottom: var(--space-sm);
-  font-size: 12px;
-  outline: none;
-  transition: all var(--transition-fast);
-}
-
-.git-commit-input:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px var(--accent-glow);
-}
-
-.git-commit-btn {
-  width: 100%;
-  padding: 10px;
-  background: var(--accent-primary);
-  color: var(--accent-contrast);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all var(--transition-fast);
-}
-
-.git-commit-btn:hover {
-  background: var(--accent-hover);
 }
 
 /* Resize Handle */
@@ -2555,9 +2416,9 @@ body {
   font-family: var(--font-mono);
 }
 
-.stat-add { color: var(--git-added); }
-.stat-delete { color: var(--git-deleted); }
-.stat-modify { color: var(--git-modified); }
+.stat-add { color: var(--delta-added); }
+.stat-delete { color: var(--delta-deleted); }
+.stat-modify { color: var(--delta-modified); }
 
 /* ========================================
    Diff Panel

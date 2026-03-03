@@ -202,7 +202,7 @@ export function AIPanel({
                         className="ai-btn ai-btn-close"
                         onClick={() => handleCloseChangeSet(changeSet.id)}
                       >
-                        ✕
+                        x
                       </button>
                     </div>
                   )}
@@ -216,8 +216,8 @@ export function AIPanel({
       {/* Input Area */}
       <div className="ai-panel-input">
         {onQuoteSelection && (
-          <button className="ai-panel-action" onClick={onQuoteSelection} title="引用选区">
-            📋
+          <button className="ai-panel-action" onClick={onQuoteSelection} title="Quote Selection">
+            Quote
           </button>
         )}
         <textarea
@@ -234,9 +234,9 @@ export function AIPanel({
           className="ai-panel-send"
           onClick={() => onSend()}
           disabled={disabled || !input.trim()}
-          title="发送 (Ctrl+Enter)"
+          title="Send (Ctrl+Enter)"
         >
-          ➤
+          Send
         </button>
       </div>
     </div>

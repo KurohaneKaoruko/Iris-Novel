@@ -65,7 +65,7 @@ export function BookAnalyzer({ isOpen, onClose }: BookAnalyzerProps) {
       <div className="book-analyzer" onClick={(e) => e.stopPropagation()}>
         <div className="book-analyzer-header">
           <h2>📖 拆书分析</h2>
-          <button className="book-analyzer-close" onClick={onClose}>×</button>
+<button className="book-analyzer-close" onClick={onClose}>x</button>
         </div>
 
         <div className="book-analyzer-content">
@@ -89,13 +89,13 @@ export function BookAnalyzer({ isOpen, onClose }: BookAnalyzerProps) {
           <div className="book-analyzer-input">
             <input
               type="text"
-              placeholder="作品标题"
+                  placeholder="Book title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="title-input"
             />
             <textarea
-              placeholder="粘贴要拆解的作品内容（可以是开头或全本）..."
+                  placeholder="Paste book content to analyze..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="content-input"

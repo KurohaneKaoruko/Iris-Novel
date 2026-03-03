@@ -1,4 +1,5 @@
 import { type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type RefObject } from 'react'
+import { useI18n } from '../../i18n'
 import type { ChangeSet, WriterMode } from '../../services'
 import { AppIcon } from '../icons/AppIcon'
 
@@ -63,25 +64,23 @@ type AIChatPanelProps = {
   onActiveProviderChange: (id: string) => void
 }
 
-function writerModeLabel(mode: WriterMode): string {
+function writerModeLabel(mode: WriterMode, t: (key: string) => string): string {
   switch (mode) {
     case 'plan':
-      return '大纲模式'
+      return t('chat.mode.plan')
     case 'spec':
-      return '细纲模式'
+      return t('chat.mode.spec')
     default:
-      return '普通模式'
+      return t('chat.mode.normal')
   }
 }
 
-function writerModeUpper(mode: WriterMode): string {
-  return mode.toUpperCase()
+function writerModeUpper(mode: WriterMode, t: (key: string) => string): string {
+  return writerModeLabel(mode, t).toUpperCase()
 }
 
-const COMPOSER_PLACEHOLDER =
-  '输入指令... 支持 #选区 #当前文件 #file:路径，可用 /plan /spec 切换模式，/auto on|off 控制自动连续生成（Enter 发送，Shift+Enter 换行）'
-
 export function AIChatPanel(props: AIChatPanelProps) {
+  const { t } = useI18n()
   const {
     writerMode,
     plannerLastRunError,
@@ -166,14 +165,14 @@ export function AIChatPanel(props: AIChatPanelProps) {
     <>
       <div className="ai-header">
         <div className="ai-title-row">
-          <span>AI 对话</span>
+          <span>{t('chat.title')}</span>
           <div className="ai-title-actions">
-            <button className="icon-button ai-new-session-btn" onClick={() => void onNewSession()} title="新建对话">
-              新会话
+            <button className="icon-button ai-new-session-btn" onClick={() => void onNewSession()} title={t('chat.newSession')}>
+              {t('chat.newSession')}
             </button>
           </div>
         </div>
-        <div className="ai-mode-brief">{writerModeLabel(writerMode)}</div>
+        <div className="ai-mode-brief">{writerModeLabel(writerMode, t)}</div>
         {plannerLastRunError ? <div className="planner-error-text">{plannerLastRunError}</div> : null}
       </div>
 
@@ -190,11 +189,11 @@ export function AIChatPanel(props: AIChatPanelProps) {
         >
           {chatMessages.length === 0 ? (
             <div className="ai-empty-state">
-              <div>嗨，我是你的写作助手。</div>
+              <div>{t('chat.emptyPrimary')}</div>
               <div className="ai-empty-state-sub">
-                {'当前模式：'}
-                {writerModeUpper(writerMode)}
-                {'。可继续剧情，或切换到大纲模式/细纲模式进行规划。'}
+                {t('chat.emptyPrefix')}
+                {writerModeUpper(writerMode, t)}
+                {t('chat.emptySuffix')}
               </div>
             </div>
           ) : (
@@ -202,11 +201,11 @@ export function AIChatPanel(props: AIChatPanelProps) {
               <div key={message.id} className={message.role === 'user' ? 'message user' : 'message assistant'}>
                 <div className="message-meta">
                   {message.role === 'user' ? (
-                    '你'
+                    t('chat.you')
                   ) : (
                     <span className="ai-meta">
                       AI
-                      {message.cancelled ? <span className="ai-cancelled-tag">{'已停止'}</span> : null}
+                      {message.cancelled ? <span className="ai-cancelled-tag">{t('chat.stopped')}</span> : null}
                       {message.streaming ? (
                         <span className="ai-dot-pulse" aria-hidden="true">
                           <span />
@@ -219,19 +218,27 @@ export function AIChatPanel(props: AIChatPanelProps) {
                 </div>
                 {message.role === 'assistant' && !message.streaming && (message.versionCount ?? 0) > 1 ? (
                   <div className="assistant-version-switch">
-                    <button className="icon-button assistant-version-btn" onClick={() => onSwitchAssistantVersion(message.id, -1)} title="上一版">
+                    <button
+                      className="icon-button assistant-version-btn"
+                      onClick={() => onSwitchAssistantVersion(message.id, -1)}
+                      title={t('chat.previousVersion')}
+                    >
                       {'<'}
                     </button>
                     <span className="assistant-version-label">
                       {(typeof message.versionIndex === 'number' ? message.versionIndex + 1 : message.versionCount)}/{message.versionCount}
                     </span>
-                    <button className="icon-button assistant-version-btn" onClick={() => onSwitchAssistantVersion(message.id, 1)} title="下一版">
+                    <button
+                      className="icon-button assistant-version-btn"
+                      onClick={() => onSwitchAssistantVersion(message.id, 1)}
+                      title={t('chat.nextVersion')}
+                    >
                       {'>'}
                     </button>
                   </div>
                 ) : null}
                 <div className="message-content" onContextMenu={(event) => onOpenMessageContextMenu(event, message)}>
-                  {message.content || (message.role === 'assistant' && message.streaming ? '正在思考…' : '')}
+                  {message.content || (message.role === 'assistant' && message.streaming ? t('chat.thinking') : '')}
                 </div>
                 {message.role === 'assistant' && message.streaming ? (
                   <div className="ai-processing-indicator">
@@ -242,10 +249,10 @@ export function AIChatPanel(props: AIChatPanelProps) {
                 {message.role === 'assistant' && message.changeSet && message.changeSet.modifications.length > 0 ? (
                   <div className="file-modifications">
                     <div className="file-modifications-header">
-                      <span>修改了 {message.changeSet.filePath.split('/').pop()}</span>
+                      <span>{t('chat.modified')} {message.changeSet.filePath.split('/').pop()}</span>
                     </div>
                     <div className="file-modifications-list">
-                      <div className="file-modification-item" onClick={() => onOpenDiffView(message.changeSet!.id)} title="点击查看差异">
+                      <div className="file-modification-item" onClick={() => onOpenDiffView(message.changeSet!.id)} title={t('chat.clickViewDiff')}>
                         <div className="file-modification-name">
                           <span className="file-name">{message.changeSet.filePath.split('/').pop()}</span>
                         </div>
@@ -264,7 +271,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
         </div>
         {!chatAutoScroll ? (
           <button className="chat-scroll-bottom-btn" onClick={onScrollToBottom}>
-            {'回到底部'}
+            {t('chat.backToBottom')}
           </button>
         ) : null}
       </div>
@@ -272,11 +279,11 @@ export function AIChatPanel(props: AIChatPanelProps) {
       <div className="ai-input-area">
         <div className="ai-input-topbar">
           <div className="ai-actions ai-input-tools">
-            <button className="icon-button" disabled={!canUseEditorActions} onClick={onQuoteSelection} title="引用选区">
-              引用
+            <button className="icon-button" disabled={!canUseEditorActions} onClick={onQuoteSelection} title={t('chat.quoteSelection')}>
+              {t('chat.quote')}
             </button>
-            <button className="icon-button" disabled={!canUseEditorActions} onClick={() => void onSmartComplete()} title="智能补全">
-              续写
+            <button className="icon-button" disabled={!canUseEditorActions} onClick={() => void onSmartComplete()} title={t('chat.smartComplete')}>
+              {t('chat.continue')}
             </button>
           </div>
           <label className={`ai-auto-switch ${autoLongWriteEnabled ? 'active' : ''}`} title="Auto continuous long-form writing">
@@ -294,9 +301,9 @@ export function AIChatPanel(props: AIChatPanelProps) {
             <span className="ai-auto-switch-text">Auto</span>
           </label>
           <select className="ai-select ai-mode-select" value={writerMode} onChange={(event) => onWriterModeChange(event.target.value as WriterMode)}>
-            <option value="normal">{'普通模式'}</option>
-            <option value="plan">{'大纲模式'}</option>
-            <option value="spec">{'细纲模式'}</option>
+            <option value="normal">{t('chat.mode.normal')}</option>
+            <option value="plan">{t('chat.mode.plan')}</option>
+            <option value="spec">{t('chat.mode.spec')}</option>
           </select>
         </div>
         {autoLongWriteStatus ? <div className="ai-auto-status">{autoLongWriteStatus}</div> : null}
@@ -306,12 +313,12 @@ export function AIChatPanel(props: AIChatPanelProps) {
           value={chatInput}
           onChange={(event) => onChatInputChange(event.target.value)}
           onKeyDown={handleComposerKeyDown}
-          placeholder={COMPOSER_PLACEHOLDER}
+          placeholder={t('chat.placeholder')}
         />
         <div className="ai-composer-footer">
           <div className="ai-composer-selects">
             <select className="ai-select ai-select-compact" value={activeAgentId} onChange={(event) => onActiveAgentChange(event.target.value)}>
-              {agents.length === 0 ? <option value="">无智能体</option> : null}
+              {agents.length === 0 ? <option value="">{t('chat.noAgents')}</option> : null}
               {agents.map((agent) => (
                 <option key={agent.id} value={agent.id}>
                   {agent.name}
@@ -328,12 +335,12 @@ export function AIChatPanel(props: AIChatPanelProps) {
           </div>
           <div className="ai-composer-main-actions">
             {!isChatStreaming && canRegenerateLatest ? (
-              <button className="icon-button ai-regenerate-btn" onClick={() => void onRegenerateAssistant(latestCompletedAssistantId)} title="重新生成上条回复">
+              <button className="icon-button ai-regenerate-btn" onClick={() => void onRegenerateAssistant(latestCompletedAssistantId)} title={t('chat.regenerateLatest')}>
                 <AppIcon name="refresh" size={13} />
               </button>
             ) : null}
             {!isChatStreaming && canRegenerateLatest ? (
-              <button className="icon-button ai-candidates-btn" onClick={() => void onGenerateAssistantCandidates(latestCompletedAssistantId, 2)} title="生成额外候选回复">
+              <button className="icon-button ai-candidates-btn" onClick={() => void onGenerateAssistantCandidates(latestCompletedAssistantId, 2)} title={t('chat.generateCandidates')}>
                 <AppIcon name="add" size={13} />
               </button>
             ) : null}
@@ -342,18 +349,18 @@ export function AIChatPanel(props: AIChatPanelProps) {
                 className="icon-button ai-regenerate-btn"
                 disabled={!canRollbackLastTurn || busy || autoLongWriteRunning}
                 onClick={() => void onRollbackLastTurn()}
-                title="回退上一轮 AI 改动（Ctrl/Cmd+Z）"
+                title={t('chat.rollbackHint')}
               >
-                {'回退'}
+                {t('chat.rollback')}
               </button>
             ) : null}
             {showStopAction ? (
-              <button className="primary-button chat-stop-button" disabled={!canStop} onClick={() => void onStopChat()} title="停止生成">
+              <button className="primary-button chat-stop-button" disabled={!canStop} onClick={() => void onStopChat()} title={t('chat.stop')}>
                 <AppIcon name="stop" size={13} />
               </button>
             ) : (
               <button className="primary-button" disabled={busy || !chatInput.trim() || autoLongWriteRunning} onClick={() => void onSendChat()}>
-                {'发送'}
+                {t('chat.send')}
               </button>
             )}
           </div>

@@ -10,7 +10,7 @@ export type AppIconName =
   | 'characters'
   | 'plotlines'
   | 'risk'
-  | 'git'
+  | 'history'
   | 'projectSwitch'
   | 'settings'
   | 'chat'
@@ -90,13 +90,12 @@ function IconPath({ name }: { name: AppIconName }) {
           <circle cx="12" cy="16.5" r="1" />
         </>
       )
-    case 'git':
+    case 'history':
       return (
         <>
-          <circle cx="7" cy="6" r="2" />
-          <circle cx="17" cy="6" r="2" />
-          <circle cx="17" cy="18" r="2" />
-          <path d="M9 6h6M17 8v8M17 14h-4a3 3 0 0 1-3-3V8" />
+          <path d="M12 7v5l3 2" />
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 3v2M21 12h-2M12 21v-2M3 12h2" />
         </>
       )
     case 'projectSwitch':

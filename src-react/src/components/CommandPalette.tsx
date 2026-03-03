@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useI18n } from '../i18n'
 import './CommandPalette.css'
 
 export type Command = {
@@ -17,6 +18,7 @@ type CommandPaletteProps = {
 }
 
 export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
+  const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -32,7 +34,6 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
       })
   }, [onClose])
 
-  // Filter commands based on query
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return commands
     const q = query.toLowerCase()
@@ -43,7 +44,6 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
     )
   }, [commands, query])
 
-  // Group commands by category
   const groupedCommands = useMemo(() => {
     const groups: Record<string, Command[]> = {}
     for (const cmd of filteredCommands) {
@@ -55,20 +55,16 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
     return groups
   }, [filteredCommands])
 
-  // Flatten for keyboard navigation
   const flatCommands = useMemo(() => filteredCommands, [filteredCommands])
 
-  // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
 
-  // Reset selection when filtered results change
   useEffect(() => {
     setSelectedIndex(0)
   }, [filteredCommands])
 
-  // Scroll selected item into view
   useEffect(() => {
     const list = listRef.current
     if (!list) return
@@ -118,21 +114,21 @@ export function CommandPalette({ commands, onClose }: CommandPaletteProps) {
     <div className="command-palette-overlay" onClick={onClose}>
       <div className="command-palette" onClick={(e) => e.stopPropagation()}>
         <div className="command-palette-input-wrapper">
-          <span className="command-palette-icon">⌘</span>
+          <span className="command-palette-icon">CMD</span>
           <input
             ref={inputRef}
             type="text"
             className="command-palette-input"
-            placeholder="输入命令..."
+            placeholder={t('commandPalette.placeholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="command-palette-shortcut">Esc</kbd>
+          <kbd className="command-palette-shortcut">{t('commandPalette.esc')}</kbd>
         </div>
         <div className="command-palette-list" ref={listRef}>
           {filteredCommands.length === 0 ? (
-            <div className="command-palette-empty">没有找到匹配的命令</div>
+            <div className="command-palette-empty">{t('commandPalette.empty')}</div>
           ) : (
             Object.entries(groupedCommands).map(([category, cmds]) => (
               <div key={category} className="command-palette-group">

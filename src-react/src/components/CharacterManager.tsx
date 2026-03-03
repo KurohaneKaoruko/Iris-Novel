@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { characterService, type Character, type CharacterData } from '../services';
+import { useI18n } from '../i18n';
 import { CharacterCard } from './CharacterCard';
 import './CharacterManager.css';
 
@@ -15,6 +16,7 @@ export interface CharacterManagerProps {
 export const CharacterManager: React.FC<CharacterManagerProps> = ({
   onCharacterClick,
 }) => {
+  const { t } = useI18n();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [filteredCharacters, setFilteredCharacters] = useState<Character[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,12 +28,10 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
     name: '',
   });
 
-  // Load characters on mount
   useEffect(() => {
-    loadCharacters();
+    void loadCharacters();
   }, []);
 
-  // Filter characters when search query or characters change
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredCharacters(characters);
@@ -48,7 +48,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       }
     };
 
-    performSearch();
+    void performSearch();
   }, [searchQuery, characters]);
 
   const loadCharacters = useCallback(async () => {
@@ -67,7 +67,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
 
   const handleCreateCharacter = useCallback(async () => {
     if (!newCharacterData.name.trim()) {
-      setError('人物姓名不能为空');
+      setError(t('character.manager.errorNameRequired'));
       return;
     }
 
@@ -83,7 +83,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [newCharacterData, loadCharacters]);
+  }, [newCharacterData, loadCharacters, t]);
 
   const handleUpdateCharacter = useCallback(
     async (id: string, data: Partial<CharacterData>) => {
@@ -98,7 +98,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
         setIsLoading(false);
       }
     },
-    [loadCharacters]
+    [loadCharacters],
   );
 
   const handleDeleteCharacter = useCallback(
@@ -114,7 +114,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
         setIsLoading(false);
       }
     },
-    [loadCharacters]
+    [loadCharacters],
   );
 
   const handleCancelCreate = useCallback(() => {
@@ -123,22 +123,19 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
     setError(null);
   }, []);
 
-  const handleNewCharacterFieldChange = useCallback(
-    (field: keyof CharacterData, value: string) => {
-      setNewCharacterData((prev) => ({
-        ...prev,
-        [field]: value,
-      }));
-    },
-    []
-  );
+  const handleNewCharacterFieldChange = useCallback((field: keyof CharacterData, value: string) => {
+    setNewCharacterData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }, []);
 
   return (
     <div className="character-manager">
       <div className="character-manager-header">
-        <h2 className="character-manager-title">人物管理</h2>
+        <h2 className="character-manager-title">{t('character.manager.title')}</h2>
         <div className="character-manager-stats">
-          共 {characters.length} 个人物
+          {t('character.manager.stats', { count: characters.length })}
         </div>
       </div>
 
@@ -147,7 +144,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           <input
             type="text"
             className="search-input"
-            placeholder="搜索人物..."
+            placeholder={t('character.manager.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -155,9 +152,9 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
             <button
               className="search-clear"
               onClick={() => setSearchQuery('')}
-              title="清除搜索"
+              title={t('character.manager.clearSearch')}
             >
-              ✕
+              {t('character.manager.clear')}
             </button>
           )}
         </div>
@@ -167,16 +164,16 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
             <button
               className={`view-mode-button ${viewMode === 'grid' ? 'active' : ''}`}
               onClick={() => setViewMode('grid')}
-              title="网格视图"
+              title={t('character.manager.gridView')}
             >
-              ⊞
+              {t('character.manager.grid')}
             </button>
             <button
               className={`view-mode-button ${viewMode === 'list' ? 'active' : ''}`}
               onClick={() => setViewMode('list')}
-              title="列表视图"
+              title={t('character.manager.listView')}
             >
-              ☰
+              {t('character.manager.list')}
             </button>
           </div>
 
@@ -185,20 +182,20 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
             onClick={() => setShowCreateForm(true)}
             disabled={isLoading}
           >
-            ＋ 新建人物
+            + {t('character.manager.createButton')}
           </button>
         </div>
       </div>
 
       {error && (
         <div className="character-manager-error">
-          <span className="error-icon">⚠️</span>
+          <span className="error-icon">{t('character.manager.error')}</span>
           {error}
           <button
             className="error-dismiss"
             onClick={() => setError(null)}
           >
-            ✕
+            {t('common.close')}
           </button>
         </div>
       )}
@@ -206,18 +203,18 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       {showCreateForm && (
         <div className="create-character-form">
           <div className="form-header">
-            <h3>新建人物</h3>
+            <h3>{t('character.manager.createTitle')}</h3>
             <button
               className="form-close"
               onClick={handleCancelCreate}
             >
-              ✕
+              {t('common.close')}
             </button>
           </div>
           <div className="form-body">
             <div className="form-field">
               <label htmlFor="new-character-name">
-                姓名 <span className="required">*</span>
+                {t('character.card.field.name')} <span className="required">*</span>
               </label>
               <input
                 id="new-character-name"
@@ -227,12 +224,12 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 onChange={(e) =>
                   handleNewCharacterFieldChange('name', e.target.value)
                 }
-                placeholder="请输入人物姓名"
+                placeholder={t('character.manager.placeholder.name')}
                 autoFocus
               />
             </div>
             <div className="form-field">
-              <label htmlFor="new-character-appearance">外貌</label>
+              <label htmlFor="new-character-appearance">{t('character.card.field.appearance')}</label>
               <textarea
                 id="new-character-appearance"
                 className="form-textarea"
@@ -240,12 +237,12 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 onChange={(e) =>
                   handleNewCharacterFieldChange('appearance', e.target.value)
                 }
-                placeholder="请输入外貌描述"
+                placeholder={t('character.manager.placeholder.appearance')}
                 rows={3}
               />
             </div>
             <div className="form-field">
-              <label htmlFor="new-character-personality">性格</label>
+              <label htmlFor="new-character-personality">{t('character.card.field.personality')}</label>
               <textarea
                 id="new-character-personality"
                 className="form-textarea"
@@ -253,12 +250,12 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 onChange={(e) =>
                   handleNewCharacterFieldChange('personality', e.target.value)
                 }
-                placeholder="请输入性格描述"
+                placeholder={t('character.manager.placeholder.personality')}
                 rows={3}
               />
             </div>
             <div className="form-field">
-              <label htmlFor="new-character-background">背景</label>
+              <label htmlFor="new-character-background">{t('character.card.field.background')}</label>
               <textarea
                 id="new-character-background"
                 className="form-textarea"
@@ -266,12 +263,12 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 onChange={(e) =>
                   handleNewCharacterFieldChange('background', e.target.value)
                 }
-                placeholder="请输入背景故事"
+                placeholder={t('character.manager.placeholder.background')}
                 rows={3}
               />
             </div>
             <div className="form-field">
-              <label htmlFor="new-character-relationships">关系</label>
+              <label htmlFor="new-character-relationships">{t('character.card.field.relationships')}</label>
               <textarea
                 id="new-character-relationships"
                 className="form-textarea"
@@ -279,12 +276,12 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 onChange={(e) =>
                   handleNewCharacterFieldChange('relationships', e.target.value)
                 }
-                placeholder="请输入人物关系"
+                placeholder={t('character.manager.placeholder.relationships')}
                 rows={3}
               />
             </div>
             <div className="form-field">
-              <label htmlFor="new-character-notes">备注</label>
+              <label htmlFor="new-character-notes">{t('character.card.field.notes')}</label>
               <textarea
                 id="new-character-notes"
                 className="form-textarea"
@@ -292,7 +289,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 onChange={(e) =>
                   handleNewCharacterFieldChange('notes', e.target.value)
                 }
-                placeholder="请输入备注信息"
+                placeholder={t('character.manager.placeholder.notes')}
                 rows={3}
               />
             </div>
@@ -303,14 +300,14 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
               onClick={handleCancelCreate}
               disabled={isLoading}
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               className="form-button form-button-submit"
-              onClick={handleCreateCharacter}
+              onClick={() => void handleCreateCharacter()}
               disabled={isLoading || !newCharacterData.name.trim()}
             >
-              {isLoading ? '创建中...' : '创建'}
+              {isLoading ? t('character.manager.creating') : t('character.manager.create')}
             </button>
           </div>
         </div>
@@ -319,7 +316,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       {isLoading && !showCreateForm && (
         <div className="character-manager-loading">
           <div className="loading-spinner"></div>
-          <p>加载中...</p>
+          <p>{t('common.loading')}</p>
         </div>
       )}
 
@@ -327,22 +324,22 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
         <div className="character-manager-empty">
           {searchQuery ? (
             <>
-              <p>未找到匹配的人物</p>
+              <p>{t('character.manager.empty.search')}</p>
               <button
                 className="empty-action"
                 onClick={() => setSearchQuery('')}
               >
-                清除搜索
+                {t('character.manager.clearSearch')}
               </button>
             </>
           ) : (
             <>
-              <p>还没有创建任何人物</p>
+              <p>{t('character.manager.empty.none')}</p>
               <button
                 className="empty-action"
                 onClick={() => setShowCreateForm(true)}
               >
-                创建第一个人物
+                {t('character.manager.empty.createFirst')}
               </button>
             </>
           )}

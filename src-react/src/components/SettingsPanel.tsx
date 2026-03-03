@@ -19,7 +19,7 @@ export function SettingsPanel({ isOpen, onClose, theme, onThemeChange }: Setting
       <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="settings-panel-header">
           <h2>设置</h2>
-          <button className="settings-panel-close" onClick={onClose}>×</button>
+        <button className="settings-panel-close" onClick={onClose}>x</button>
         </div>
         
         <div className="settings-panel-content">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useI18n } from '../i18n'
 import './StatusBar.css'
 
 export type StatusBarInfo = {
@@ -12,18 +13,20 @@ export type StatusBarInfo = {
   wordCount?: number
   chapterTarget?: number
   currentChapter?: string
-  gitBranch?: string
-  gitStatus?: 'clean' | 'modified' | 'staged'
+  historyLabel?: string
+  historyStatus?: 'idle' | 'recording'
   theme?: 'light' | 'dark'
 }
 
 type StatusBarProps = {
   info: StatusBarInfo
   onThemeToggle?: () => void
-  onGitClick?: () => void
+  onHistoryClick?: () => void
 }
 
-export function StatusBar({ info, onThemeToggle, onGitClick }: StatusBarProps) {
+export function StatusBar({ info, onThemeToggle, onHistoryClick }: StatusBarProps) {
+  const { t } = useI18n()
+
   const wordCountText = useMemo(() => {
     if (!info.wordCount) return ''
     const w = info.wordCount.toLocaleString()
@@ -34,40 +37,28 @@ export function StatusBar({ info, onThemeToggle, onGitClick }: StatusBarProps) {
     return w
   }, [info.wordCount, info.chapterTarget])
 
-  const gitStatusIcon = useMemo(() => {
-    switch (info.gitStatus) {
-      case 'clean':
-        return '✓'
-      case 'modified':
-        return '●'
-      case 'staged':
-        return '◉'
-      default:
-        return ''
-    }
-  }, [info.gitStatus])
-
-  const gitStatusText = useMemo(() => {
-    if (!info.gitBranch) return null
-    return `${info.gitBranch}${gitStatusIcon ? ` ${gitStatusIcon}` : ''}`
-  }, [info.gitBranch, gitStatusIcon])
+  const historyText = useMemo(() => {
+    if (!info.historyLabel) return null
+    if (info.historyStatus === 'recording') return `${info.historyLabel} *`
+    return info.historyLabel
+  }, [info.historyLabel, info.historyStatus])
 
   return (
     <div className="status-bar">
       <div className="status-bar-left">
-        {info.gitBranch && (
+        {historyText && (
           <div
-            className={`status-bar-item clickable ${info.gitStatus || ''}`}
-            onClick={onGitClick}
-            title="Git 状态"
+            className={`status-bar-item clickable ${info.historyStatus === 'recording' ? 'recording' : ''}`}
+            onClick={onHistoryClick}
+            title={t('status.history')}
           >
-            <span className="status-bar-icon">⎇</span>
-            {gitStatusText}
+            <span className="status-bar-icon">H</span>
+            {historyText}
           </div>
         )}
         {info.currentChapter && (
-          <div className="status-bar-item" title="当前章节">
-            <span className="status-bar-icon">📑</span>
+          <div className="status-bar-item" title={t('status.currentChapter')}>
+            <span className="status-bar-icon">C</span>
             {info.currentChapter}
           </div>
         )}
@@ -75,32 +66,24 @@ export function StatusBar({ info, onThemeToggle, onGitClick }: StatusBarProps) {
 
       <div className="status-bar-right">
         {wordCountText && (
-          <div className="status-bar-item" title="字数统计">
-            <span className="status-bar-icon">✎</span>
+          <div className="status-bar-item" title={t('status.wordCount')}>
+            <span className="status-bar-icon">W</span>
             {wordCountText}
           </div>
         )}
         {info.charCount !== undefined && (
-          <div className="status-bar-item" title="字符数">
-            {info.charCount.toLocaleString()} 字符
+          <div className="status-bar-item" title={t('status.characterCount')}>
+            {info.charCount.toLocaleString()} {t('status.chars')}
           </div>
         )}
         {info.lineCount !== undefined && (
-          <div className="status-bar-item" title="行数">
-            {info.lineCount} 行
+          <div className="status-bar-item" title={t('status.lineCount')}>
+            {info.lineCount} {t('status.lines')}
           </div>
         )}
-        {info.language && (
-          <div className="status-bar-item">
-            {info.language}
-          </div>
-        )}
-        <div
-          className="status-bar-item clickable theme-toggle"
-          onClick={onThemeToggle}
-          title="切换主题"
-        >
-          {info.theme === 'dark' ? '☀️' : '🌙'}
+        {info.language && <div className="status-bar-item">{info.language}</div>}
+        <div className="status-bar-item clickable theme-toggle" onClick={onThemeToggle} title={t('status.toggleTheme')}>
+          {info.theme === 'dark' ? t('common.light') : t('common.dark')}
         </div>
       </div>
     </div>

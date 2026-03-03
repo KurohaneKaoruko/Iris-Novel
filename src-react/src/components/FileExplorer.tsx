@@ -115,16 +115,16 @@ export function FileExplorer({ tree, activePath, query, onQueryChange, onFileCli
   return (
     <div className="file-explorer">
       <div className="file-explorer-header">
-        <span className="file-explorer-title">资源管理器</span>
+        <span className="file-explorer-title">Explorer</span>
         <div className="file-explorer-actions">
-          <button className="file-explorer-action" title="新建文件">+</button>
-          <button className="file-explorer-action" title="刷新">↻</button>
+          <button className="file-explorer-action" title="New File">+</button>
+          <button className="file-explorer-action" title="Refresh">R</button>
         </div>
       </div>
       <div className="file-explorer-search">
         <input
           type="text"
-          placeholder="搜索文件..."
+          placeholder="Search files..."
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
         />
@@ -140,7 +140,7 @@ export function FileExplorer({ tree, activePath, query, onQueryChange, onFileCli
               .map((child) => renderEntry(child, 0))}
           </div>
         ) : (
-          <div className="file-explorer-empty">无文件</div>
+          <div className="file-explorer-empty">No files</div>
         )}
       </div>
     </div>

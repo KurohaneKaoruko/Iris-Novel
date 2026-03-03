@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { chapterService } from '../services';
 import type { Chapter } from '../services';
+import { useI18n } from '../i18n';
 import './ChapterManager.css';
 
 export interface ChapterManagerProps {
@@ -16,13 +17,13 @@ export interface ChapterManagerProps {
 export const ChapterManager: React.FC<ChapterManagerProps> = ({
   onChapterClick,
 }) => {
+  const { t } = useI18n();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load chapters on mount
   useEffect(() => {
-    loadChapters();
+    void loadChapters();
   }, []);
 
   const loadChapters = async () => {
@@ -32,7 +33,7 @@ export const ChapterManager: React.FC<ChapterManagerProps> = ({
       const chapterList = await chapterService.listChapters();
       setChapters(chapterList);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load chapters');
+      setError(err instanceof Error ? err.message : t('chapter.error.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -44,7 +45,6 @@ export const ChapterManager: React.FC<ChapterManagerProps> = ({
     }
   };
 
-  // Calculate total statistics
   const totalStats = React.useMemo(() => {
     const totalWordCount = chapters.reduce((sum, c) => sum + c.wordCount, 0);
     const totalChapters = chapters.length;
@@ -57,7 +57,7 @@ export const ChapterManager: React.FC<ChapterManagerProps> = ({
   if (loading) {
     return (
       <div className="chapter-manager">
-        <div className="chapter-manager-loading">加载中...</div>
+        <div className="chapter-manager-loading">{t('common.loading')}</div>
       </div>
     );
   }
@@ -66,8 +66,8 @@ export const ChapterManager: React.FC<ChapterManagerProps> = ({
     return (
       <div className="chapter-manager">
         <div className="chapter-manager-error">
-          <p>错误: {error}</p>
-          <button onClick={loadChapters}>重试</button>
+          <p>{t('chapter.error.prefix')}: {error}</p>
+          <button onClick={() => void loadChapters()}>{t('common.retry')}</button>
         </div>
       </div>
     );
@@ -75,29 +75,26 @@ export const ChapterManager: React.FC<ChapterManagerProps> = ({
 
   return (
     <div className="chapter-manager">
-      {/* Error banner for non-fatal errors */}
       {error && chapters.length > 0 && (
         <div className="chapter-manager-error-banner">
-          <span>错误: {error}</span>
-          <button onClick={() => setError(null)}>关闭</button>
+          <span>{t('chapter.error.prefix')}: {error}</span>
+          <button onClick={() => setError(null)}>{t('common.close')}</button>
         </div>
       )}
-      
-      {/* Header - simplified */}
+
       <div className="chapter-manager-header chapter-manager-header-compact">
         <div className="chapter-manager-header-row">
-          <span className="chapter-manager-header-title">章节管理</span>
+          <span className="chapter-manager-header-title">{t('chapter.title')}</span>
           <span className="chapter-manager-header-meta">
-            {chapters.length} 章 · {totalStats.totalWordCount.toLocaleString()} 字
+            {t('chapter.meta', { count: chapters.length, words: totalStats.totalWordCount.toLocaleString() })}
           </span>
         </div>
       </div>
 
-      {/* Chapter list - simplified display */}
       <div className="chapter-list chapter-list-compact">
         {chapters.length === 0 ? (
           <div className="chapter-list-empty chapter-list-empty-compact">
-            <p className="chapter-list-empty-text">暂无章节</p>
+            <p className="chapter-list-empty-text">{t('chapter.empty')}</p>
           </div>
         ) : (
           chapters.map((chapter) => (
@@ -106,11 +103,9 @@ export const ChapterManager: React.FC<ChapterManagerProps> = ({
               className="chapter-item chapter-item-compact"
               onClick={() => handleChapterClick(chapter)}
             >
-              <span className="chapter-item-title-compact">
-                {chapter.title}
-              </span>
+              <span className="chapter-item-title-compact">{chapter.title}</span>
               <span className="chapter-item-meta-compact">
-                {chapter.wordCount.toLocaleString()} 字
+                {chapter.wordCount.toLocaleString()} {t('chapter.wordsUnit')}
               </span>
             </div>
           ))

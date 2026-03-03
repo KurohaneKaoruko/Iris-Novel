@@ -1,9 +1,8 @@
-use crate::app_settings;
+﻿use crate::app_settings;
 use crate::agents;
 use crate::agent_system;
 use crate::ai_types::ChatMessage;
 use crate::app_data;
-use crate::branding;
 use crate::chat_history;
 use crate::secrets;
 use crate::skills::{Skill, SkillManager};
@@ -14,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -51,6 +50,38 @@ pub struct ProjectPickerState {
   pub last_workspace: Option<String>,
   pub launch_mode: app_settings::LaunchMode,
 }
+
+#[derive(Serialize, Clone)]
+pub struct HistoryEntry {
+  pub id: String,
+  pub file_path: String,
+  pub created_at: i64,
+  pub reason: String,
+  pub word_count: usize,
+  pub char_count: usize,
+  pub summary: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct HistoryEntryRecord {
+  id: String,
+  file_path: String,
+  snapshot_rel_path: String,
+  created_at: i64,
+  reason: String,
+  word_count: usize,
+  char_count: usize,
+  summary: String,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct HistoryStore {
+  #[serde(default)]
+  entries: Vec<HistoryEntryRecord>,
+}
+
+const HISTORY_MAX_ENTRIES: usize = 800;
+static HISTORY_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Serialize, Deserialize, Default)]
 struct ExternalProjectsStore {
@@ -193,6 +224,56 @@ fn list_default_projects(root: &Path) -> Result<Vec<ProjectItem>, String> {
   Ok(projects)
 }
 
+fn sanitize_project_folder_name(input: &str) -> String {
+  let mut out = String::new();
+  for ch in input.trim().chars() {
+    let allowed = ch.is_ascii_alphanumeric()
+      || ch == '-'
+      || ch == '_'
+      || ('\u{4E00}'..='\u{9FFF}').contains(&ch);
+    if allowed {
+      out.push(ch);
+    } else if ch.is_whitespace() {
+      out.push('-');
+    }
+  }
+  let compact = out
+    .split('-')
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join("-");
+  if compact.is_empty() {
+    "novel".to_string()
+  } else {
+    compact
+  }
+}
+
+fn build_unique_project_path(root: &Path, base_name: &str) -> PathBuf {
+  let mut idx = 1usize;
+  loop {
+    let candidate = if idx == 1 {
+      root.join(base_name)
+    } else {
+      root.join(format!("{base_name}-{idx:02}"))
+    };
+    if !candidate.exists() {
+      return candidate;
+    }
+    idx += 1;
+  }
+}
+
+fn write_file_if_absent(path: &Path, content: &str) -> Result<(), String> {
+  if path.exists() {
+    return Ok(());
+  }
+  if let Some(parent) = path.parent() {
+    fs::create_dir_all(parent).map_err(|e| format!("create dir failed: {e}"))?;
+  }
+  fs::write(path, content).map_err(|e| format!("write file failed: {e}"))
+}
+
 fn parse_launch_mode(mode: &str) -> Result<app_settings::LaunchMode, String> {
   match mode.trim() {
     "picker" => Ok(app_settings::LaunchMode::Picker),
@@ -239,6 +320,30 @@ pub fn get_project_picker_state(app: AppHandle) -> Result<ProjectPickerState, St
     last_workspace,
     launch_mode: settings.launch_mode,
   })
+}
+
+#[tauri::command]
+pub fn create_novel_project(name: String) -> Result<ProjectItem, String> {
+  let trimmed = name.trim();
+  if trimmed.is_empty() {
+    return Err("project name is empty".to_string());
+  }
+
+  let default_root = default_projects_root()?;
+  fs::create_dir_all(&default_root).map_err(|e| format!("create default projects root failed: {e}"))?;
+
+  let folder_name = sanitize_project_folder_name(trimmed);
+  let target_root = build_unique_project_path(&default_root, &folder_name);
+  fs::create_dir_all(&target_root).map_err(|e| format!("create project dir failed: {e}"))?;
+
+  init_novel_workspace(&target_root)?;
+
+  let canonical = canonicalize_path(&target_root).unwrap_or(target_root);
+  Ok(to_project_item(
+    &canonical,
+    "default",
+    Some(Utc::now().timestamp()),
+  ))
 }
 
 #[tauri::command]
@@ -294,14 +399,14 @@ pub fn set_launch_mode(app: AppHandle, mode: String) -> Result<(), String> {
   app_settings::save(&app, &settings)
 }
 
-#[tauri::command]
-pub fn init_novel(state: State<'_, AppState>) -> Result<(), String> {
-  let root = get_workspace_root(&state)?;
+fn init_novel_workspace(root: &Path) -> Result<(), String> {
   let novel_dir = root.join(".novel");
 
   let dirs = [
     novel_dir.join(".settings"),
     novel_dir.join(".cache"),
+    novel_dir.join(".history"),
+    novel_dir.join(".history").join("snapshots"),
     novel_dir.join("plans"),
     novel_dir.join("tasks"),
     novel_dir.join("state"),
@@ -358,11 +463,44 @@ pub fn init_novel(state: State<'_, AppState>) -> Result<(), String> {
 
   let continuity_index = novel_dir.join("state").join("continuity-index.md");
   if !continuity_index.exists() {
-    let raw = "# Continuity Index\n\n用于记录角色、时间线、伏笔回收等连续性信息。";
+    let raw = "# Continuity Index\n\nTrack characters, timeline, and callbacks here.\n";
     fs::write(continuity_index, raw).map_err(|e| format!("write continuity index failed: {e}"))?;
   }
 
+  let history_store = novel_dir.join(".history").join("revisions.json");
+  write_file_if_absent(&history_store, "{\n  \"entries\": []\n}")?;
+
+  let outline_md = root.join("outline").join("outline.md");
+  write_file_if_absent(
+    &outline_md,
+    "# Story Outline\n\n## Act 1\n- Setup\n\n## Act 2\n- Conflict escalates\n\n## Act 3\n- Resolution\n",
+  )?;
+
+  let characters_md = root.join("concept").join("characters.md");
+  write_file_if_absent(
+    &characters_md,
+    "# Character Sheet\n\n## Protagonist\n- Goal:\n- Flaw:\n- Arc:\n",
+  )?;
+
+  let relations_md = root.join("concept").join("relations.md");
+  write_file_if_absent(
+    &relations_md,
+    "# Character Relations\n\n- Protagonist -> Mentor : Trust and conflict\n",
+  )?;
+
+  let first_chapter = root.join("stories").join("chapter-0001-opening.md");
+  write_file_if_absent(
+    &first_chapter,
+    "# Chapter 1: Opening\n\nWrite your first scene here.\n",
+  )?;
+
   Ok(())
+}
+
+#[tauri::command]
+pub fn init_novel(state: State<'_, AppState>) -> Result<(), String> {
+  let root = get_workspace_root(&state)?;
+  init_novel_workspace(&root)
 }
 
 #[derive(Serialize, Clone)]
@@ -589,10 +727,10 @@ pub fn resolve_inline_references(
     });
   }
 
-  let selection_regex = Regex::new(r"#(?:选区|selection)\b").map_err(|e| format!("selection regex invalid: {e}"))?;
+  let selection_regex = Regex::new(r"#(?:閫夊尯|selection)\b").map_err(|e| format!("selection regex invalid: {e}"))?;
   let current_file_regex =
-    Regex::new(r"#(?:当前文件|current_file|current)\b").map_err(|e| format!("current file regex invalid: {e}"))?;
-  let file_prefix_regex = Regex::new(r"#(?:文件|file):([^\s#]+)").map_err(|e| format!("file prefix regex invalid: {e}"))?;
+    Regex::new(r"#(?:褰撳墠鏂囦欢|current_file|current)\b").map_err(|e| format!("current file regex invalid: {e}"))?;
+  let file_prefix_regex = Regex::new(r"#(?:鏂囦欢|file):([^\s#]+)").map_err(|e| format!("file prefix regex invalid: {e}"))?;
   let file_path_regex =
     Regex::new(r"#([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]{1,16})").map_err(|e| format!("file path regex invalid: {e}"))?;
 
@@ -756,7 +894,7 @@ pub fn validate_novel_task_quality(
   }
 
   if !content.trim().is_empty()
-    && task.acceptance_checks.iter().any(|check| check.contains("钩子"))
+    && task.acceptance_checks.iter().any(|check| check.contains("閽╁瓙"))
   {
     let tail: String = content.chars().rev().take(80).collect::<String>().chars().rev().collect();
     let has_hook_end = tail.chars().any(|ch| ['?', '!', '.', '？', '！', '。', '…'].contains(&ch));
@@ -812,6 +950,137 @@ pub fn set_project_writing_settings(
   Ok(normalized)
 }
 
+fn history_dir(root: &Path) -> PathBuf {
+  root.join(".novel").join(".history")
+}
+
+fn history_index_path(root: &Path) -> PathBuf {
+  history_dir(root).join("revisions.json")
+}
+
+fn history_snapshots_dir(root: &Path) -> PathBuf {
+  history_dir(root).join("snapshots")
+}
+
+fn ensure_history_workspace(root: &Path) -> Result<(), String> {
+  fs::create_dir_all(history_snapshots_dir(root)).map_err(|e| format!("create history dir failed: {e}"))?;
+  let index = history_index_path(root);
+  if !index.exists() {
+    fs::write(&index, "{\n  \"entries\": []\n}").map_err(|e| format!("init history index failed: {e}"))?;
+  }
+  Ok(())
+}
+
+fn load_history_store(root: &Path) -> Result<HistoryStore, String> {
+  ensure_history_workspace(root)?;
+  let raw = fs::read_to_string(history_index_path(root)).map_err(|e| format!("read history index failed: {e}"))?;
+  serde_json::from_str::<HistoryStore>(&raw).map_err(|e| format!("parse history index failed: {e}"))
+}
+
+fn save_history_store(root: &Path, store: &HistoryStore) -> Result<(), String> {
+  ensure_history_workspace(root)?;
+  let raw = serde_json::to_string_pretty(store).map_err(|e| format!("serialize history index failed: {e}"))?;
+  fs::write(history_index_path(root), raw).map_err(|e| format!("write history index failed: {e}"))
+}
+
+fn next_history_id() -> String {
+  let seq = HISTORY_ID_COUNTER.fetch_add(1, Ordering::Relaxed) % 10_000;
+  format!("hist-{}-{seq:04}", Utc::now().timestamp_millis())
+}
+
+fn count_words(text: &str) -> usize {
+  text.split_whitespace().filter(|part| !part.trim().is_empty()).count()
+}
+
+fn summarize_snapshot(text: &str) -> String {
+  let line = text.lines().find(|line| !line.trim().is_empty()).unwrap_or("").trim();
+  if line.is_empty() {
+    "(empty)".to_string()
+  } else if line.chars().count() > 80 {
+    let short = line.chars().take(80).collect::<String>();
+    format!("{short}...")
+  } else {
+    line.to_string()
+  }
+}
+
+fn history_entry_from_record(record: &HistoryEntryRecord) -> HistoryEntry {
+  HistoryEntry {
+    id: record.id.clone(),
+    file_path: record.file_path.clone(),
+    created_at: record.created_at,
+    reason: record.reason.clone(),
+    word_count: record.word_count,
+    char_count: record.char_count,
+    summary: record.summary.clone(),
+  }
+}
+
+fn should_track_history_path(relative_path: &str) -> bool {
+  let norm = relative_path.replace('\\', "/").to_lowercase();
+  if norm.starts_with(".novel/.history/")
+    || norm.starts_with(".novel/.cache/")
+    || norm.starts_with(".novel/state/")
+    || norm.starts_with(".git/")
+  {
+    return false;
+  }
+  norm.starts_with("stories/")
+    || norm.starts_with("outline/")
+    || norm.starts_with("concept/")
+    || norm.ends_with(".md")
+    || norm.ends_with(".txt")
+}
+
+fn create_history_snapshot_internal(
+  root: &Path,
+  file_path: &str,
+  snapshot_content: &str,
+  reason: &str,
+) -> Result<HistoryEntryRecord, String> {
+  ensure_history_workspace(root)?;
+
+  let normalized_file_path = file_path.replace('\\', "/");
+  let ext = Path::new(&normalized_file_path)
+    .extension()
+    .and_then(|v| v.to_str())
+    .unwrap_or("txt");
+  let id = next_history_id();
+  let snapshot_rel_path = format!(".novel/.history/snapshots/{id}.{ext}");
+  let snapshot_abs_path = root.join(validate_relative_path(&snapshot_rel_path)?);
+  fs::write(&snapshot_abs_path, snapshot_content).map_err(|e| format!("write history snapshot failed: {e}"))?;
+
+  let mut store = load_history_store(root)?;
+  let record = HistoryEntryRecord {
+    id: id.clone(),
+    file_path: normalized_file_path,
+    snapshot_rel_path,
+    created_at: Utc::now().timestamp_millis(),
+    reason: reason.to_string(),
+    word_count: count_words(snapshot_content),
+    char_count: snapshot_content.chars().count(),
+    summary: summarize_snapshot(snapshot_content),
+  };
+  store.entries.insert(0, record.clone());
+
+  if store.entries.len() > HISTORY_MAX_ENTRIES {
+    let dropped = store.entries.split_off(HISTORY_MAX_ENTRIES);
+    for old in dropped {
+      if let Ok(rel) = validate_relative_path(&old.snapshot_rel_path) {
+        let old_path = root.join(rel);
+        let _ = fs::remove_file(old_path);
+      }
+    }
+  }
+
+  save_history_store(root, &store)?;
+  Ok(record)
+}
+
+fn find_history_entry_record(store: &HistoryStore, id: &str) -> Option<HistoryEntryRecord> {
+  store.entries.iter().find(|entry| entry.id == id).cloned()
+}
+
 #[tauri::command]
 pub fn list_workspace_tree(state: State<'_, AppState>, max_depth: usize) -> Result<FsEntry, String> {
   let root = get_workspace_root(&state)?;
@@ -851,6 +1120,14 @@ pub fn write_text(
       return Err("parent directory does not exist; create it first".to_string());
     }
   }
+
+  if target.exists() && should_track_history_path(&rel_norm) {
+    if let Ok(previous_content) = fs::read_to_string(&target) {
+      if previous_content != content {
+        let _ = create_history_snapshot_internal(&root, &rel_norm, &previous_content, "auto-save");
+      }
+    }
+  }
   fs::write(&target, &content).map_err(|e| format!("write failed: {e}"))?;
 
   if rel_norm.starts_with("concept/") && rel_norm.to_lowercase().ends_with(".md") {
@@ -858,6 +1135,85 @@ pub fn write_text(
   }
 
   Ok(())
+}
+
+#[tauri::command]
+pub fn list_history_entries(state: State<'_, AppState>, max: Option<usize>) -> Result<Vec<HistoryEntry>, String> {
+  let root = get_workspace_root(&state)?;
+  let store = load_history_store(&root)?;
+  let limit = max.unwrap_or(120).clamp(1, 500);
+  Ok(
+    store
+      .entries
+      .iter()
+      .take(limit)
+      .map(history_entry_from_record)
+      .collect(),
+  )
+}
+
+#[tauri::command]
+pub fn create_history_snapshot(
+  state: State<'_, AppState>,
+  relative_path: String,
+  reason: Option<String>,
+) -> Result<HistoryEntry, String> {
+  let root = get_workspace_root(&state)?;
+  let rel = validate_relative_path(&relative_path)?;
+  let rel_norm = rel.to_string_lossy().replace('\\', "/");
+  let target = root.join(rel);
+  if !target.exists() {
+    return Err("target file does not exist".to_string());
+  }
+  let content = fs::read_to_string(target).map_err(|e| format!("read snapshot source failed: {e}"))?;
+  let reason_text = reason
+    .as_deref()
+    .map(str::trim)
+    .filter(|v| !v.is_empty())
+    .unwrap_or("manual");
+  let entry = create_history_snapshot_internal(&root, &rel_norm, &content, reason_text)?;
+  Ok(history_entry_from_record(&entry))
+}
+
+#[tauri::command]
+pub fn read_history_snapshot(state: State<'_, AppState>, id: String) -> Result<String, String> {
+  let root = get_workspace_root(&state)?;
+  let store = load_history_store(&root)?;
+  let record = find_history_entry_record(&store, id.trim())
+    .ok_or_else(|| "history entry not found".to_string())?;
+  let rel = validate_relative_path(&record.snapshot_rel_path)?;
+  fs::read_to_string(root.join(rel)).map_err(|e| format!("read snapshot failed: {e}"))
+}
+
+#[tauri::command]
+pub fn restore_history_snapshot(state: State<'_, AppState>, id: String) -> Result<String, String> {
+  let root = get_workspace_root(&state)?;
+  let store = load_history_store(&root)?;
+  let record = find_history_entry_record(&store, id.trim())
+    .ok_or_else(|| "history entry not found".to_string())?;
+  let file_rel = validate_relative_path(&record.file_path)?;
+  let snapshot_rel = validate_relative_path(&record.snapshot_rel_path)?;
+  let target = root.join(file_rel);
+  let snapshot_path = root.join(snapshot_rel);
+  let snapshot_content = fs::read_to_string(snapshot_path).map_err(|e| format!("read snapshot failed: {e}"))?;
+
+  if let Some(parent) = target.parent() {
+    fs::create_dir_all(parent).map_err(|e| format!("create parent dir failed: {e}"))?;
+  }
+
+  if target.exists() {
+    if let Ok(current) = fs::read_to_string(&target) {
+      if current != snapshot_content {
+        let _ = create_history_snapshot_internal(&root, &record.file_path, &current, "restore-backup");
+      }
+    }
+  }
+
+  fs::write(&target, &snapshot_content).map_err(|e| format!("restore snapshot failed: {e}"))?;
+  if record.file_path.starts_with("concept/") && record.file_path.to_lowercase().ends_with(".md") {
+    update_concept_index(&root, &record.file_path, &snapshot_content)?;
+  }
+  Ok(record.file_path)
 }
 
 #[tauri::command]
@@ -1000,12 +1356,12 @@ pub fn set_api_key(
   let pid = providerId.or(provider_id).unwrap_or_default();
   let pid = pid.trim();
   if pid.is_empty() {
-    return Err("provider_id 不能为空".to_string());
+    return Err("provider_id 涓嶈兘涓虹┖".to_string());
   }
   let key = apiKey.or(api_key).unwrap_or_default();
   let key = key.trim();
   if key.is_empty() {
-    return Err("API Key 不能为空".to_string());
+    return Err("API Key 涓嶈兘涓虹┖".to_string());
   }
   secrets::set_api_key(&app, pid, key)
 }
@@ -1226,161 +1582,6 @@ pub fn list_chat_sessions(app: AppHandle, workspace_root: Option<String>) -> Res
 pub fn get_chat_session(app: AppHandle, id: String) -> Result<chat_history::ChatSession, String> {
   let sessions = chat_history::load(&app)?;
   sessions.into_iter().find(|s| s.id == id).ok_or_else(|| "session not found".to_string())
-}
-
-#[derive(Serialize)]
-pub struct GitStatusItem {
-  pub path: String,
-  pub status: String,
-}
-
-#[tauri::command]
-pub fn git_init(state: State<'_, AppState>) -> Result<(), String> {
-  let root = get_workspace_root(&state)?;
-  git2::Repository::init(root).map(|_| ()).map_err(|e| format!("git init failed: {e}"))
-}
-
-#[tauri::command]
-pub fn git_status(state: State<'_, AppState>) -> Result<Vec<GitStatusItem>, String> {
-  let root = get_workspace_root(&state)?;
-  let repo = git2::Repository::open(root).map_err(|e| format!("open repo failed: {e}"))?;
-  let mut opts = git2::StatusOptions::new();
-  opts.include_untracked(true)
-    .recurse_untracked_dirs(true)
-    .include_ignored(false)
-    .renames_head_to_index(true)
-    .renames_index_to_workdir(true);
-  let statuses = repo.statuses(Some(&mut opts)).map_err(|e| format!("status failed: {e}"))?;
-
-  let mut out: Vec<GitStatusItem> = Vec::new();
-  for entry in statuses.iter() {
-    let st = entry.status();
-    let path = entry.path().unwrap_or("").to_string();
-    if path.is_empty() {
-      continue;
-    }
-    out.push(GitStatusItem {
-      path,
-      status: format_status(st),
-    });
-  }
-
-  out.sort_by(|a, b| a.path.to_lowercase().cmp(&b.path.to_lowercase()));
-  Ok(out)
-}
-
-#[tauri::command]
-pub fn git_diff(state: State<'_, AppState>, path: String) -> Result<String, String> {
-  let root = get_workspace_root(&state)?;
-  let repo = git2::Repository::open(root).map_err(|e| format!("open repo failed: {e}"))?;
-  let mut opts = git2::DiffOptions::new();
-  opts.pathspec(path);
-  let diff = repo
-    .diff_index_to_workdir(None, Some(&mut opts))
-    .map_err(|e| format!("diff failed: {e}"))?;
-
-  let mut out = String::new();
-  diff
-    .print(git2::DiffFormat::Patch, |_d, _h, line| {
-      out.push_str(std::str::from_utf8(line.content()).unwrap_or_default());
-      true
-    })
-    .map_err(|e| format!("diff print failed: {e}"))?;
-
-  Ok(out)
-}
-
-#[tauri::command]
-pub fn git_commit(state: State<'_, AppState>, message: String) -> Result<String, String> {
-  let root = get_workspace_root(&state)?;
-  let repo = git2::Repository::open(root).map_err(|e| format!("open repo failed: {e}"))?;
-  let mut index = repo.index().map_err(|e| format!("open index failed: {e}"))?;
-  index
-    .add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)
-    .map_err(|e| format!("stage failed: {e}"))?;
-  index.write().map_err(|e| format!("index write failed: {e}"))?;
-
-  let tree_oid = index.write_tree().map_err(|e| format!("write tree failed: {e}"))?;
-  let tree = repo.find_tree(tree_oid).map_err(|e| format!("find tree failed: {e}"))?;
-
-  let sig = repo
-    .signature()
-    .or_else(|_| git2::Signature::now(branding::GIT_SIGNATURE_NAME, branding::GIT_SIGNATURE_EMAIL))
-    .map_err(|e| format!("signature failed: {e}"))?;
-
-  let parent = repo
-    .head()
-    .ok()
-    .and_then(|h| h.target())
-    .and_then(|oid| repo.find_commit(oid).ok());
-
-  let oid = if let Some(parent) = parent {
-    repo
-      .commit(Some("HEAD"), &sig, &sig, message.trim(), &tree, &[&parent])
-      .map_err(|e| format!("commit failed: {e}"))?
-  } else {
-    repo
-      .commit(Some("HEAD"), &sig, &sig, message.trim(), &tree, &[])
-      .map_err(|e| format!("commit failed: {e}"))?
-  };
-
-  Ok(oid.to_string())
-}
-
-#[derive(Serialize)]
-pub struct GitCommitInfo {
-  pub id: String,
-  pub summary: String,
-  pub author: String,
-  pub time: i64,
-}
-
-#[tauri::command]
-pub fn git_log(state: State<'_, AppState>, max: usize) -> Result<Vec<GitCommitInfo>, String> {
-  let root = get_workspace_root(&state)?;
-  let repo = git2::Repository::open(root).map_err(|e| format!("open repo failed: {e}"))?;
-  let mut walk = repo.revwalk().map_err(|e| format!("revwalk failed: {e}"))?;
-  walk.push_head().map_err(|e| format!("push head failed: {e}"))?;
-  let mut out: Vec<GitCommitInfo> = Vec::new();
-  for oid in walk.take(max) {
-    let oid = oid.map_err(|e| format!("revwalk oid failed: {e}"))?;
-    let commit = repo.find_commit(oid).map_err(|e| format!("find commit failed: {e}"))?;
-    let author = commit.author();
-    out.push(GitCommitInfo {
-      id: oid.to_string(),
-      summary: commit.summary().unwrap_or("").to_string(),
-      author: author.name().unwrap_or("").to_string(),
-      time: commit.time().seconds(),
-    });
-  }
-  Ok(out)
-}
-
-fn format_status(st: git2::Status) -> String {
-  let mut parts: Vec<&str> = Vec::new();
-  if st.contains(git2::Status::INDEX_NEW) {
-    parts.push("A");
-  }
-  if st.contains(git2::Status::INDEX_MODIFIED) {
-    parts.push("M");
-  }
-  if st.contains(git2::Status::INDEX_DELETED) {
-    parts.push("D");
-  }
-  if st.contains(git2::Status::WT_NEW) {
-    parts.push("?")
-  }
-  if st.contains(git2::Status::WT_MODIFIED) {
-    parts.push("M")
-  }
-  if st.contains(git2::Status::WT_DELETED) {
-    parts.push("D")
-  }
-  if parts.is_empty() {
-    " ".to_string()
-  } else {
-    parts.join("")
-  }
 }
 
 fn emit_stream_status(window: &tauri::Window, stream_id: &str, phase: &str) {
@@ -2419,7 +2620,7 @@ fn trim_for_risk_scan(content: &str, max_chars: usize) -> String {
     .rev()
     .collect::<String>();
   format!(
-    "{head}\n\n...[中间内容已省略，约 {} 字符]...\n\n{tail}",
+    "{head}\n\n...[涓棿鍐呭宸茬渷鐣ワ紝绾?{} 瀛楃]...\n\n{tail}",
     total.saturating_sub(max_chars)
   )
 }
@@ -2582,24 +2783,24 @@ pub async fn risk_scan_content(
   let snippets = collect_related_chapter_snippets(&root, file_path.as_deref());
 
   let mut prompt = String::new();
-  prompt.push_str("请对以下小说内容做合规风险检测，重点识别违法违规、过度暴力血腥、未成年人不当内容、仇恨歧视、色情露骨、现实敏感风险等问题。\n");
-  prompt.push_str("请返回 JSON，字段必须完整：\n");
+  prompt.push_str("璇峰浠ヤ笅灏忚鍐呭鍋氬悎瑙勯闄╂娴嬶紝閲嶇偣璇嗗埆杩濇硶杩濊銆佽繃搴︽毚鍔涜鑵ャ€佹湭鎴愬勾浜轰笉褰撳唴瀹广€佷粐鎭ㄦ瑙嗐€佽壊鎯呴湶楠ㄣ€佺幇瀹炴晱鎰熼闄╃瓑闂銆俓n");
+  prompt.push_str("璇疯繑鍥?JSON锛屽瓧娈靛繀椤诲畬鏁达細\n");
   prompt.push_str("{\"summary\":\"...\",\"overall_level\":\"low|medium|high\",\"findings\":[{\"level\":\"low|medium|high\",\"category\":\"...\",\"excerpt\":\"...\",\"reason\":\"...\",\"suggestion\":\"...\",\"line_start\":1,\"line_end\":1}]}\n");
-  prompt.push_str("要求：\n");
-  prompt.push_str("- 仅返回 JSON，不要 Markdown。\n");
-  prompt.push_str("- 若没有明显问题，findings 返回空数组，overall_level=low。\n");
-  prompt.push_str("- excerpt 必须引用原文中的短片段，避免过长。\n");
-  prompt.push_str("- suggestion 给出可执行改写建议。\n\n");
+  prompt.push_str("瑕佹眰锛歕n");
+  prompt.push_str("- 浠呰繑鍥?JSON锛屼笉瑕?Markdown銆俓n");
+  prompt.push_str("- 鑻ユ病鏈夋槑鏄鹃棶棰橈紝findings 杩斿洖绌烘暟缁勶紝overall_level=low銆俓n");
+  prompt.push_str("- excerpt 蹇呴』寮曠敤鍘熸枃涓殑鐭墖娈碉紝閬垮厤杩囬暱銆俓n");
+  prompt.push_str("- suggestion 缁欏嚭鍙墽琛屾敼鍐欏缓璁€俓n\n");
   if let Some(path) = file_path.as_ref().filter(|p| !p.trim().is_empty()) {
-    prompt.push_str(format!("当前文件: {}\n\n", path.trim()).as_str());
+    prompt.push_str(format!("褰撳墠鏂囦欢: {}\n\n", path.trim()).as_str());
   }
   if !snippets.is_empty() {
-    prompt.push_str("相关章节上下文（用于避免误判，非必须逐条点评）：\n");
+    prompt.push_str("鐩稿叧绔犺妭涓婁笅鏂囷紙鐢ㄤ簬閬垮厤璇垽锛岄潪蹇呴』閫愭潯鐐硅瘎锛夛細\n");
     for (idx, (path, text)) in snippets.iter().enumerate() {
-      prompt.push_str(format!("【上下文{}】{}\n{}\n\n", idx + 1, path, text).as_str());
+      prompt.push_str(format!("[Context {}] {}\n{}\n\n", idx + 1, path, text).as_str());
     }
   }
-  prompt.push_str("待检测正文：\n");
+  prompt.push_str("寰呮娴嬫鏂囷細\n");
   prompt.push_str(payload_text.as_str());
 
   let system_prompt = "你是严格的中文小说合规审校助手，输出务必是可解析 JSON，不得包含解释文字。";
@@ -2815,7 +3016,7 @@ pub(crate) fn validate_outline(existing_json: &str, new_json: &str) -> Result<()
   for (idx, ev) in combined.iter().enumerate() {
     if !ev.id.trim().is_empty() {
       if let Some(prev) = id_set.insert(ev.id.clone(), idx) {
-        conflicts.push(format!("事件 id 重复：{}（{} 与 {}）", ev.id, prev + 1, idx + 1));
+        conflicts.push(format!("事件 id 重复：{}（第{}条 与 第{}条）", ev.id, prev + 1, idx + 1));
       }
     }
   }
@@ -2834,7 +3035,7 @@ pub(crate) fn validate_outline(existing_json: &str, new_json: &str) -> Result<()
       let by_time = per_character.entry(ch.clone()).or_default();
       if let Some(prev_loc) = by_time.get(&ev.time) {
         if !ev.location.trim().is_empty() && prev_loc != &ev.location {
-          conflicts.push(format!("时间线冲突：{} 在 {} 同时出现在 {} 与 {}", ch, ev.time, prev_loc, ev.location));
+          conflicts.push(format!("鏃堕棿绾垮啿绐侊細{} 鍦?{} 鍚屾椂鍑虹幇鍦?{} 涓?{}", ch, ev.time, prev_loc, ev.location));
         }
       } else if !ev.location.trim().is_empty() {
         by_time.insert(ev.time.clone(), ev.location.clone());
@@ -2939,250 +3140,166 @@ pub fn apply_skill(skill_id: String, content: String) -> String {
 
 use crate::book_split::{BookAnalysis, BookSplitConfig, BookSplitResult, ChapterInfo, SplitChapter};
 
+fn looks_like_chapter_title(line: &str) -> bool {
+  let trimmed = line.trim();
+  if trimmed.is_empty() || trimmed.len() > 80 {
+    return false;
+  }
+  let lower = trimmed.to_lowercase();
+  lower.starts_with("chapter ")
+    || lower.starts_with("ch ")
+    || (trimmed.starts_with('第') && (trimmed.contains('章') || trimmed.contains('节') || trimmed.contains('卷')))
+}
+
 #[allow(dead_code)]
 #[tauri::command]
 pub async fn analyze_book(content: String, title: String) -> Result<BookAnalysis, String> {
-    // 简单分析实现
+  let mut analysis = BookAnalysis::new(&title);
+  analysis.total_words = content.chars().filter(|c| !c.is_whitespace()).count();
+
+  let chapters = extract_chapters(content.clone()).await?;
+  if chapters.is_empty() {
     let words = content.chars().filter(|c| !c.is_whitespace()).count();
-    let lines: Vec<&str> = content.lines().collect();
-    
-    let mut analysis = BookAnalysis::new(&title);
-    analysis.total_words = words;
-    
-    // 尝试识别章节
-    let mut chapter_count = 0;
-    let mut current_chapter = String::new();
-    let mut chapter_start = 0;
-    
-    for (i, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
-        // 检测章节标题模式
-        if trimmed.starts_with("第") && (trimmed.contains("章") || trimmed.contains("节") || trimmed.contains("回")) {
-            if chapter_count > 0 {
-                // 保存上一章
-                let chapter_words = current_chapter.chars().filter(|c| !c.is_whitespace()).count();
-                analysis.chapters.push(ChapterInfo {
-                    id: chapter_count,
-                    title: format!("第{}章", chapter_count),
-                    start_line: chapter_start,
-                    end_line: i - 1,
-                    word_count: chapter_words,
-                    summary: format!("第{}章内容，约{}字", chapter_count, chapter_words),
-                    key_events: vec![],
-                    characters_appearing: vec![],
-                });
-            }
-            chapter_count += 1;
-            chapter_start = i;
-            current_chapter = String::new();
-        } else if chapter_count > 0 {
-            current_chapter.push_str(line);
-            current_chapter.push('\n');
-        }
-    }
-    
-    // 保存最后一章
-    if chapter_count > 0 && !current_chapter.is_empty() {
-        let chapter_words = current_chapter.chars().filter(|c| !c.is_whitespace()).count();
-        analysis.chapters.push(ChapterInfo {
-            id: chapter_count,
-            title: format!("第{}章", chapter_count),
-            start_line: chapter_start,
-            end_line: lines.len() - 1,
-            word_count: chapter_words,
-            summary: format!("最后一章，约{}字", chapter_words),
-            key_events: vec![],
-            characters_appearing: vec![],
-        });
-    }
-    
-    // 如果没有识别到章节，按字数拆分
-    if analysis.chapters.is_empty() {
-        let target_words = 3000;
-        let mut chapter_content = String::new();
-        let mut chapter_id = 1;
-        
-        for line in &lines {
-            chapter_content.push_str(line);
-            chapter_content.push('\n');
-            
-            let current_words = chapter_content.chars().filter(|c| !c.is_whitespace()).count();
-            if current_words >= target_words {
-                analysis.chapters.push(ChapterInfo {
-                    id: chapter_id,
-                    title: format!("第{}章", chapter_id),
-                    start_line: 0,
-                    end_line: 0,
-                    word_count: current_words,
-                    summary: format!("自动拆分章节，约{}字", current_words),
-                    key_events: vec![],
-                    characters_appearing: vec![],
-                });
-                chapter_id += 1;
-                chapter_content = String::new();
-            }
-        }
-        
-        // 最后一章
-        if !chapter_content.is_empty() {
-            let current_words = chapter_content.chars().filter(|c| !c.is_whitespace()).count();
-            if current_words > 100 {
-                analysis.chapters.push(ChapterInfo {
-                    id: chapter_id,
-                    title: format!("第{}章", chapter_id),
-                    start_line: 0,
-                    end_line: 0,
-                    word_count: current_words,
-                    summary: format!("自动拆分章节，约{}字", current_words),
-                    key_events: vec![],
-                    characters_appearing: vec![],
-                });
-            }
-        }
-    }
-    
-    analysis.outline.structure = if chapter_count > 10 { "多线复杂结构".to_string() } else { "线性结构".to_string() };
-    analysis.themes = vec!["待分析".to_string()];
-    analysis.style = "待分析".to_string();
-    
-    Ok(analysis)
+    analysis.chapters.push(ChapterInfo {
+      id: 1,
+      title: "Chapter 1".to_string(),
+      start_line: 0,
+      end_line: content.lines().count().saturating_sub(1),
+      word_count: words,
+      summary: format!("Single chapter, around {} chars", words),
+      key_events: vec![],
+      characters_appearing: vec![],
+    });
+  } else {
+    analysis.chapters = chapters;
+  }
+
+  analysis.outline.structure = if analysis.chapters.len() > 10 {
+    "Multi-line complex structure".to_string()
+  } else {
+    "Linear structure".to_string()
+  };
+  analysis.themes = vec!["To be analyzed".to_string()];
+  analysis.style = "To be analyzed".to_string();
+  Ok(analysis)
 }
 
 #[allow(dead_code)]
 #[tauri::command]
 pub async fn split_book(content: String, title: String, config: BookSplitConfig) -> Result<BookSplitResult, String> {
-    let words: Vec<&str> = content.lines().collect();
-    let target_words = config.target_chapter_words;
-    
-    let mut chapters: Vec<SplitChapter> = vec![];
-    let mut current_content = String::new();
-    let mut chapter_id = 1;
-    let mut current_words = 0;
-    
-    for line in words {
-        current_content.push_str(line);
-        current_content.push('\n');
-        current_words += line.chars().filter(|c| !c.is_whitespace()).count();
-        
-        if current_words >= target_words {
-            // 查找合适的断点（句号、段落结束）
-            let mut break_point = current_content.len();
-            for (i, c) in current_content.chars().rev().enumerate() {
-                if c == '。' || c == '！' || c == '？' || c == '\n' {
-                    break_point = current_content.len() - i;
-                    break;
-                }
-            }
-            
-            let chapter_content = current_content[..break_point].to_string();
-            let chapter_words = chapter_content.chars().filter(|c| !c.is_whitespace()).count();
-            
-            chapters.push(SplitChapter {
-                id: chapter_id,
-                title: format!("第{}章", chapter_id),
-                content: chapter_content,
-                word_count: chapter_words,
-                start_index: 0,
-                end_index: 0,
-                summary: None,
-            });
-            
-            current_content = current_content[break_point..].to_string();
-            current_words = current_content.chars().filter(|c| !c.is_whitespace()).count();
-            chapter_id += 1;
-        }
-    }
-    
-    // 处理剩余内容
-    if !current_content.is_empty() {
-        let chapter_words = current_content.chars().filter(|c| !c.is_whitespace()).count();
-        if chapter_words > 50 {
-            chapters.push(SplitChapter {
-                id: chapter_id,
-                title: format!("第{}章", chapter_id),
-                content: current_content,
-                word_count: chapter_words,
-                start_index: 0,
-                end_index: 0,
-                summary: None,
-            });
-        }
-    }
+  let lines: Vec<&str> = content.lines().collect();
+  let target_words = config.target_chapter_words.max(500);
 
-    let total_words: usize = chapters.iter().map(|c| c.word_count).sum();
-    let mut metadata = HashMap::new();
-    metadata.insert("total_chapters".to_string(), chapters.len().to_string());
-    metadata.insert("target_words_per_chapter".to_string(), target_words.to_string());
+  let mut chapters: Vec<SplitChapter> = vec![];
+  let mut current_content = String::new();
+  let mut chapter_id = 1usize;
+  let mut current_words = 0usize;
 
-    Ok(BookSplitResult {
-        title: title.clone(),
-        original_title: title,
-        chapters,
-        total_words,
-        metadata,
-    })
+  for line in lines {
+    current_content.push_str(line);
+    current_content.push('\n');
+    current_words += line.chars().filter(|c| !c.is_whitespace()).count();
+
+    if current_words >= target_words {
+      let chapter_words = current_content.chars().filter(|c| !c.is_whitespace()).count();
+      chapters.push(SplitChapter {
+        id: chapter_id,
+        title: format!("Chapter {}", chapter_id),
+        content: current_content.clone(),
+        word_count: chapter_words,
+        start_index: 0,
+        end_index: 0,
+        summary: None,
+      });
+      chapter_id += 1;
+      current_content.clear();
+      current_words = 0;
+    }
+  }
+
+  if !current_content.trim().is_empty() {
+    let chapter_words = current_content.chars().filter(|c| !c.is_whitespace()).count();
+    chapters.push(SplitChapter {
+      id: chapter_id,
+      title: format!("Chapter {}", chapter_id),
+      content: current_content,
+      word_count: chapter_words,
+      start_index: 0,
+      end_index: 0,
+      summary: None,
+    });
+  }
+
+  let total_words: usize = chapters.iter().map(|c| c.word_count).sum();
+  let mut metadata = HashMap::new();
+  metadata.insert("total_chapters".to_string(), chapters.len().to_string());
+  metadata.insert("target_words_per_chapter".to_string(), target_words.to_string());
+
+  Ok(BookSplitResult {
+    title: title.clone(),
+    original_title: title,
+    chapters,
+    total_words,
+    metadata,
+  })
 }
 
 #[allow(dead_code)]
 #[tauri::command]
 pub async fn extract_chapters(content: String) -> Result<Vec<ChapterInfo>, String> {
-    let lines: Vec<&str> = content.lines().collect();
-    let mut chapters: Vec<ChapterInfo> = vec![];
-    let mut chapter_id = 0;
-    let mut current_title = String::new();
-    let mut current_content = String::new();
-    let mut start_line = 0;
-    
-    for (i, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
-        
-        // 检测章节标题
-        let is_chapter_title = trimmed.starts_with("第") 
-            && (trimmed.contains("章") || trimmed.contains("节") || trimmed.contains("回"))
-            && trimmed.len() < 50;
-        
-        if is_chapter_title {
-            // 保存上一章
-            if chapter_id > 0 && !current_content.is_empty() {
-                let word_count = current_content.chars().filter(|c| !c.is_whitespace()).count();
-                chapters.push(ChapterInfo {
-                    id: chapter_id,
-                    title: current_title,
-                    start_line,
-                    end_line: i - 1,
-                    word_count,
-                    summary: format!("约{}字", word_count),
-                    key_events: vec![],
-                    characters_appearing: vec![],
-                });
-            }
-            
-            chapter_id += 1;
-            current_title = trimmed.to_string();
-            current_content = String::new();
-            start_line = i;
-        } else if chapter_id > 0 {
-            current_content.push_str(line);
-            current_content.push('\n');
-        }
+  let lines: Vec<&str> = content.lines().collect();
+  let mut chapters: Vec<ChapterInfo> = Vec::new();
+
+  let mut current_title: Option<String> = None;
+  let mut start_line: usize = 0;
+  let mut current_body = String::new();
+
+  let push_chapter = |title: String, start: usize, end: usize, body: &str, out: &mut Vec<ChapterInfo>| {
+    let word_count = body.chars().filter(|c| !c.is_whitespace()).count();
+    if word_count == 0 {
+      return;
     }
-    
-    // 保存最后一章
-    if chapter_id > 0 && !current_content.is_empty() {
-        let word_count = current_content.chars().filter(|c| !c.is_whitespace()).count();
-        chapters.push(ChapterInfo {
-            id: chapter_id,
-            title: current_title,
-            start_line,
-            end_line: lines.len() - 1,
-            word_count,
-            summary: format!("约{}字", word_count),
-            key_events: vec![],
-            characters_appearing: vec![],
-        });
+    let id = out.len() + 1;
+    out.push(ChapterInfo {
+      id,
+      title,
+      start_line: start,
+      end_line: end,
+      word_count,
+      summary: format!("Around {} chars", word_count),
+      key_events: vec![],
+      characters_appearing: vec![],
+    });
+  };
+
+  for (idx, line) in lines.iter().enumerate() {
+    if looks_like_chapter_title(line) {
+      if let Some(title) = current_title.take() {
+        push_chapter(title, start_line, idx.saturating_sub(1), current_body.as_str(), &mut chapters);
+      }
+      current_title = Some(line.trim().to_string());
+      start_line = idx;
+      current_body.clear();
+      continue;
     }
-    
-    Ok(chapters)
+
+    if current_title.is_some() {
+      current_body.push_str(line);
+      current_body.push('\n');
+    }
+  }
+
+  if let Some(title) = current_title.take() {
+    push_chapter(
+      title,
+      start_line,
+      lines.len().saturating_sub(1),
+      current_body.as_str(),
+      &mut chapters,
+    );
+  }
+
+  Ok(chapters)
 }
 
 // ============ AI Book Analysis Commands ============
@@ -3190,268 +3307,211 @@ pub async fn extract_chapters(content: String) -> Result<Vec<ChapterInfo>, Strin
 #[allow(dead_code)]
 #[tauri::command]
 pub async fn ai_analyze_book_deep(
-    content: String,
-    title: String,
-    _openai_key: String,
+  _content: String,
+  _title: String,
+  _openai_key: String,
 ) -> Result<String, String> {
-    let _prompt = format!(r#"请分析以下小说内容，提供详细的书本结构分析：
-
-书籍标题：{}
-
-要求分析：
-1. 故事结构（起承转合）
-2. 主要人物及其性格特点
-3. 核心主题
-4. 世界观/设定
-5. 每章的内容概要
-
-小说内容：
-{}
-
-请用JSON格式返回分析结果，格式如下：
-{{
-    "structure": "故事结构描述",
-    "themes": ["主题1", "主题2"],
-    "characters": [
-        {{"name": "人物名", "role": "角色", "description": "描述"}}
-    ],
-    "chapters_summary": [
-        {{"title": "章节名", "summary": "章节概要"}}
-    ]
-}}"#, title, content);
-    
-    // 这里需要调用OpenAI API
-    // 简化版本返回提示信息
-    Ok("AI分析功能需要配置API Key".to_string())
+  Ok("AI deep analysis requires a configured provider and key.".to_string())
 }
 
 #[allow(dead_code)]
 #[tauri::command]
 pub async fn ai_split_by_ai(
-    content: String,
-    _title: String,
-    target_words: u32,
-    _openai_key: String,
+  _content: String,
+  _title: String,
+  _target_words: u32,
+  _openai_key: String,
 ) -> Result<String, String> {
-    let _prompt = format!(r#"请将以下小说内容拆分成章节，每章大约{}字：
-
-要求：
-1. 在合适的断点分割（句号、段落结束）
-2. 为每个章节起一个标题
-3. 输出JSON格式
-
-小说内容：
-{}
-
-输出格式：
-{{
-    "chapters": [
-        {{"title": "章节标题", "content": "章节内容"}}
-    ]
-}}"#, target_words, content);
-    
-    Ok("AI拆分功能需要配置API Key".to_string())
+  Ok("AI split-by-AI requires a configured provider and key.".to_string())
 }
 
 // ============ Book Analysis Commands ============
 
-use crate::book_split::{BookAnalysisResult, Act, TurningPoint, PowerMoment, CharacterAnalysis, WritingTechnique};
+use crate::book_split::{
+  Act,
+  BookAnalysisResult,
+  CharacterAnalysis,
+  PowerMoment,
+  TurningPoint,
+  WritingTechnique,
+};
 
 #[tauri::command]
 pub async fn book_analyze(content: String, title: String) -> Result<BookAnalysisResult, String> {
-    let mut result = BookAnalysisResult::new(&title);
-    let word_count = content.chars().filter(|c| !c.is_whitespace()).count();
-    let lines: Vec<&str> = content.lines().collect();
-    
-    // 估算章节数（假设每章3000字）
-    let estimated_chapters = (word_count / 3000).max(1);
-    
-    // 分析章节标题模式
-    let mut chapter_count = 0;
+  let mut result = BookAnalysisResult::new(&title);
+  let word_count = content.chars().filter(|c| !c.is_whitespace()).count();
+  let lines: Vec<&str> = content.lines().collect();
 
-    for line in lines.iter() {
-        let trimmed = line.trim();
-        // 检测章节标题
-        if trimmed.starts_with("第") && (trimmed.contains("章") || trimmed.contains("节") || trimmed.contains("回")) {
-            chapter_count += 1;
-        }
-    }
-    
-    let actual_chapters = if chapter_count > 0 { chapter_count } else { estimated_chapters };
-    
-    // 生成结构分析
-    result.structure.r#type = if actual_chapters > 100 {
-        "长篇多线结构".to_string()
-    } else if actual_chapters > 50 {
-        "中长篇结构".to_string()
-    } else {
-        "中短篇结构".to_string()
-    };
-    
-    // Estimate act structure
-    let chapters_per_act = (actual_chapters as f32 / 4.0).ceil() as usize;
-    result.structure.acts = vec![
-        Act { id: 1, name: "opening".to_string(), chapters: (1..=chapters_per_act).collect(), description: "setup and introduction".to_string() },
-        Act { id: 2, name: "development".to_string(), chapters: (chapters_per_act+1..=chapters_per_act*2).collect(), description: "develop and deepen".to_string() },
-        Act { id: 3, name: "climax".to_string(), chapters: (chapters_per_act*2+1..=chapters_per_act*3).collect(), description: "turning point and climax".to_string() },
-        Act { id: 4, name: "conclusion".to_string(), chapters: (chapters_per_act*3+1..=actual_chapters).collect(), description: "resolution and ending".to_string() },
-    ];
-    
-    // 节奏分析
-    result.rhythm.average_chapter_length = word_count / actual_chapters.max(1);
-    result.rhythm.conflict_density = if result.rhythm.average_chapter_length > 4000 {
-        "高".to_string()
-    } else if result.rhythm.average_chapter_length > 2000 {
-        "中".to_string()
-    } else {
-        "低".to_string()
-    };
-    
-    // Add some sample turning points
-    if actual_chapters > 10 {
-        result.rhythm.turning_points = vec![
-            TurningPoint {
-                chapter: actual_chapters / 4,
-                r#type: "minor_climax".to_string(),
-                description: "First conflict resolution".to_string()
-            },
-            TurningPoint {
-                chapter: actual_chapters / 2,
-                r#type: "major_turn".to_string(),
-                description: "Core conflict erupts".to_string()
-            },
-            TurningPoint {
-                chapter: (actual_chapters as f32 * 0.75) as usize,
-                r#type: "climax".to_string(),
-                description: "Final battle".to_string()
-            },
-        ];
-    }
-    
-    // 章尾钩子类型
-    result.rhythm.chapter_hooks = vec![
-        "悬念型".to_string(), // 战斗胜负未分
-        "意外型".to_string(), // 突然出现强敌
-        "反转型".to_string(), // 真相出人意料
-        "期待型".to_string(), // 修炼突破在即
-    ];
-    
-    // Analyze common web novel power moments
-    result.power_moments = vec![
-        PowerMoment { chapter: actual_chapters / 5, r#type: "face_slap".to_string(), description: "Protagonist shames the antagonist".to_string(), frequency: "high".to_string() },
-        PowerMoment { chapter: actual_chapters / 3, r#type: "reversal".to_string(), description: "Weak to strong, defeats powerful enemy".to_string(), frequency: "medium".to_string() },
-        PowerMoment { chapter: actual_chapters / 2, r#type: "gain".to_string(), description: "Obtain treasure/legacy".to_string(), frequency: "high".to_string() },
-    ];
-    
-    // Character analysis (sample)
-    result.characters = vec![
-        CharacterAnalysis {
-            name: "protagonist".to_string(),
-            role: "protagonist".to_string(),
-            archetype: "loser_reversal".to_string(),
-            growth: "Weak to strong growth curve".to_string(),
-            main_moments: vec!["First victory".to_string(), "Major breakthrough".to_string()],
-            relationships: vec!["Conflict with antagonist".to_string(), "Bond with companions".to_string()],
-        },
-    ];
-    
-    // Writing techniques summary
-    result.techniques = vec![
-        WritingTechnique {
-            category: "narrative".to_string(),
-            technique: "Omniscient perspective".to_string(),
-            example: "All-knowing perspective".to_string(),
-            application: "Good for beginners".to_string()
-        },
-        WritingTechnique {
-            category: "pacing".to_string(),
-            technique: "Continuous minor climaxes".to_string(),
-            example: "One power moment every 3-5 chapters".to_string(),
-            application: "Maintain reader interest".to_string()
-        },
-        WritingTechnique {
-            category: "dialogue".to_string(),
-            technique: "Plot-advancing dialogue".to_string(),
-            example: "Less filler, more information".to_string(),
-            application: "Avoid padding".to_string()
-        },
-    ];
+  let detected_chapters = lines.iter().filter(|line| looks_like_chapter_title(line)).count();
+  let estimated_chapters = (word_count / 3000).max(1);
+  let actual_chapters = if detected_chapters > 0 { detected_chapters } else { estimated_chapters };
 
-    // Learnable points
-    result.learnable_points = vec![
-        "Pacing: ~{} words/chapter".replace("{}", &result.rhythm.average_chapter_length.to_string()),
-        "Structure: Four-act structure".to_string(),
-        "Power moment design: Face-slap - Reversal - Gain".to_string(),
-        "Character growth: Classic loser-to-hero route".to_string(),
-        "Chapter hooks: Leave suspense at end of each chapter".to_string(),
-    ];
-    
-    result.summary = format!(
-        "\"{}\" has about {} words, {} chapters, belongs to {}. \
-        Pacing is {}, conflict density is {}. \
-        Main power moment types: face-slap, reversal, gain. \
-        Learnable points: pacing control, power moment design, character growth curve.",
-        title,
-        word_count,
-        actual_chapters,
-        result.structure.r#type,
-        result.rhythm.conflict_density,
-        result.rhythm.conflict_density
-    );
-    
-    Ok(result)
+  result.source = "book_text".to_string();
+  result.structure.r#type = if actual_chapters > 100 {
+    "long multi-thread structure".to_string()
+  } else if actual_chapters > 50 {
+    "mid-long structure".to_string()
+  } else {
+    "short-mid structure".to_string()
+  };
+  result.structure.pacing = if word_count > 500_000 { "slow" } else { "medium" }.to_string();
+  result.structure.audience = "general".to_string();
+
+  let chapters_per_act = ((actual_chapters as f32) / 4.0).ceil() as usize;
+  result.structure.acts = vec![
+    Act {
+      id: 1,
+      name: "opening".to_string(),
+      chapters: (1..=chapters_per_act.max(1)).collect(),
+      description: "setup and introduction".to_string(),
+    },
+    Act {
+      id: 2,
+      name: "development".to_string(),
+      chapters: (chapters_per_act + 1..=chapters_per_act * 2).collect(),
+      description: "conflict development".to_string(),
+    },
+    Act {
+      id: 3,
+      name: "climax".to_string(),
+      chapters: (chapters_per_act * 2 + 1..=chapters_per_act * 3).collect(),
+      description: "turning point and climax".to_string(),
+    },
+    Act {
+      id: 4,
+      name: "ending".to_string(),
+      chapters: (chapters_per_act * 3 + 1..=actual_chapters).collect(),
+      description: "resolution".to_string(),
+    },
+  ];
+
+  result.rhythm.average_chapter_length = (word_count / actual_chapters.max(1)).max(1);
+  result.rhythm.conflict_density = if result.rhythm.average_chapter_length > 4500 {
+    "high".to_string()
+  } else if result.rhythm.average_chapter_length > 2200 {
+    "medium".to_string()
+  } else {
+    "low".to_string()
+  };
+  result.rhythm.turning_points = vec![
+    TurningPoint {
+      chapter: actual_chapters.max(4) / 4,
+      r#type: "minor_climax".to_string(),
+      description: "first major conflict solved".to_string(),
+    },
+    TurningPoint {
+      chapter: actual_chapters.max(2) / 2,
+      r#type: "major_turn".to_string(),
+      description: "core conflict escalates".to_string(),
+    },
+    TurningPoint {
+      chapter: ((actual_chapters as f32) * 0.75_f32).ceil() as usize,
+      r#type: "climax".to_string(),
+      description: "final decisive event".to_string(),
+    },
+  ];
+  result.rhythm.chapter_hooks = vec![
+    "suspense".to_string(),
+    "reversal".to_string(),
+    "foreshadow payoff".to_string(),
+  ];
+
+  result.power_moments = vec![
+    PowerMoment {
+      chapter: actual_chapters.max(5) / 5,
+      r#type: "face_slap".to_string(),
+      description: "protagonist wins first public conflict".to_string(),
+      frequency: "high".to_string(),
+    },
+    PowerMoment {
+      chapter: actual_chapters.max(3) / 3,
+      r#type: "reversal".to_string(),
+      description: "weak-to-strong breakthrough".to_string(),
+      frequency: "medium".to_string(),
+    },
+  ];
+
+  result.characters = vec![CharacterAnalysis {
+    name: "Protagonist".to_string(),
+    role: "protagonist".to_string(),
+    archetype: "growth".to_string(),
+    growth: "from weak to strong".to_string(),
+    main_moments: vec!["first victory".to_string(), "core breakthrough".to_string()],
+    relationships: vec!["ally".to_string(), "rival".to_string()],
+  }];
+
+  result.techniques = vec![
+    WritingTechnique {
+      category: "narrative".to_string(),
+      technique: "clear perspective".to_string(),
+      example: "stable POV in each scene".to_string(),
+      application: "reduce confusion".to_string(),
+    },
+    WritingTechnique {
+      category: "pacing".to_string(),
+      technique: "periodic mini climax".to_string(),
+      example: "one major event every 3-5 chapters".to_string(),
+      application: "keep momentum".to_string(),
+    },
+  ];
+
+  result.learnable_points = vec![
+    format!("Pacing: around {} chars per chapter", result.rhythm.average_chapter_length),
+    "Use a four-act backbone".to_string(),
+    "Keep chapter-end hooks consistent".to_string(),
+  ];
+
+  result.summary = format!(
+    "\"{}\" has around {} chars and {} chapters. Structure: {}. Conflict density: {}.",
+    title,
+    word_count,
+    actual_chapters,
+    result.structure.r#type,
+    result.rhythm.conflict_density,
+  );
+
+  Ok(result)
 }
 
 #[tauri::command]
 pub async fn book_extract_techniques(content: String) -> Result<Vec<WritingTechnique>, String> {
-    let mut techniques = vec![];
-    
-    // Simple analysis of common writing patterns
-    if content.contains("只见") || content.contains("那道") || content.contains("此人") {
-        techniques.push(WritingTechnique {
-            category: "description".to_string(),
-            technique: "appearance description".to_string(),
-            example: "just see this person...".to_string(),
-            application: "character introduction".to_string()
-        });
-    }
-    
-    if content.contains("修为") || content.contains("灵气") || content.contains("功法") {
-        techniques.push(WritingTechnique {
-            category: "setting".to_string(),
-            technique: "cultivation system".to_string(),
-            example: "spiritual energy - technique - cultivation".to_string(),
-            application: "fantasy power system".to_string()
-        });
-    }
-    
-    if content.contains("冷笑") || content.contains("不屑") || content.contains("讥讽") {
-        techniques.push(WritingTechnique {
-            category: "dialogue".to_string(),
-            technique: "antagonist mockery".to_string(),
-            example: "cold laugh...".to_string(),
-            application: "create conflict".to_string()
-        });
-    }
-    
-    if content.contains("系统") || content.contains("叮") || content.contains("恭喜") {
-        techniques.push(WritingTechnique {
-            category: "golden_finger".to_string(),
-            technique: "system stream".to_string(),
-            example: "system issues task".to_string(),
-            application: "protagonist gets strong quickly".to_string()
-        });
-    }
-    
-    // Default technique
-    if techniques.is_empty() {
-        techniques.push(WritingTechnique {
-            category: "narrative".to_string(),
-            technique: "progressive narrative".to_string(),
-            example: "clear main plot".to_string(),
-            application: "keep story moving".to_string()
-        });
-    }
-    
-    Ok(techniques)
+  let mut techniques = vec![];
+
+  if content.contains("突然") || content.contains("只见") || content.contains("那道") {
+    techniques.push(WritingTechnique {
+      category: "description".to_string(),
+      technique: "visual reveal".to_string(),
+      example: "sudden appearance in key scene".to_string(),
+      application: "enhance scene impact".to_string(),
+    });
+  }
+
+  if content.contains("系统") || content.contains("任务") || content.contains("奖励") {
+    techniques.push(WritingTechnique {
+      category: "plot device".to_string(),
+      technique: "system trigger".to_string(),
+      example: "system gives mission and reward".to_string(),
+      application: "accelerate progression".to_string(),
+    });
+  }
+
+  if content.contains("冷笑") || content.contains("不屑") || content.contains("嘲讽") {
+    techniques.push(WritingTechnique {
+      category: "dialogue".to_string(),
+      technique: "provocation dialogue".to_string(),
+      example: "taunting lines before conflict".to_string(),
+      application: "build tension".to_string(),
+    });
+  }
+
+  if techniques.is_empty() {
+    techniques.push(WritingTechnique {
+      category: "narrative".to_string(),
+      technique: "progressive storytelling".to_string(),
+      example: "clear objective -> obstacle -> payoff".to_string(),
+      application: "keep story readable".to_string(),
+    });
+  }
+
+  Ok(techniques)
 }

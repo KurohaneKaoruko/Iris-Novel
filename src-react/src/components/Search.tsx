@@ -75,7 +75,7 @@ export function SearchPanel({ isOpen, onClose, onSearch, onResultClick }: Search
             ref={inputRef}
             type="text"
             className="search-input"
-            placeholder="搜索..."
+          placeholder="Search..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -83,7 +83,7 @@ export function SearchPanel({ isOpen, onClose, onSearch, onResultClick }: Search
           <button className="search-btn" onClick={handleSearch} disabled={loading}>
             {loading ? '...' : '🔍'}
           </button>
-          <button className="search-close" onClick={onClose}>×</button>
+        <button className="search-close" onClick={onClose}>x</button>
         </div>
 
         <div className="search-options">

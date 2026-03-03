@@ -46,17 +46,8 @@
   margin-left: 4px;
 }
 
-/* Git status colors */
-.status-bar-item.clean {
-  color: var(--text-secondary, #b0b0b0);
-}
-
-.status-bar-item.modified {
-  color: var(--text-secondary, #b0b0b0);
-}
-
-.status-bar-item.staged {
-  color: var(--text-secondary, #b0b0b0);
+.status-bar-item.recording {
+  color: var(--text-primary, #dcdcdc);
 }
 
 @media (max-width: 900px) {

@@ -10,26 +10,21 @@ import { LexicalEditor } from './components/LexicalEditor'
 import type { EditorConfig } from './types/editor'
 import { EDITOR_NAMESPACE } from './branding'
 import {
+  createHistorySnapshot,
   createFile,
   createDir,
-  deleteEntry,
+  createNovelProject,
   getAgents,
   getApiKeyStatus,
   getAppSettings,
   forgetExternalProject,
   getProjectPickerState,
-  gitCommit,
-  gitDiff,
-  gitInit,
-  gitLog,
-  gitStatus,
   initNovel,
   isTauriApp,
   listWorkspaceTree,
   openFolderDialog,
   readText,
   rememberExternalProject,
-  renameEntry,
   setAgents,
   setApiKey,
   setAppSettings,
@@ -42,8 +37,6 @@ import {
   type AiEditApplyMode,
   type AppSettings,
   type FsEntry,
-  type GitCommitInfo,
-  type GitStatusItem,
   type LaunchMode,
   type ModelProvider,
   type ProviderConnectivityResult,
@@ -70,13 +63,16 @@ import { StatusBar } from './components/StatusBar'
 import { CommandPalette } from './components/CommandPalette'
 import { TabBar } from './components/TabBar'
 import { handleFileSaveError, clearBackupContent } from './utils/fileSaveErrorHandler'
-import { useAutoSave, clearAutoSavedContent, getAutoSavedContent } from './hooks/useAutoSave'
+import { useAutoSave, clearAutoSavedContent } from './hooks/useAutoSave'
 import { useProjectWritingSettings } from './hooks/useProjectWritingSettings'
 import { useAutoStoryNavigation } from './hooks/useAutoStoryNavigation'
 import { useTaskQualityValidator } from './hooks/useTaskQualityValidator'
+import { APP_LOCALES, type AppLocale, useI18n } from './i18n'
 import { logError } from './utils/errorLogger'
 import { RecoveryDialog } from './components/RecoveryDialog'
 import { ProjectPickerPage } from './components/ProjectPickerPage'
+import { NovelStructurePanel } from './components/NovelStructurePanel'
+import { HistoryPanel } from './components/HistoryPanel'
 import { AppIcon } from './components/icons/AppIcon'
 import { AIChatPanel } from './components/chat/AIChatPanel'
 import {
@@ -94,6 +90,10 @@ type OpenFile = {
   name: string
   content: string
   dirty: boolean
+}
+
+type OpenByPathOptions = {
+  forceReload?: boolean
 }
 
 type ChatItem = {
@@ -233,17 +233,6 @@ type EditorContextMenuState = {
   selectedText: string
 }
 
-type ExplorerContextMenuState = {
-  x: number
-  y: number
-  entry: FsEntry
-}
-
-type ExplorerModalState =
-  | { mode: 'newFile'; dirPath: string }
-  | { mode: 'newFolder'; dirPath: string }
-  | { mode: 'rename'; entry: FsEntry; parentDir: string }
-
 type UISettingsState = {
   theme: 'light' | 'dark'
   density: 'compact' | 'comfortable'
@@ -317,64 +306,63 @@ function shortText(text: string, max = 180): string {
 
 function formatProviderProbeErrorMessage(rawMessage: string): string {
   const raw = rawMessage.trim()
-  if (!raw) return '连通性检测失败，请稍后重试。'
+  if (!raw) return 'Connectivity check failed. Please try again.'
   const lower = raw.toLowerCase()
   const statusMatch = lower.match(/\bhttp\s+(\d{3})\b/)
   const statusCode = statusMatch ? Number(statusMatch[1]) : null
 
   if (lower.includes('api key not found') || lower.includes('keyring')) {
-    return '未找到可用 API Key，请先填写并保存 API Key。'
+    return 'No API key was found. Set and save the API key first.'
   }
   if (statusCode === 400) {
     if (lower.includes('model') && lower.includes('not found')) {
-      return '模型不存在（HTTP 400），请检查 Model ID。'
+      return 'Model not found (HTTP 400). Check the model ID.'
     }
-    return '请求参数无效（HTTP 400），请检查 Base URL 与 Model ID。'
+    return 'Invalid request (HTTP 400). Check base URL and model ID.'
   }
   if (statusCode === 401 || statusCode === 403) {
-    return `鉴权失败（HTTP ${statusCode}），请检查 API Key 是否正确且有权限。`
+    return `Authentication failed (HTTP ${statusCode}). Check API key and permissions.`
   }
   if (statusCode === 404) {
-    return '接口地址不存在（HTTP 404），请检查 Base URL 是否正确。'
+    return 'Endpoint not found (HTTP 404). Check base URL.'
   }
   if (statusCode === 408) {
-    return '请求超时（HTTP 408），请稍后重试。'
+    return 'Request timed out (HTTP 408). Please try again.'
   }
   if (statusCode === 409) {
-    return '请求冲突（HTTP 409），请稍后重试。'
+    return 'Request conflict (HTTP 409). Please retry.'
   }
   if (statusCode === 422) {
-    return '请求格式正确但无法处理（HTTP 422），请检查模型和参数。'
+    return 'Request format is valid but unprocessable (HTTP 422). Check model and parameters.'
   }
   if (statusCode === 429) {
-    return '请求过于频繁或额度不足（HTTP 429），请检查限流和余额。'
+    return 'Rate limited or quota exceeded (HTTP 429). Check limits and balance.'
   }
   if (statusCode && statusCode >= 500) {
-    return `模型服务暂时不可用（HTTP ${statusCode}），请稍后重试。`
+    return `Provider service is temporarily unavailable (HTTP ${statusCode}). Try again later.`
   }
   if (lower.includes('timed out') || lower.includes('timeout')) {
-    return '连接超时，请检查网络后重试。'
+    return 'Connection timed out. Check network and try again.'
   }
   if (lower.includes('dns') || lower.includes('name or service not known') || lower.includes('failed to lookup address information')) {
-    return '域名解析失败，请检查 Base URL 是否可访问。'
+    return 'DNS resolution failed. Check whether base URL is reachable.'
   }
   if (lower.includes('connection refused')) {
-    return '连接被拒绝，请确认服务地址和端口是否正确。'
+    return 'Connection refused. Confirm service address and port.'
   }
   if (lower.includes('certificate') || lower.includes('tls')) {
-    return 'TLS 证书校验失败，请检查 HTTPS 证书配置。'
+    return 'TLS certificate validation failed. Check HTTPS certificate settings.'
   }
   if (lower.includes('model') && lower.includes('not found')) {
-    return '模型不存在，请检查 Model ID 是否正确。'
+    return 'Model not found. Check model ID.'
   }
 
-  return `连通性检测失败：${shortText(raw, 220)}`
+  return `Connectivity check failed: ${shortText(raw, 220)}`
 }
-
 function formatProviderProbeSuccessMessage(result: ProviderConnectivityResult): string {
   const status = Number.isFinite(result.status_code) ? result.status_code : 200
   const latency = Math.max(1, Math.round(result.latency_ms))
-  return `连通成功 · HTTP ${status} · ${latency}ms`
+  return `Connectivity OK · HTTP ${status} · ${latency}ms`
 }
 
 function formatProviderProbeDetail(rawMessage: string): string | undefined {
@@ -384,6 +372,8 @@ function formatProviderProbeDetail(rawMessage: string): string | undefined {
 }
 
 function App() {
+  const { locale, setLocale, t } = useI18n()
+
   // Diff Context
   const diffContext = useDiff()
 
@@ -410,12 +400,12 @@ function App() {
   >(null)
 
   // Activity Bar State
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'git' | 'chapters' | 'characters' | 'plotlines' | 'risk'>('files')
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'history' | 'chapters' | 'characters' | 'plotlines' | 'risk'>('files')
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | 'writing-goal' | null>('chat')
 
   // Workspace & Files
   const [appView, setAppView] = useState<'project-picker' | 'workspace'>('project-picker')
-  const [workspaceInput, setWorkspaceInput] = useState('')
+  const [workspaceInput] = useState('')
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null)
   const [defaultProjectsRoot, setDefaultProjectsRoot] = useState<string>('')
   const [defaultProjects, setDefaultProjects] = useState<ProjectItem[]>([])
@@ -439,18 +429,11 @@ function App() {
   const [providerProbeRunning, setProviderProbeRunning] = useState(false)
   const [providerProbeResult, setProviderProbeResult] = useState<ProviderProbeViewResult | null>(null)
 
-  // ... (rest of App component)
-  const [explorerContextMenu, setExplorerContextMenu] = useState<ExplorerContextMenuState | null>(null)
-  const [explorerModal, setExplorerModal] = useState<ExplorerModalState | null>(null)
-  const [explorerModalValue, setExplorerModalValue] = useState<string>('')
-  const [explorerQuery, setExplorerQuery] = useState<string>('')
-
   // Editors & Refs
   const editorRef = useRef<LexicalEditorType | null>(null)
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null)
   const aiMessagesRef = useRef<HTMLDivElement | null>(null)
   const graphCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const gitCommitInputRef = useRef<HTMLInputElement | null>(null)
   const autoOpenedRef = useRef(false)
   const [isMobileLayout, setIsMobileLayout] = useState(false)
   const SIDEBAR_WIDTH_MIN = 200
@@ -524,16 +507,8 @@ function App() {
   // Recovery State
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false)
 
-  // Git State
-  const [gitItems, setGitItems] = useState<GitStatusItem[]>([])
-  const [gitCommits, setGitCommits] = useState<GitCommitInfo[]>([])
-  const [gitCommitMsg, setGitCommitMsg] = useState('')
-  const [gitSelectedPath, setGitSelectedPath] = useState<string | null>(null)
-  const [gitDiffText, setGitDiffText] = useState('')
-
   // Editor Configuration State
   const [editorUserConfig, setEditorUserConfig] = useState<EditorUserConfig>(editorConfigManager.getConfig())
-  const [gitError, setGitError] = useState<string | null>(null)
 
   // Stats & Visuals
   const {
@@ -809,20 +784,6 @@ function App() {
     setTree(t)
   }, [workspaceRoot])
 
-  const refreshGit = useCallback(async () => {
-    if (!isTauriApp()) return
-    try {
-      const [items, commits] = await Promise.all([gitStatus(), gitLog(20)])
-      setGitItems(items)
-      setGitCommits(commits)
-      setGitError(null)
-    } catch (e) {
-      setGitItems([])
-      setGitCommits([])
-      setGitError(e instanceof Error ? e.message : String(e))
-    }
-  }, [])
-
   const reloadAppSettings = useCallback(async () => {
     if (!isTauriApp()) return
     try {
@@ -970,10 +931,10 @@ function App() {
         if (!waiter) return
         streamWaitersRef.current.delete(streamId)
         streamFailuresRef.current.delete(streamId)
-        reject(new Error('等待 AI 响应超时'))
+        reject(new Error(t('app.error.aiTimeout')))
       }, 8 * 60 * 1000)
     })
-  }, [])
+  }, [t])
 
   const loadGraph = useCallback(async () => {
     if (!workspaceRoot) return
@@ -1017,18 +978,25 @@ function App() {
   }, [workspaceRoot])
 
   const openSidebarTab = useCallback(
-    (tab: 'files' | 'git' | 'chapters' | 'characters' | 'plotlines' | 'risk') => {
-      if (activeSidebarTab === tab) {
-        setSidebarCollapsed((prev) => !prev)
-      } else {
-        setActiveSidebarTab(tab)
-        setSidebarCollapsed(false)
-      }
+    (tab: 'files' | 'history' | 'chapters' | 'characters' | 'plotlines' | 'risk') => {
+      setActiveSidebarTab(tab)
+      setSidebarCollapsed(false)
       if (isMobileLayout) {
         setActiveRightTab(null)
       }
     },
-    [activeSidebarTab, isMobileLayout],
+    [isMobileLayout],
+  )
+
+  const toggleSidebarTab = useCallback(
+    (tab: 'files' | 'history' | 'chapters' | 'characters' | 'plotlines' | 'risk') => {
+      if (activeSidebarTab === tab) {
+        setSidebarCollapsed((prev) => !prev)
+        return
+      }
+      openSidebarTab(tab)
+    },
+    [activeSidebarTab, openSidebarTab],
   )
 
   const openRightTab = useCallback(
@@ -1097,6 +1065,30 @@ function App() {
     [isMobileLayout, openWorkspacePath, refreshProjectPickerState],
   )
 
+  const onCreateProjectFromPicker = useCallback(
+    async (name: string) => {
+      if (!isTauriApp()) return
+      setError(null)
+      setBusy(true)
+      try {
+        const project = await createNovelProject(name)
+        const opened = await openWorkspacePath(project.path)
+        if (!opened) return
+        setAppView('workspace')
+        if (isMobileLayout) {
+          setSidebarCollapsed(true)
+          setActiveRightTab(null)
+        }
+        await refreshProjectPickerState()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [isMobileLayout, openWorkspacePath, refreshProjectPickerState],
+  )
+
   const onLoadExternalProject = useCallback(async () => {
     try {
       if (!isTauriApp()) {
@@ -1147,59 +1139,29 @@ function App() {
     [refreshProjectPickerState],
   )
 
-  const onOpenFile = useCallback(
-    async (entry: FsEntry) => {
-      if (entry.kind !== 'file') return
-      setError(null)
-      setBusy(true)
-      try {
-        const existing = openFiles.find((f) => f.path === entry.path)
-        if (existing) {
-          setActivePath(existing.path)
-          return
-        }
-
-        // Check for auto-saved content
-        const autoSaved = getAutoSavedContent(entry.path)
-        let content = await readText(entry.path)
-
-        // If auto-saved content exists and is different, use it
-        if (autoSaved && autoSaved.content !== content) {
-          content = autoSaved.content
-          // Mark as dirty since it has unsaved changes
-          const next: OpenFile = { path: entry.path, name: entry.name, content, dirty: true }
-          setOpenFiles((prev) => [...prev, next])
-          setActivePath(entry.path)
-        } else {
-          const next: OpenFile = { path: entry.path, name: entry.name, content, dirty: false }
-          setOpenFiles((prev) => [...prev, next])
-          setActivePath(entry.path)
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
-      } finally {
-        setBusy(false)
-      }
-    },
-    [openFiles],
-  )
-
   const onOpenByPath = useCallback(
-    async (relPath: string) => {
+    async (relPath: string, options?: OpenByPathOptions) => {
       if (!relPath) return
+      const forceReload = options?.forceReload === true
       setError(null)
       setBusy(true)
       try {
         const existing = openFiles.find((f) => f.path === relPath)
-        if (existing) {
+        if (existing && !forceReload) {
           setActivePath(existing.path)
           return
         }
         const parts = relPath.replaceAll('\\', '/').split('/')
         const name = parts[parts.length - 1] || relPath
         const content = await readText(relPath)
-        const next: OpenFile = { path: relPath, name, content, dirty: false }
-        setOpenFiles((prev) => [...prev, next])
+        if (existing) {
+          setOpenFiles((prev) =>
+            prev.map((f) => (f.path === relPath ? { ...f, name, content, dirty: false } : f)),
+          )
+        } else {
+          const next: OpenFile = { path: relPath, name, content, dirty: false }
+          setOpenFiles((prev) => [...prev, next])
+        }
         setActivePath(relPath)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -1263,8 +1225,8 @@ function App() {
 
   const showConfirm = useCallback(async (text: string): Promise<boolean> => {
     if (!isTauriApp()) return window.confirm(text)
-    return confirm(text, { title: '确认', kind: 'warning' })
-  }, [])
+    return confirm(text, { title: t('common.confirm'), kind: 'warning' })
+  }, [t])
 
   const onNewChapter = useCallback(async () => {
     if (!workspaceRoot) return
@@ -1281,7 +1243,7 @@ function App() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         if (msg.includes("parent directory does not exist")) {
-          const ok = await showConfirm('stories/ 目录不存在，是否创建？')
+          const ok = await showConfirm('stories/ folder does not exist. Create it now?')
           if (!ok) throw e
           await createDir('stories')
           await createFile(fileName)
@@ -1297,116 +1259,87 @@ function App() {
     }
   }, [workspaceRoot, refreshTree, showConfirm])
 
-  const onGitInit = useCallback(async () => {
-    if (!workspaceRoot) return
-    setBusy(true)
-    try {
-      await gitInit()
-      await refreshGit()
-    } catch (e) {
-      setGitError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
-    }
-  }, [workspaceRoot, refreshGit])
-
-  const onGitSelect = useCallback(
-    async (path: string) => {
+  const onCreateDraftInDir = useCallback(
+    async (dir: string, prefix: string, ext: 'md' | 'txt' = 'md') => {
       if (!workspaceRoot) return
+      setError(null)
       setBusy(true)
-      setGitSelectedPath(path)
       try {
-        const text = await gitDiff(path)
-        setGitDiffText(text)
+        const now = new Date()
+        const yyyy = String(now.getFullYear())
+        const mm = String(now.getMonth() + 1).padStart(2, '0')
+        const dd = String(now.getDate()).padStart(2, '0')
+        const hh = String(now.getHours()).padStart(2, '0')
+        const min = String(now.getMinutes()).padStart(2, '0')
+        const relativePath = `${dir}/${prefix}-${yyyy}${mm}${dd}-${hh}${min}.${ext}`
+        try {
+          await createFile(relativePath)
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          if (msg.includes('parent directory does not exist')) {
+            await createDir(dir)
+            await createFile(relativePath)
+          } else {
+            throw e
+          }
+        }
+        await refreshTree()
+        await onOpenByPath(relativePath, { forceReload: true })
       } catch (e) {
-        setGitDiffText(e instanceof Error ? e.message : String(e))
+        setError(e instanceof Error ? e.message : String(e))
       } finally {
         setBusy(false)
       }
     },
-    [workspaceRoot],
+    [onOpenByPath, refreshTree, workspaceRoot],
   )
 
-  const onGitCommit = useCallback(async () => {
+  const onNewOutline = useCallback(async () => {
+    await onCreateDraftInDir('outline', 'outline', 'md')
+  }, [onCreateDraftInDir])
+
+  const onNewConceptNote = useCallback(async () => {
+    await onCreateDraftInDir('concept', 'concept-note', 'md')
+  }, [onCreateDraftInDir])
+
+  const onOpenMasterPlanDoc = useCallback(async () => {
     if (!workspaceRoot) return
-    const msg = gitCommitMsg.trim()
-    if (!msg) return
+    setError(null)
     setBusy(true)
     try {
-      await gitCommit(msg)
-      setGitCommitMsg('')
-      await refreshGit()
+      let exists = true
+      try {
+        await readText(MASTER_PLAN_RELATIVE_PATH)
+      } catch {
+        exists = false
+      }
+      if (!exists) {
+        try {
+          await createDir('.novel')
+        } catch {
+          // no-op
+        }
+        try {
+          await createDir('.novel/plans')
+        } catch {
+          // no-op
+        }
+        try {
+          await createFile(MASTER_PLAN_RELATIVE_PATH)
+        } catch {
+          // no-op
+        }
+        const seed = '# Master Plan\n\n## Premise\n\n## Major Arcs\n\n## Chapter Beats\n'
+        await writeText(MASTER_PLAN_RELATIVE_PATH, seed)
+      }
+      await refreshTree()
+      await onOpenByPath(MASTER_PLAN_RELATIVE_PATH, { forceReload: true })
     } catch (e) {
-      setGitError(e instanceof Error ? e.message : String(e))
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
-  }, [workspaceRoot, gitCommitMsg, refreshGit])
-
-  const nameCollator = useMemo(() => new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' }), [])
-
-  const visibleTree = useMemo(() => {
-    if (!tree) return null
-    const q = explorerQuery.trim().toLowerCase()
-    if (!q) return tree
-
-    const walk = (e: FsEntry): FsEntry | null => {
-      const name = e.name.toLowerCase()
-      if (e.kind === 'file') return name.includes(q) ? e : null
-      const children = e.children.map(walk).filter(Boolean) as FsEntry[]
-      if (name.includes(q) || children.length > 0) return { ...e, children }
-      return null
-    }
-
-    return walk(tree)
-  }, [tree, explorerQuery])
-
-  const openExplorerContextMenu = useCallback((e: MouseEvent, entry: FsEntry) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setExplorerContextMenu({ x: e.clientX, y: e.clientY, entry })
-  }, [])
-
-  const TreeNode = useCallback(
-    function TreeNodeInner({ entry, depth }: { entry: FsEntry; depth: number }) {
-      const [open, setOpen] = useState(depth < 1)
-      const pad = { paddingLeft: `${depth * 12}px` }
-      if (entry.kind === 'file') {
-        return (
-          <div
-            className="file-tree-item"
-            style={pad}
-            onClick={() => void onOpenFile(entry)}
-            onContextMenu={(e) => openExplorerContextMenu(e, entry)}
-          >
-            <span className="file-icon file"><AppIcon name="file" size={14} /></span>
-            {entry.name}
-          </div>
-        )
-      }
-      return (
-        <div>
-          <div
-            className="file-tree-item"
-            style={pad}
-            onClick={() => setOpen((v) => !v)}
-            onContextMenu={(e) => openExplorerContextMenu(e, entry)}
-          >
-            <span className="file-icon"><AppIcon name={open ? 'folderOpen' : 'folder'} size={14} /></span>
-            {entry.name}
-          </div>
-          {open &&
-            [...entry.children]
-              .sort((a, b) => {
-                if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1
-                return nameCollator.compare(a.name, b.name)
-              })
-              .map((c) => <TreeNodeInner key={c.path} entry={c} depth={depth + 1} />)}
-        </div>
-      )
-    },
-    [onOpenFile, openExplorerContextMenu, nameCollator],
-  )
+  }, [onOpenByPath, refreshTree, workspaceRoot])
 
   const newId = useCallback(() => {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -1430,7 +1363,7 @@ function App() {
     } else {
       setEditingProvider({
         id: newId(),
-        name: '自定义提供商',
+        name: t('app.model.customProviderDefaultName'),
         kind: 'OpenAICompatible',
         base_url: 'https://api.openai.com/v1',
         model_name: '',
@@ -1442,7 +1375,7 @@ function App() {
     setProviderProbeResult(null)
     setProviderProbeRunning(false)
     setShowModelModal(true)
-  }, [newId])
+  }, [newId, t])
 
   const openEditProviderModal = useCallback((provider: ModelProvider) => {
     const presetKey = inferProviderPresetKey(provider)
@@ -1464,7 +1397,7 @@ function App() {
         setEditingProvider((prev) => ({
           ...prev,
           kind: nextKind,
-          name: prev.name?.trim() ? prev.name : '自定义提供商',
+          name: prev.name?.trim() ? prev.name : t('app.model.customProviderDefaultName'),
           base_url: prev.base_url?.trim() ? prev.base_url : nextBase,
         }))
         return
@@ -1481,7 +1414,7 @@ function App() {
       }))
       setEditingCustomProviderApiFormat(preset.kind === 'Anthropic' ? 'claude' : 'openai')
     },
-    [editingCustomProviderApiFormat],
+    [editingCustomProviderApiFormat, t],
   )
 
   const onChangeCustomProviderApiFormat = useCallback(
@@ -1581,7 +1514,7 @@ function App() {
         await setAppSettings(next)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
-        await showErrorDialog(`保存设置失败：${msg}`)
+        await showErrorDialog(t('app.error.saveSettings', { msg }))
         if (prev) {
           setAppSettingsState(prev)
         } else {
@@ -1589,7 +1522,7 @@ function App() {
         }
       }
     },
-    [reloadAppSettings, showErrorDialog],
+    [reloadAppSettings, showErrorDialog, t],
   )
   const onChatAgentChange = useCallback(
     (id: string) => {
@@ -1652,19 +1585,19 @@ function App() {
       await setAppSettings(appSettings)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      await showErrorDialog(`保存设置失败：${msg}`)
+      await showErrorDialog(t('app.error.saveSettings', { msg }))
       return
     }
     try {
-      await setAgents(agentsList.filter((agent) => agent.category === '自定义'))
+      await setAgents(agentsList)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      await showErrorDialog(`保存智能体失败：${msg}`)
+      await showErrorDialog(t('app.error.saveAgents', { msg }))
       return
     }
     await reloadAppSettings()
     setShowSettings(false)
-  }, [agentsList, appSettings, reloadAppSettings, showErrorDialog])
+  }, [agentsList, appSettings, reloadAppSettings, showErrorDialog, t])
 
   const requestCloseSettings = useCallback(() => {
     void (async () => {
@@ -1672,18 +1605,18 @@ function App() {
         setShowSettings(false)
         return
       }
-      const shouldSave = await showConfirm('检测到未保存的设置更改，是否保存？')
+      const shouldSave = await showConfirm(t('app.settings.saveBeforeClose'))
       if (shouldSave) {
         await saveAndCloseSettings()
         return
       }
-      const discard = await showConfirm('确认放弃未保存的更改？')
+      const discard = await showConfirm(t('app.settings.discardUnsaved'))
       if (!discard) return
       if (settingsSnapshot) setAppSettingsState(settingsSnapshot)
       if (agentsSnapshot) setAgentsList(agentsSnapshot)
       setShowSettings(false)
     })()
-  }, [agentsSnapshot, saveAndCloseSettings, settingsDirty, settingsSnapshot, showConfirm])
+  }, [agentsSnapshot, saveAndCloseSettings, settingsDirty, settingsSnapshot, showConfirm, t])
 
   const openChatContextMenu = useCallback((e: MouseEvent, item: ChatItem) => {
     e.preventDefault()
@@ -1714,20 +1647,6 @@ function App() {
   }, [chatContextMenu])
 
   useEffect(() => {
-    if (!explorerContextMenu) return
-    const onClick = () => setExplorerContextMenu(null)
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setExplorerContextMenu(null)
-    }
-    window.addEventListener('click', onClick)
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('click', onClick)
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [explorerContextMenu])
-
-  useEffect(() => {
     if (!editorContextMenu) return
     const onClick = () => setEditorContextMenu(null)
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1742,12 +1661,13 @@ function App() {
   }, [editorContextMenu])
 
   const onQuoteSelection = useCallback(() => {
+    const tag = t('app.chat.selectionReferenceTag')
     setChatInput((prev) => {
       const next = prev.trim()
-      return next ? `${next} #选区` : '#选区 '
+      return next ? `${next} ${tag}` : `${tag} `
     })
     chatInputRef.current?.focus()
-  }, [])
+  }, [t])
 
   const onSendChat = useCallback(
     async (overrideContent?: string, options?: SendChatOptions): Promise<string | null> => {
@@ -1888,7 +1808,9 @@ function App() {
       if (!isTauriApp()) {
         cleanupStreamRefs(streamRefs, streamId)
         setChatMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, content: '当前未运行在 Tauri 环境，无法调用 AI。', streaming: false } : m)),
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: 'Tauri runtime is required for this AI capability.', streaming: false } : m,
+          ),
         )
         return null
       }
@@ -1896,7 +1818,9 @@ function App() {
       if (!workspaceRoot) {
         cleanupStreamRefs(streamRefs, streamId)
         setChatMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, content: '请先打开一个工作区（Workspace）。', streaming: false } : m)),
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: 'No workspace is currently opened.', streaming: false } : m,
+          ),
         )
         return null
       }
@@ -2140,7 +2064,7 @@ function App() {
       if (chatMessagesRef.current.some((m) => m.streaming)) return
 
       const assistantId = streamAssistantIdRef.current.get(streamId) ?? active.id
-      setError('AI 首次输出超时，已自动重试一次。')
+      setError('AI response timed out repeatedly. Please check your network and try again.')
       const history = chatMessagesRef.current
       const assistantIndex = history.findIndex((m) => m.id === assistantId && m.role === 'assistant' && !m.streaming)
       if (assistantIndex < 0) return
@@ -2348,11 +2272,11 @@ function App() {
 
     const nearing = chapterWordTarget > 0 && activeCharCount >= Math.floor(chapterWordTarget * 0.9)
     const prompt =
-      `续写补全：本章目标字数 ${chapterWordTarget}，当前 ${activeCharCount}。\n` +
-      (nearing ? '请开始考虑本章收尾，并给出下一章开头建议。\n' : '请续写下一段（150-300 字）。\n') +
-      `上下文：\n${snippet}`
+      `${t('app.chat.autoWritePrompt.header', { target: chapterWordTarget, current: activeCharCount })}\n` +
+      `${nearing ? t('app.chat.autoWritePrompt.nearing') : t('app.chat.autoWritePrompt.continue')}\n` +
+      `${t('app.chat.autoWritePrompt.context')}\n${snippet}`
     void onSendChat(prompt)
-  }, [activeFile, chapterWordTarget, activeCharCount, onSendChat])
+  }, [activeFile, chapterWordTarget, activeCharCount, onSendChat, t])
 
   const getLatestFileCharCount = useCallback(
     async (filePath: string, fallback = ''): Promise<number> => {
@@ -2937,11 +2861,10 @@ function App() {
         setTree(null)
       }
     })()
-    void refreshGit()
     void loadProjectWritingSettings()
     void refreshProjectPickerState()
     setAppView((prev) => (prev === 'workspace' ? prev : 'workspace'))
-  }, [loadProjectWritingSettings, refreshGit, refreshProjectPickerState, workspaceRoot])
+  }, [loadProjectWritingSettings, refreshProjectPickerState, workspaceRoot])
 
   useEffect(() => {
     if (!isTauriApp()) return
@@ -3298,7 +3221,7 @@ function App() {
     let unlisten: null | (() => void) = null
     void getCurrentWindow()
       .onCloseRequested(async (event) => {
-        const ok = await showConfirm('存在未保存内容，确认要关闭吗？')
+        const ok = await showConfirm('You have unsaved changes. Close anyway?')
         if (!ok) event.preventDefault()
       })
       .then((u) => {
@@ -3399,6 +3322,7 @@ function App() {
         lastWorkspace={lastWorkspace}
         launchMode={launchMode}
         onSelectProject={onOpenProjectFromPicker}
+        onCreateProject={(name) => void onCreateProjectFromPicker(name)}
         onLoadExternalProject={() => void onLoadExternalProject()}
         onForgetExternalProject={(path) => void onForgetExternalProject(path)}
         onRefresh={() => void refreshProjectPickerState()}
@@ -3418,45 +3342,45 @@ function App() {
         <div className="activity-bar">
           <div
             className={`activity-bar-item ${activeSidebarTab === 'files' ? 'active' : ''}`}
-            onClick={() => openSidebarTab('files')}
-            title="资源管理器"
+            onClick={() => toggleSidebarTab('files')}
+            title={t('app.activity.workspaceStructure')}
           >
-            <span className="activity-bar-icon"><AppIcon name="files" /></span>
+            <span className="activity-bar-icon"><AppIcon name="chapters" /></span>
           </div>
           <div
             className={`activity-bar-item ${activeSidebarTab === 'chapters' ? 'active' : ''}`}
-            onClick={() => openSidebarTab('chapters')}
-            title="章节管理"
+            onClick={() => toggleSidebarTab('chapters')}
+            title={t('app.activity.chapters')}
           >
             <span className="activity-bar-icon"><AppIcon name="chapters" /></span>
           </div>
           <div
             className={`activity-bar-item ${activeSidebarTab === 'characters' ? 'active' : ''}`}
-            onClick={() => openSidebarTab('characters')}
-            title="人物管理"
+            onClick={() => toggleSidebarTab('characters')}
+            title={t('app.activity.characters')}
           >
             <span className="activity-bar-icon"><AppIcon name="characters" /></span>
           </div>
           <div
             className={`activity-bar-item ${activeSidebarTab === 'plotlines' ? 'active' : ''}`}
-            onClick={() => openSidebarTab('plotlines')}
-            title="情节线管理"
+            onClick={() => toggleSidebarTab('plotlines')}
+            title={t('app.activity.plotLines')}
           >
             <span className="activity-bar-icon"><AppIcon name="plotlines" /></span>
           </div>
           <div
             className={`activity-bar-item ${activeSidebarTab === 'risk' ? 'active' : ''}`}
-            onClick={() => openSidebarTab('risk')}
-            title="风险检测"
+            onClick={() => toggleSidebarTab('risk')}
+            title={t('app.activity.riskReview')}
           >
             <span className="activity-bar-icon"><AppIcon name="risk" /></span>
           </div>
           <div
-            className={`activity-bar-item ${activeSidebarTab === 'git' ? 'active' : ''}`}
-            onClick={() => openSidebarTab('git')}
-            title="源代码管理"
+            className={`activity-bar-item ${activeSidebarTab === 'history' ? 'active' : ''}`}
+            onClick={() => toggleSidebarTab('history')}
+            title={t('app.activity.history')}
           >
-            <span className="activity-bar-icon"><AppIcon name="git" /></span>
+            <span className="activity-bar-icon"><AppIcon name="history" /></span>
           </div>
           <div className="spacer" />
           <div
@@ -3465,7 +3389,7 @@ function App() {
               setAppView('project-picker')
               void refreshProjectPickerState()
             }}
-            title="切换项目"
+            title={t('app.activity.projectPicker')}
           >
             <span className="activity-bar-icon"><AppIcon name="projectSwitch" /></span>
           </div>
@@ -3475,7 +3399,7 @@ function App() {
               setShowSettings(true)
               if (!appSettings) void reloadAppSettings()
             }}
-            title="设置"
+            title={t('app.activity.settings')}
           >
             <span className="activity-bar-icon"><AppIcon name="settings" /></span>
           </div>
@@ -3483,143 +3407,41 @@ function App() {
 
         {/* Sidebar Panel (Left) */}
         <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        {activeSidebarTab === 'files' ? (
-          <>
-            <div className="sidebar-header">
-              <span>{workspaceRoot ? workspaceRoot.split(/[/\\]/).pop() || '项目' : '资源管理器'}</span>
-              <div className="spacer" />
-              {workspaceRoot ? (
-                <button className="icon-button" onClick={() => void refreshTree()} title="刷新">
-                  <AppIcon name="refresh" size={14} />
-                </button>
-              ) : null}
-            </div>
-            <div className="sidebar-content flex-1" onContextMenu={(e) => {
-              e.preventDefault()
-              if (workspaceRoot) {
-                setExplorerContextMenu({ x: e.clientX, y: e.clientY, entry: { kind: 'dir', path: workspaceRoot, name: workspaceRoot.split('/').pop() || '', children: [] } })
-              }
-            }}>
-              {workspaceRoot ? (
-                <>
-                  {error ? <div className="error-text">{error}</div> : null}
-                  <div className="sidebar-search-wrap">
-                    <input
-                      className="explorer-search"
-                      value={explorerQuery}
-                      onChange={(e) => setExplorerQuery(e.target.value)}
-                      placeholder="搜索..."
-                    />
-                  </div>
-                  {visibleTree ? <TreeNode entry={visibleTree} depth={0} /> : <div className="sidebar-loading">加载中...</div>}
-                </>
-              ) : (
-                <div className="sidebar-empty">
-                  <button
-                    className="primary-button"
-                    onClick={() => {
-                      setAppView('project-picker')
-                      void refreshProjectPickerState()
-                    }}
-                  >
-                    项目选择页
-                  </button>
-                  {error ? <div className="error-text">{error}</div> : null}
-                  {lastWorkspace ? (
-                    <div className="welcome-recent" style={{ width: '100%' }}>
-                      <h3>最近打开</h3>
-                      <div className="recent-list">
-                        <div className="recent-item" onClick={() => void openWorkspacePath(lastWorkspace)}>
-                          {lastWorkspace}
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                  {!isTauriApp() && (
-                    <input
-                      className="workspace-path-input"
-                      value={workspaceInput}
-                      onChange={(e) => setWorkspaceInput(e.target.value)}
-                      placeholder="或输入路径"
-                    />
-	                  )}
-	                  </div>
-              )}
-            </div>
-            {workspaceRoot ? (
-              <>
-                <div className="sidebar-header">大纲</div>
-                <div className="sidebar-content sidebar-outline">
-                  <button
-                    className="btn btn-secondary sidebar-outline-btn"
-                    onClick={() => void onOpenByPath('outline/outline.md')}
-                  >
-                    打开 outline.md
-                  </button>
-                  <div className="sidebar-outline-hint">在 outline/ 目录维护章节大纲。</div>
-                </div>
-              </>
-            ) : null}
-          </>
+                {activeSidebarTab === 'files' ? (
+          <NovelStructurePanel
+            workspaceRoot={workspaceRoot}
+            tree={tree}
+            activePath={activePath}
+            busy={busy}
+            error={error}
+            onRefresh={() => void refreshTree()}
+            onOpenPath={(path) => {
+              void onOpenByPath(path)
+            }}
+            onNewChapter={() => void onNewChapter()}
+            onNewOutline={() => void onNewOutline()}
+            onNewConceptNote={() => void onNewConceptNote()}
+            onOpenMasterPlan={() => void onOpenMasterPlanDoc()}
+            onOpenProjectPicker={() => {
+              setAppView('project-picker')
+              void refreshProjectPickerState()
+            }}
+          />
         ) : null}
 
-        {activeSidebarTab === 'git' ? (
-          <>
-            <div className="sidebar-header">源代码管理</div>
-            <div className="sidebar-content">
-              {gitError ? <div className="error-text">{gitError}</div> : null}
-              <div className="git-toolbar">
-                <button disabled={busy || !workspaceRoot} onClick={() => void onGitInit()}>
-                  初始化
-                </button>
-                <button disabled={busy || !workspaceRoot} onClick={() => void refreshGit()}>
-                  刷新
-                </button>
-              </div>
-              <div className="git-status-list">
-                {gitItems.length === 0 ? (
-                  <div className="git-empty">无变更</div>
-                ) : (
-                  gitItems.map((it) => (
-                    <div
-                      key={it.path}
-                      className={gitSelectedPath === it.path ? 'git-row active' : 'git-row'}
-                      onClick={() => void onGitSelect(it.path)}
-                    >
-                      <span className={`git-status-icon ${it.status === 'M' ? 'modified' : 'new'}`}>{it.status}</span>
-                      <span className="git-path">{it.path}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-              {gitSelectedPath ? <pre className="git-diff-view">{gitDiffText}</pre> : null}
-              <div className="git-commit-section">
-                <input
-                  ref={gitCommitInputRef}
-                  className="git-commit-input"
-                  value={gitCommitMsg}
-                  onChange={(e) => setGitCommitMsg(e.target.value)}
-                  placeholder="提交信息 (Ctrl+Enter)"
-                  onKeyDown={(e) => {
-                    if (e.ctrlKey && e.key === 'Enter') void onGitCommit()
-                  }}
-                />
-                <button className="git-commit-btn" disabled={busy || !gitCommitMsg.trim()} onClick={() => void onGitCommit()}>
-                  提交
-                </button>
-              </div>
-              {gitCommits.length > 0 ? (
-                <div className="git-commits">
-                  {gitCommits.slice(0, 5).map((c) => (
-                    <div key={c.id} className="git-commit-item">
-                      <span className="git-commit-hash">{c.id.slice(0, 7)}</span>
-                      <span>{c.summary}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </>
+        {activeSidebarTab === 'history' ? (
+          <HistoryPanel
+            workspaceRoot={workspaceRoot}
+            activePath={activePath}
+            onOpenPath={(path, options) => {
+              void onOpenByPath(path, options)
+            }}
+            onAfterRestore={() => {
+              if (workspaceRoot) {
+                void refreshTree()
+              }
+            }}
+          />
         ) : null}
 
         {activeSidebarTab === 'chapters' ? (
@@ -3667,7 +3489,7 @@ function App() {
         <div
           className="layout-resize-handle layout-resize-handle-sidebar"
           onMouseDown={startSidebarResize}
-          title="拖动调整左侧栏宽度"
+          title="Drag to resize sidebar width"
         />
       ) : null}
 
@@ -3685,7 +3507,7 @@ function App() {
           onTabClose={async (id) => {
             const file = openFiles.find(f => f.path === id)
             if (file?.dirty) {
-              const ok = await showConfirm(`文件"${file.name}"未保存，确认关闭吗？`)
+              const ok = await showConfirm(t('app.confirm.unsavedClose', { name: file.name }))
               if (!ok) return
             }
             editorManager.destroyEditor(id)
@@ -3708,17 +3530,17 @@ function App() {
         />
         {activeFile ? (
           <div className="editor-tabs-actions">
-            <button className="icon-button" disabled={!workspaceRoot} onClick={() => void onNewChapter()} title="新建章节">
+            <button className="icon-button" disabled={!workspaceRoot} onClick={() => void onNewChapter()} title={t('app.action.newChapter')}>
               <AppIcon name="add" size={14} />
             </button>
-            <button className="icon-button" disabled={!activeFile || !activeFile.dirty} onClick={() => void onSaveActive()} title="保存">
+            <button className="icon-button" disabled={!activeFile || !activeFile.dirty} onClick={() => void onSaveActive()} title={t('app.action.save')}>
               <AppIcon name="save" size={15} />
             </button>
             <button
               className="icon-button"
               disabled={!activeFile}
               onClick={() => setShowPreview((v) => !v)}
-              title="预览"
+              title={t('app.action.preview')}
             >
               <AppIcon name="preview" size={15} />
             </button>
@@ -3734,7 +3556,7 @@ function App() {
                   onChange={handleEditorChange}
                   config={editorConfig}
                   readOnly={false}
-                  placeholder="开始写作..."
+                  placeholder={t('app.editor.placeholder')}
                   editorRef={editorRef}
                   fileType={activeFile.path.split('.').pop() || 'txt'}
                   className="novel-editor"
@@ -3742,7 +3564,7 @@ function App() {
                   contextMenuItems={[
                     {
                       id: 'ai-polish',
-                      label: 'AI 润色',
+                      label: t('app.editor.context.polish'),
                       icon: 'A',
                       action: async (editor, selection) => {
                         await runInlineAIAssist('polish', selection, editor)
@@ -3751,7 +3573,7 @@ function App() {
                     },
                     {
                       id: 'ai-expand',
-                      label: 'AI 扩写',
+                      label: t('app.editor.context.expand'),
                       icon: '+',
                       action: async (editor, selection) => {
                         await runInlineAIAssist('expand', selection, editor)
@@ -3760,7 +3582,7 @@ function App() {
                     },
                     {
                       id: 'ai-condense',
-                      label: 'AI 缩写',
+                      label: t('app.editor.context.condense'),
                       icon: '-',
                       action: async (editor, selection) => {
                         await runInlineAIAssist('condense', selection, editor)
@@ -3775,7 +3597,7 @@ function App() {
                   {previewHtml ? (
                     <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
                   ) : (
-                    <div className="preview-empty">无预览内容</div>
+                    <div className="preview-empty">Nothing to preview yet.</div>
                   )}
                 </div>
               ) : null}
@@ -3791,7 +3613,7 @@ function App() {
                     void refreshProjectPickerState()
                   }}
                 >
-                  选择项目
+                  {t('app.welcome.openProjectPicker')}
                 </button>
               </div>
               {!workspaceRoot && error ? <div className="error-text">{error}</div> : null}
@@ -3806,7 +3628,7 @@ function App() {
           <div
             className="layout-resize-handle layout-resize-handle-right"
             onMouseDown={startRightPanelResize}
-            title="拖动调整右侧面板宽度"
+            title={t('app.action.dragResizeRight')}
           />
         ) : null}
         {activeRightTab ? (
@@ -3862,14 +3684,14 @@ function App() {
               <div className="graph-panel">
                 <div className="ai-header graph-header">
                   <button className="icon-button" onClick={() => void loadGraph()}>
-                    刷新图谱
+                    {t('app.action.reloadGraph')}
                   </button>
                 </div>
                 <div className="graph-canvas-wrap">
                   <canvas ref={graphCanvasRef} className="graph-canvas" />
                 </div>
                 <div className="graph-footer">
-                  数据: concept/characters.md & relations.md
+                  Data source: concept/characters.md & concept/relations.md
                 </div>
               </div>
             ) : null}
@@ -3889,21 +3711,21 @@ function App() {
           <div
             className={`right-activity-item ${activeRightTab === 'chat' ? 'active' : ''}`}
             onClick={() => toggleRightTab('chat')}
-            title="对话"
+            title={t('app.panel.aiChat')}
           >
             <span className="right-activity-icon"><AppIcon name="chat" /></span>
           </div>
           <div
             className={`right-activity-item ${activeRightTab === 'graph' ? 'active' : ''}`}
             onClick={() => toggleRightTab('graph')}
-            title="图谱"
+            title={t('app.panel.characterGraph')}
           >
             <span className="right-activity-icon"><AppIcon name="graph" /></span>
           </div>
           <div
             className={`right-activity-item ${activeRightTab === 'writing-goal' ? 'active' : ''}`}
             onClick={() => toggleRightTab('writing-goal')}
-            title="写作目标"
+            title={t('app.panel.writingGoal')}
           >
             <span className="right-activity-icon"><AppIcon name="target" /></span>
           </div>
@@ -3935,9 +3757,9 @@ function App() {
                       e.stopPropagation()
                       onCloseDiffView(changeSet.id)
                     }}
-                    title="Close"
+                    title={t('app.diff.closeTab')}
                   >
-                    ×
+                    x
                   </button>
                 </div>
               ))}
@@ -3948,9 +3770,9 @@ function App() {
                   setShowDiffPanel(false)
                   setActiveDiffTab(null)
                 }}
-                title="Close diff panel"
+                title={t('app.diff.closePanel')}
               >
-                Close Panel
+                {t('app.diff.closePanel')}
               </button>
             </div>
 
@@ -3968,7 +3790,7 @@ function App() {
                 </div>
               ) : (
                 <div className="diff-panel-empty">
-                  <p>No diff view selected</p>
+                  <p>{t('app.diff.noSelection')}</p>
                 </div>
               )}
             </div>
@@ -3979,7 +3801,7 @@ function App() {
                 onClick={() => diffContext.toggleViewMode()}
                 title={`Switch to ${diffContext.viewMode === 'split' ? 'unified' : 'split'} view`}
               >
-                {diffContext.viewMode === 'split' ? '⊟ Unified' : '⊞ Split'}
+                {diffContext.viewMode === 'split' ? 'Switch to Unified' : 'Switch to Split'}
               </button>
             </div>
           </div>
@@ -3991,22 +3813,22 @@ function App() {
         <div className="modal-overlay" onClick={requestCloseSettings}>
 	          <div className="modal-content settings-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>设置</h2>
+              <h2>{t('common.settings')}</h2>
               <button className="close-btn" onClick={requestCloseSettings}>
-                ×
+                x
               </button>
             </div>
 	            <div className="modal-body settings-modal-body">
               {!appSettings ? (
                 <div className="settings-load-state">
-                  <div className="settings-load-message">设置加载失败或尚未加载完成。</div>
+                  <div className="settings-load-message">Failed to load settings. Please retry.</div>
                   {settingsError ? <div className="error-text">{settingsError}</div> : null}
                   <div className="settings-load-actions">
                     <button className="btn btn-secondary" onClick={() => void reloadAppSettings()}>
-                      重新加载
+                      {t('common.reload')}
                     </button>
                     <button className="primary-button" onClick={() => setShowSettings(false)}>
-                      关闭
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </div>
@@ -4014,25 +3836,25 @@ function App() {
 	                <div className="settings-layout">
 	                  <aside className="settings-nav">
 	                    <button className={`settings-nav-item ${settingsTab === 'general' ? 'active' : ''}`} onClick={() => setSettingsTab('general')}>
-	                      通用
+                      {t('common.general')}
 	                    </button>
 	                    <button className={`settings-nav-item ${settingsTab === 'editor' ? 'active' : ''}`} onClick={() => setSettingsTab('editor')}>
-	                      编辑器
+                      {t('common.editor')}
 	                    </button>
 	                    <button className={`settings-nav-item ${settingsTab === 'models' ? 'active' : ''}`} onClick={() => setSettingsTab('models')}>
-	                      模型配置
+                      {t('common.models')}
 	                    </button>
 	                    <button className={`settings-nav-item ${settingsTab === 'agents' ? 'active' : ''}`} onClick={() => setSettingsTab('agents')}>
-	                      智能体
+                      {t('common.agents')}
 	                    </button>
 	                  </aside>
 	                  <div className="settings-content">
 	                <div className="settings-form settings-page">
 	                {settingsTab === 'general' ? (
 	                <div className="settings-section">
-                  <h3 className="settings-section-title">通用</h3>
+                  <h3 className="settings-section-title">{t('app.settings.generalTitle')}</h3>
                   <div className="form-group settings-inline-row">
-                    <label className="settings-inline-label">Markdown 输出</label>
+                    <label className="settings-inline-label">{t('app.settings.markdownOutput')}</label>
                     <input
                       type="checkbox"
                       checked={appSettings.output.use_markdown}
@@ -4045,7 +3867,7 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>启动行为</label>
+                    <label>{t('app.settings.launchMode')}</label>
                     <select
                       value={appSettings.launch_mode}
                       onChange={(e) => {
@@ -4058,12 +3880,12 @@ function App() {
                       }}
                       
                     >
-                      <option value="picker">总是显示项目选择页</option>
-                      <option value="auto_last">自动打开上次项目</option>
+                      <option value="picker">{t('app.settings.launchPicker')}</option>
+                      <option value="auto_last">{t('app.settings.launchAutoLast')}</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>项目管理</label>
+                    <label>{t('app.settings.openProjectPicker')}</label>
                     <button
                       className="btn btn-secondary"
                       onClick={() => {
@@ -4072,11 +3894,11 @@ function App() {
                         void refreshProjectPickerState()
                       }}
                     >
-                      打开项目选择页
+                      {t('app.settings.openProjectPicker')}
                     </button>
                   </div>
                   <div className="form-group">
-                    <label>AI 文件修改</label>
+                    <label>{t('app.settings.aiEditApplyMode')}</label>
                     <select
                       value={appSettings.ai_edit_apply_mode}
                       onChange={(e) => {
@@ -4088,12 +3910,12 @@ function App() {
                       }}
                       
                     >
-                      <option value="auto_apply">自动应用（推荐）</option>
-                      <option value="review">审阅后应用</option>
+                      <option value="auto_apply">{t('app.settings.aiApplyAuto')}</option>
+                      <option value="review">{t('app.settings.aiApplyReview')}</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>章节目标字数</label>
+                    <label>{t('app.settings.chapterTarget')}</label>
                     <input
                       type="number"
                       value={chapterWordTarget}
@@ -4106,7 +3928,7 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Auto 每轮最小字数</label>
+                    <label>Auto Minimum Characters</label>
                     <input
                       type="number"
                       value={autoLongWriteMinChars}
@@ -4119,7 +3941,7 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Auto 每轮最大字数</label>
+                    <label>Auto Maximum Characters</label>
                     <input
                       type="number"
                       value={autoLongWriteMaxChars}
@@ -4132,7 +3954,7 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Auto 最大轮次</label>
+                    <label>Auto Max Rounds</label>
                     <input
                       type="number"
                       value={autoLongWriteMaxRounds}
@@ -4145,7 +3967,7 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Auto 最大章节推进</label>
+                    <label>Auto Max Chapter Advances</label>
                     <input
                       type="number"
                       value={autoLongWriteMaxChapterAdvances}
@@ -4158,36 +3980,49 @@ function App() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>界面主题</label>
+                    <label>{t('common.theme')}</label>
                     <select
                       value={theme}
                       onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
                       
                     >
-                      <option value="dark">暗色</option>
-                      <option value="light">亮色</option>
+                      <option value="dark">{t('common.dark')}</option>
+                      <option value="light">{t('common.light')}</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>界面密度</label>
+                    <label>{t('common.language')}</label>
+                    <select
+                      value={locale}
+                      onChange={(e) => setLocale(e.target.value as AppLocale)}
+                    >
+                      {APP_LOCALES.map((lang) => (
+                        <option key={lang} value={lang}>
+                          {lang}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>{t('app.settings.uiDensity')}</label>
                     <select
                       value={uiDensity}
                       onChange={(e) => setUiDensity(e.target.value as 'compact' | 'comfortable')}
                       
                     >
-                      <option value="comfortable">默认</option>
-                      <option value="compact">紧凑</option>
+                      <option value="comfortable">{t('app.settings.densityComfortable')}</option>
+                      <option value="compact">{t('app.settings.densityCompact')}</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>动效</label>
+                    <label>{t('app.settings.motion')}</label>
                     <select
                       value={uiMotion}
                       onChange={(e) => setUiMotion(e.target.value as 'full' | 'reduced')}
                       
                     >
-                      <option value="full">完整动效</option>
-                      <option value="reduced">减少动效</option>
+                      <option value="full">{t('app.settings.motionFull')}</option>
+                      <option value="reduced">{t('app.settings.motionReduced')}</option>
                     </select>
                   </div>
                   <div className="settings-action-row">
@@ -4204,7 +4039,7 @@ function App() {
                         setRightPanelWidth(defaults.rightPanelWidth)
                       }}
                     >
-                      重置界面设置
+                      {t('app.settings.resetUILayout')}
                     </button>
                   </div>
 	                </div>
@@ -4213,11 +4048,11 @@ function App() {
 	                {/* Editor Configuration Section */}
 	                {settingsTab === 'editor' ? (
 	                <div className="settings-section">
-                  <h3 className="settings-section-title">编辑器配置</h3>
+                  <h3 className="settings-section-title">Editor Settings</h3>
 
                   {/* Font Family */}
                   <div className="form-group">
-                    <label>字体</label>
+                    <label>Font Family</label>
                     <select
                       value={editorUserConfig.fontFamily}
                       onChange={(e) => {
@@ -4225,19 +4060,19 @@ function App() {
                       }}
                       
                     >
-                      <option value="system-ui, -apple-system, sans-serif">系统默认</option>
-                      <option value="'Songti SC', 'SimSun', serif">宋体</option>
-                      <option value="'Heiti SC', 'SimHei', sans-serif">黑体</option>
-                      <option value="'Kaiti SC', 'KaiTi', serif">楷体</option>
-                      <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
-                      <option value="'PingFang SC', sans-serif">苹方</option>
-                      <option value="monospace">等宽字体</option>
+                      <option value="system-ui, -apple-system, sans-serif">System UI</option>
+                      <option value="'Songti SC', 'SimSun', serif">Songti</option>
+                      <option value="'Heiti SC', 'SimHei', sans-serif">Heiti</option>
+                      <option value="'Kaiti SC', 'KaiTi', serif">Kaiti</option>
+                      <option value="'Microsoft YaHei', sans-serif">Microsoft YaHei</option>
+                      <option value="'PingFang SC', sans-serif">PingFang SC</option>
+                      <option value="monospace">Monospace</option>
                     </select>
                   </div>
 
                   {/* Font Size */}
                   <div className="form-group">
-                    <label>字号 ({editorUserConfig.fontSize}px)</label>
+                    <label>Font Size ({editorUserConfig.fontSize}px)</label>
                     <input
                       className="settings-range-input"
                       type="range"
@@ -4253,7 +4088,7 @@ function App() {
 
                   {/* Line Height */}
                   <div className="form-group">
-                    <label>行高 ({editorUserConfig.lineHeight})</label>
+                    <label>Line Height ({editorUserConfig.lineHeight})</label>
                     <input
                       className="settings-range-input"
                       type="range"
@@ -4269,7 +4104,7 @@ function App() {
 
                   {/* Theme */}
                   <div className="form-group">
-                    <label>主题</label>
+                    <label>Theme</label>
                     <select
                       value={editorUserConfig.theme}
                       onChange={(e) => {
@@ -4277,14 +4112,14 @@ function App() {
                       }}
                       
                     >
-                      <option value="dark">暗色</option>
-                      <option value="light">亮色</option>
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
                     </select>
                   </div>
 
                   {/* Editor Width */}
                   <div className="form-group">
-                    <label>编辑器宽度</label>
+                    <label>Editor Width</label>
                     <select
                       value={editorUserConfig.editorWidth}
                       onChange={(e) => {
@@ -4292,14 +4127,14 @@ function App() {
                       }}
                       
                     >
-                      <option value="centered">居中（800px）</option>
-                      <option value="full">全宽</option>
+                      <option value="centered">Centered (1100px)</option>
+                      <option value="full">Full Width</option>
                     </select>
                   </div>
 
                   {/* Auto-save Interval */}
                   <div className="form-group">
-                    <label>自动保存间隔 ({editorUserConfig.autoSaveInterval === 0 ? '禁用' : `${editorUserConfig.autoSaveInterval}秒`})</label>
+                    <label>Auto Save Interval ({editorUserConfig.autoSaveInterval === 0 ? 'disabled' : `${editorUserConfig.autoSaveInterval}s`})</label>
                     <input
                       className="settings-range-input"
                       type="range"
@@ -4312,7 +4147,7 @@ function App() {
                       }}
                     />
                     <div className="settings-hint">
-                      {editorUserConfig.autoSaveInterval === 0 ? '自动保存已禁用' : `每 ${editorUserConfig.autoSaveInterval} 秒自动保存到本地缓存`}
+                      {editorUserConfig.autoSaveInterval === 0 ? 'Auto save is disabled.' : `Auto-save every ${editorUserConfig.autoSaveInterval} seconds.`}
                     </div>
                   </div>
 
@@ -4322,14 +4157,14 @@ function App() {
                       className="btn btn-secondary settings-small-btn"
                       onClick={() => {
                         void (async () => {
-                          const ok = await showConfirm('确定要重置编辑器配置为默认值吗？')
+                          const ok = await showConfirm('Reset editor settings to defaults?')
                           if (ok) {
                             editorConfigManager.resetConfig()
                           }
                         })()
                       }}
                     >
-                      重置为默认值
+                      Reset Editor Settings
                     </button>
                   </div>
 	                </div>
@@ -4337,12 +4172,12 @@ function App() {
 	                {settingsTab === 'models' ? (
 	                <div className="settings-section">
                   <div className="settings-section-head">
-                    <h3 className="settings-section-title settings-section-title-inline">模型配置</h3>
+                    <h3 className="settings-section-title settings-section-title-inline">{t('app.settings.modelTitle')}</h3>
                     <button
                       className="primary-button settings-tiny-btn"
                       onClick={openCreateProviderModal}
                     >
-                      + 添加模型
+                      + {t('app.settings.newProvider')}
                     </button>
                   </div>
 
@@ -4363,17 +4198,17 @@ function App() {
                         <div className="settings-provider-meta">
                           <div className="settings-provider-name">{p.name}</div>
                           <div className="settings-provider-detail">
-                            {providerKindLabel(p.kind)} • {p.model_name}
+                            {providerKindLabel(p.kind)} - {p.model_name}
                           </div>
                           <div className={`settings-provider-key${apiKeyStatus[p.id] ? ' is-set' : ''}`}>
-                            API Key：{apiKeyStatus[p.id] ? '已设置' : '未设置'}
+                            {t('app.model.apiKey')}: {apiKeyStatus[p.id] ? t('app.settings.keySet') : t('app.settings.keyNotSet')}
                           </div>
                         </div>
                         <div className="settings-provider-actions">
                           {appSettings.active_provider_id !== p.id && (
                             <button
                               className="icon-button"
-                              title="设为默认"
+                              title={t('app.settings.setActive')}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 const prev = appSettings
@@ -4382,27 +4217,27 @@ function App() {
                                 void persistAppSettings(next, prev)
                               }}
                             >
-                              ★
+                              {t('app.settings.setActive')}
                             </button>
                           )}
                           <button
                             className="icon-button"
-                            title="编辑"
+                            title={t('app.settings.edit')}
                             onClick={(e) => {
                               e.stopPropagation()
                               openEditProviderModal(p)
                             }}
                           >
-                            ✎
+                            {t('app.settings.edit')}
                           </button>
                           <button
                             className="icon-button"
-                            title="删除"
+                            title={t('app.settings.delete')}
                             disabled={appSettings.providers.length <= 1}
                             onClick={(e) => {
                               e.stopPropagation()
                               void (async () => {
-                                const ok = await showConfirm('确定删除该模型配置？')
+                                const ok = await showConfirm(t('app.settings.confirmDeleteProvider'))
                                 if (!ok) return
                                 const prev = appSettings
                                 const nextProviders = appSettings.providers.filter((x) => x.id !== p.id)
@@ -4416,7 +4251,7 @@ function App() {
                               })()
                             }}
                           >
-                            🗑️
+                            {t('app.settings.delete')}
                           </button>
                         </div>
                       </div>
@@ -4426,14 +4261,14 @@ function App() {
 	                ) : null}
 	                {settingsTab === 'agents' ? (
 	                <div className="settings-section">
-                  <h3 className="settings-section-title">智能体管理</h3>
+                  <h3 className="settings-section-title">{t('app.settings.agentTitle')}</h3>
 
                   {/* Built-in Agents */}
                   <div className="settings-subsection settings-subsection-lg">
-                    <div className="settings-subtitle">内置智能体</div>
+                    <div className="settings-subtitle">{t('app.settings.builtInAgents')}</div>
                     <div className="settings-grid-two">
                       {agentsList
-                        .filter((a) => a.category !== '自定义')
+                        .filter((a) => a.category !== 'custom')
                         .map((a) => (
                           <div
                             key={a.id}
@@ -4450,15 +4285,15 @@ function App() {
                   {/* Custom Agents */}
                   <div className="settings-subsection">
                     <div className="settings-subsection-head">
-                      <div className="settings-subtitle settings-subtitle-inline">自定义智能体</div>
+                      <div className="settings-subtitle settings-subtitle-inline">{t('app.settings.customAgents')}</div>
                       <button
                         className="icon-button settings-create-btn"
                         onClick={() => {
                           const id = newId()
                           const next: Agent = {
                             id,
-                            name: '新智能体',
-                            category: '自定义',
+                            name: t('app.settings.newAgentName'),
+                            category: 'custom',
                             system_prompt: '',
                             temperature: 0.7,
                             max_tokens: 32000,
@@ -4467,17 +4302,17 @@ function App() {
                           setAgentEditorId(id)
                         }}
                       >
-                        + 创建
+                        + {t('app.settings.newAgent')}
                       </button>
                     </div>
-                    {agentsList.filter((a) => a.category === '自定义').length === 0 ? (
+                    {agentsList.filter((a) => a.category === 'custom').length === 0 ? (
                       <div className="settings-empty-note settings-empty-box">
-                        暂无自定义智能体
+                        {t('app.settings.noCustomAgents')}
                       </div>
                     ) : (
                       <div className="settings-grid-two">
                         {agentsList
-                          .filter((a) => a.category === '自定义')
+                          .filter((a) => a.category === 'custom')
                           .map((a) => (
                             <div
                               key={a.id}
@@ -4485,21 +4320,21 @@ function App() {
                               onClick={() => setAgentEditorId(a.id)}
                             >
                               <div className="settings-agent-name">{a.name}</div>
-                              <div className="settings-agent-category">自定义</div>
+                              <div className="settings-agent-category">{t('app.settings.customCategory')}</div>
                               {agentEditorId === a.id && (
                                 <button
                                   className="icon-button settings-agent-delete-btn"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     void (async () => {
-                                      const ok = await showConfirm('确定删除此智能体？')
+                                      const ok = await showConfirm(t('app.settings.confirmDeleteCustomAgent'))
                                       if (!ok) return
                                       setAgentsList((prev) => prev.filter((x) => x.id !== a.id))
                                       setAgentEditorId('')
                                     })()
                                   }}
                                 >
-                                  🗑️
+                                  {t('app.settings.delete')}
                                 </button>
                               )}
                             </div>
@@ -4511,36 +4346,36 @@ function App() {
                   {agentEditorId && agentsList.find((a) => a.id === agentEditorId) && (
                     <div className="settings-editor-panel">
                       <div className="settings-editor-title">
-                        编辑: {agentsList.find((a) => a.id === agentEditorId)?.name}
+                        {t('app.settings.editAgent')}: {agentsList.find((a) => a.id === agentEditorId)?.name}
                       </div>
                       <div className="settings-editor-fields">
                         <div className="form-group">
-                          <label>名称</label>
+                          <label>{t('app.settings.name')}</label>
                           <input
                             className="ai-select"
                             value={agentsList.find((a) => a.id === agentEditorId)?.name ?? ''}
                             onChange={(e) =>
                               setAgentsList((prev) => prev.map((a) => (a.id === agentEditorId ? { ...a, name: e.target.value } : a)))
                             }
-                            disabled={agentsList.find((a) => a.id === agentEditorId)?.category !== '自定义'}
+                            disabled={agentsList.find((a) => a.id === agentEditorId)?.category !== 'custom'}
                           />
                         </div>
                         <div className="form-group">
-                          <label>系统提示词 (System Prompt)</label>
+                          <label>{t('app.settings.systemPrompt')}</label>
                           <textarea
                             className="ai-textarea settings-agent-prompt"
-                            placeholder="你是一个..."
+                            placeholder={t('app.settings.systemPromptPlaceholder')}
 
                             value={agentsList.find((a) => a.id === agentEditorId)?.system_prompt ?? ''}
                             onChange={(e) =>
                               setAgentsList((prev) => prev.map((a) => (a.id === agentEditorId ? { ...a, system_prompt: e.target.value } : a)))
                             }
-                            disabled={agentsList.find((a) => a.id === agentEditorId)?.category !== '自定义'}
+                            disabled={agentsList.find((a) => a.id === agentEditorId)?.category !== 'custom'}
                           />
                         </div>
                         <div className="form-group">
-                          <label>章节目标字数</label>
-                          <div className="settings-spacer-text">此项为项目级设置，请在上方“章节目标字数”中调整。</div>
+                          <label>{t('app.settings.projectSpecific')}</label>
+                          <div className="settings-spacer-text">{t('app.settings.projectSpecificHint')}</div>
 	                        </div>
 	                      </div>
 	                    </div>
@@ -4560,7 +4395,7 @@ function App() {
                     void saveAndCloseSettings()
                   }}
                 >
-                  保存并关闭
+                  {t('common.save')}
                 </button>
               ) : null}
             </div>
@@ -4573,23 +4408,23 @@ function App() {
         <div className="modal-overlay" onClick={() => setShowModelModal(false)}>
           <div className="modal-content modal-content-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{isNewProvider ? '添加模型' : '编辑模型'}</h2>
+              <h2>{isNewProvider ? t('app.model.addProvider') : t('app.model.editProvider')}</h2>
               <button className="close-btn" onClick={() => setShowModelModal(false)}>
-                ×
+                x
               </button>
             </div>
             <div className="modal-body">
               <div className="settings-form">
                 <div className="form-group">
-                  <label>名称 (显示用)</label>
+                  <label>{t('app.model.displayName')}</label>
                   <input
                     value={editingProvider.name ?? ''}
                     onChange={(e) => setEditingProvider((p) => ({ ...p, name: e.target.value }))}
-                    placeholder="例如：DeepSeek V3"
+                    placeholder={t('app.model.displayNamePlaceholder')}
                   />
                 </div>
                 <div className="form-group">
-                  <label>提供商</label>
+                  <label>{t('app.model.providerType')}</label>
                   <select
                     value={editingProviderPreset}
                     onChange={(e) => onSelectProviderPreset(e.target.value)}
@@ -4599,45 +4434,45 @@ function App() {
                         {preset.name}
                       </option>
                     ))}
-                    <option value={CUSTOM_PROVIDER_PRESET_KEY}>自定义提供商</option>
+                    <option value={CUSTOM_PROVIDER_PRESET_KEY}>{t('app.model.providerTypeCustom')}</option>
                   </select>
                 </div>
                 {editingProviderPreset === CUSTOM_PROVIDER_PRESET_KEY ? (
                   <div className="form-group">
-                    <label>API 格式</label>
+                    <label>{t('app.model.apiFormat')}</label>
                     <select
                       value={editingCustomProviderApiFormat}
                       onChange={(e) => onChangeCustomProviderApiFormat(e.target.value as CustomProviderApiFormat)}
                     >
-                      <option value="openai">OpenAI API 格式</option>
-                      <option value="claude">Claude API 格式</option>
+                      <option value="openai">{t('app.model.apiFormatOpenAI')}</option>
+                      <option value="claude">{t('app.model.apiFormatClaude')}</option>
                     </select>
                   </div>
                 ) : null}
                 <div className="form-group">
-                  <label>Base URL</label>
+                  <label>{t('app.model.baseUrl')}</label>
                   <input
                     value={editingProvider.base_url ?? ''}
                     onChange={(e) => setEditingProvider((p) => ({ ...p, base_url: e.target.value }))}
-                    placeholder="https://api.example.com/v1"
+                    placeholder={t('app.model.baseUrlPlaceholder')}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Model ID</label>
+                  <label>{t('app.model.modelId')}</label>
                   <input
                     value={editingProvider.model_name ?? ''}
                     onChange={(e) => setEditingProvider((p) => ({ ...p, model_name: e.target.value }))}
-                    placeholder="例如：gpt-4o, claude-sonnet-4-5, deepseek-chat"
+                    placeholder={t('app.model.modelIdPlaceholder')}
                   />
                 </div>
                 <div className="form-group">
-                  <label>API Key</label>
+                  <label>{t('app.model.apiKey')}</label>
                   <input
                     type="password"
                     value={editingProvider.api_key ?? ''}
                     onChange={(e) => setEditingProvider((p) => ({ ...p, api_key: e.target.value }))}
                     placeholder={
-                      editingProvider.id && apiKeyStatus[editingProvider.id] ? '已设置（留空表示不修改）' : 'sk-...'
+                      editingProvider.id && apiKeyStatus[editingProvider.id] ? t('app.model.apiKeyAlreadySetPlaceholder') : 'sk-...'
                     }
                   />
                 </div>
@@ -4646,7 +4481,7 @@ function App() {
 	                    <div>{providerProbeResult.text}</div>
 	                    {providerProbeResult.detail && providerProbeResult.detail !== providerProbeResult.text ? (
 	                      <details className="settings-connectivity-detail">
-	                        <summary>查看详情</summary>
+                        <summary>{t('app.model.viewDetails')}</summary>
 	                        <pre>{providerProbeResult.detail}</pre>
 	                      </details>
 	                    ) : null}
@@ -4662,7 +4497,7 @@ function App() {
 	                  void onProbeProviderConnectivity()
 	                }}
 	              >
-	                {providerProbeRunning ? '检测中...' : '检测连通性'}
+                {providerProbeRunning ? t('app.model.checking') : t('app.model.checkConnectivity')}
 	              </button>
 	              <button
 	                className="primary-button"
@@ -4682,7 +4517,7 @@ function App() {
                     const rawKey = (editingProvider.api_key ?? '').trim()
                     const pid = normalizedProvider.id
                     if (isNewProvider && pid && !rawKey) {
-                      const ok = await showConfirm('未填写 API Key，仍要保存该模型配置吗？')
+                      const ok = await showConfirm(t('app.model.confirmNoApiKey'))
                       if (!ok) return
                     }
                     if (pid && rawKey) {
@@ -4691,7 +4526,7 @@ function App() {
                         setApiKeyStatus((m) => ({ ...m, [pid]: true }))
                       } catch (e) {
                         const msg = e instanceof Error ? e.message : String(e)
-                        await showErrorDialog(`保存 API Key 失败：${msg}`)
+                        await showErrorDialog(t('app.model.errorSaveApiKey', { msg }))
                         return
                       }
                     }
@@ -4709,7 +4544,7 @@ function App() {
                       await setAppSettings(next)
                     } catch (e) {
                       const msg = e instanceof Error ? e.message : String(e)
-                      await showErrorDialog(`保存设置失败：${msg}`)
+                      await showErrorDialog(t('app.model.errorSaveSettings', { msg }))
                       setAppSettingsState(prev)
                       return
                     }
@@ -4718,13 +4553,13 @@ function App() {
                         const ok = await getApiKeyStatus(pid)
                         setApiKeyStatus((m) => ({ ...m, [pid]: ok }))
                         if (rawKey && !ok) {
-                          await showErrorDialog(`API Key 已提交保存，但读取状态仍为"未设置"（provider=${pid}）。可能是系统凭据存储不可用。`)
+                          await showErrorDialog(t('app.model.errorApiKeyStatusUnset', { provider: pid }))
                           return
                         }
                       } catch {
                         setApiKeyStatus((m) => ({ ...m, [pid]: false }))
                         if (rawKey) {
-                          await showErrorDialog(`API Key 已提交保存，但读取状态失败（provider=${pid}）。可能是系统凭据存储不可用。`)
+                          await showErrorDialog(t('app.model.errorApiKeyStatusReadFailed', { provider: pid }))
                           return
                         }
                       }
@@ -4734,7 +4569,7 @@ function App() {
                   })()
                 }}
               >
-                保存
+                {t('common.save')}
               </button>
             </div>
           </div>
@@ -4745,13 +4580,14 @@ function App() {
         info={{
           charCount: activeCharCount,
           chapterTarget: chapterWordTarget,
-          gitStatus: gitItems.length > 0 ? 'modified' : 'clean',
-          gitBranch: 'main',
+          historyLabel: t('status.history'),
+          historyStatus: openFiles.some((file) => file.dirty) ? 'recording' : 'idle',
           theme,
+          language: locale,
         }}
         onThemeToggle={toggleTheme}
-        onGitClick={() => {
-          openSidebarTab('git')
+        onHistoryClick={() => {
+          openSidebarTab('history')
         }}
       />
 
@@ -4762,13 +4598,13 @@ function App() {
             disabled={!chatContextMenu.selection}
             onClick={() => void copyText(chatContextMenu.selection).finally(() => setChatContextMenu(null))}
           >
-            复制选中内容
+            {t('app.chat.copySelection')}
           </button>
           <button
             className="context-menu-item"
             onClick={() => void copyText(chatContextMenu.message).finally(() => setChatContextMenu(null))}
           >
-            复制该条消息
+            {t('app.chat.copyMessage')}
           </button>
 	          <button
 	            className={
@@ -4789,7 +4625,7 @@ function App() {
               })
             }
 	          >
-	            {'\u91cd\u65b0\u751f\u6210\u56de\u590d'}
+	            {t('app.command.regenerateReply')}
 	          </button>
 	          <button
 	            className={
@@ -4810,162 +4646,12 @@ function App() {
 	              })
 	            }
 	          >
-	            {'\u751f\u6210 2 \u4e2a\u5019\u9009'}
+	            {t('app.command.generateCandidates')}
 	          </button>
 	        </div>
 	      ) : null}
 
-      {explorerContextMenu ? (
-        <div className="context-menu" style={{ left: explorerContextMenu.x, top: explorerContextMenu.y }}>
-          <button className="context-menu-item" onClick={() => void refreshTree().finally(() => setExplorerContextMenu(null))}>
-            刷新
-          </button>
-          {explorerContextMenu.entry.kind === 'dir' ? (
-            <>
-              <button
-                className="context-menu-item"
-                onClick={() => {
-                  setExplorerModal({ mode: 'newFile', dirPath: explorerContextMenu.entry.path })
-                  setExplorerModalValue('')
-                  setExplorerContextMenu(null)
-                }}
-              >
-                新建文件
-              </button>
-              <button
-                className="context-menu-item"
-                onClick={() => {
-                  setExplorerModal({ mode: 'newFolder', dirPath: explorerContextMenu.entry.path })
-                  setExplorerModalValue('')
-                  setExplorerContextMenu(null)
-                }}
-              >
-                新建文件夹
-              </button>
-            </>
-          ) : null}
-          <button
-            className="context-menu-item"
-            onClick={() => {
-              const parentDir = explorerContextMenu.entry.path.replaceAll('\\', '/').split('/').slice(0, -1).join('/')
-              setExplorerModal({ mode: 'rename', entry: explorerContextMenu.entry, parentDir })
-              setExplorerModalValue(explorerContextMenu.entry.name)
-              setExplorerContextMenu(null)
-            }}
-          >
-            重命名
-          </button>
-          <button
-            className="context-menu-item"
-            onClick={() => {
-              const entry = explorerContextMenu.entry
-              setExplorerContextMenu(null)
-              void (async () => {
-                const ok = await showConfirm(`确认删除：${entry.path} ?`)
-                if (!ok) return
-                try {
-                  await deleteEntry(entry.path)
-                  await refreshTree()
-                } catch (e) {
-                  const msg = e instanceof Error ? e.message : String(e)
-                  await showErrorDialog(msg)
-                }
-              })()
-            }}
-          >
-            删除
-          </button>
-        </div>
-      ) : null}
-
-      {explorerModal ? (
-        <div
-          className="modal-overlay"
-          onClick={() => {
-            setExplorerModal(null)
-          }}
-        >
-          <div
-            className="modal-content"
-            onClick={(e) => {
-              e.stopPropagation()
-            }}
-          >
-            <div className="modal-header">
-              <h2>
-                {explorerModal.mode === 'newFile' ? '新建文件' : explorerModal.mode === 'newFolder' ? '新建文件夹' : '重命名'}
-              </h2>
-              <button className="close-btn" onClick={() => setExplorerModal(null)}>
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>名称</label>
-                <input
-                  value={explorerModalValue}
-                  onChange={(e) => setExplorerModalValue(e.target.value)}
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setExplorerModal(null)}>
-                取消
-              </button>
-              <button
-                className="primary-button"
-                onClick={() => {
-                  void (async () => {
-                    const name = explorerModalValue.trim()
-                    if (!name) return
-                    if (explorerModal.mode === 'newFile') {
-                      const rel = `${explorerModal.dirPath.replaceAll('\\', '/')}/${name}`.replaceAll('//', '/')
-                      const ok = await showConfirm(`确认新建文件：${rel} ?`)
-                      if (!ok) return
-                      try {
-                        await createFile(rel)
-                        await refreshTree()
-                        setExplorerModal(null)
-                      } catch (e) {
-                        await showErrorDialog(e instanceof Error ? e.message : String(e))
-                      }
-                      return
-                    }
-                    if (explorerModal.mode === 'newFolder') {
-                      const rel = `${explorerModal.dirPath.replaceAll('\\', '/')}/${name}`.replaceAll('//', '/')
-                      const ok = await showConfirm(`确认新建文件夹：${rel} ?`)
-                      if (!ok) return
-                      try {
-                        await createDir(rel)
-                        await refreshTree()
-                        setExplorerModal(null)
-                      } catch (e) {
-                        await showErrorDialog(e instanceof Error ? e.message : String(e))
-                      }
-                      return
-                    }
-                    const next = `${explorerModal.parentDir}/${name}`.replaceAll('//', '/')
-                    const ok = await showConfirm(`确认重命名为：${next} ?`)
-                    if (!ok) return
-                    try {
-                      await renameEntry(explorerModal.entry.path, next)
-                      await refreshTree()
-                      setExplorerModal(null)
-                    } catch (e) {
-                      await showErrorDialog(e instanceof Error ? e.message : String(e))
-                    }
-                  })()
-                }}
-              >
-                确定
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Editor Context Menu */}
+            {/* Editor Context Menu */}
       {editorContextMenu ? (
         <EditorContextMenu
           x={editorContextMenu.x}
@@ -4999,26 +4685,26 @@ function App() {
       {showCommandPalette && (
         <CommandPalette
           commands={[
-            { id: 'save', label: '保存文件', category: '文件', shortcut: 'Ctrl+S', action: () => void onSaveActive() },
-            { id: 'newChapter', label: '新建章节', category: '文件', action: () => void onNewChapter() },
+            { id: 'save', label: t('app.command.saveFile'), category: t('app.command.category.file'), shortcut: 'Ctrl+S', action: () => void onSaveActive() },
+            { id: 'newChapter', label: t('app.command.newChapter'), category: t('app.command.category.file'), action: () => void onNewChapter() },
             {
               id: 'switchProject',
-              label: '切换项目',
-              category: '文件',
+              label: t('app.command.switchProject'),
+              category: t('app.command.category.file'),
               action: () => {
                 setShowCommandPalette(false)
                 setAppView('project-picker')
                 void refreshProjectPickerState()
               },
             },
-            { id: 'toggleTheme', label: '切换主题', category: '视图', action: toggleTheme },
-            { id: 'toggleDensity', label: '切换界面密度', category: '视图', action: toggleDensity },
-            { id: 'toggleSidebar', label: '切换侧边栏', category: '视图', shortcut: 'Ctrl+B', action: toggleSidebar },
-            { id: 'openSettings', label: '打开设置', category: '设置', shortcut: 'Ctrl+,', action: () => setShowSettings(true) },
+            { id: 'toggleTheme', label: t('app.command.toggleTheme'), category: t('app.command.category.view'), action: toggleTheme },
+            { id: 'toggleDensity', label: t('app.command.toggleDensity'), category: t('app.command.category.view'), action: toggleDensity },
+            { id: 'toggleSidebar', label: t('app.command.toggleSidebar'), category: t('app.command.category.view'), shortcut: 'Ctrl+B', action: toggleSidebar },
+            { id: 'openSettings', label: t('app.command.openSettings'), category: t('app.command.category.settings'), shortcut: 'Ctrl+,', action: () => setShowSettings(true) },
             {
               id: 'aiChat',
-              label: 'AI 对话',
-              category: 'AI',
+              label: t('app.command.aiChat'),
+              category: t('app.command.category.ai'),
               shortcut: 'Ctrl+Shift+L',
               action: () => {
                 openRightTab('chat')
@@ -5027,11 +4713,11 @@ function App() {
                 }, 0)
               },
             },
-            { id: 'smartComplete', label: '智能补全', category: 'AI', action: () => void onSmartComplete() },
+            { id: 'smartComplete', label: t('app.command.smartComplete'), category: t('app.command.category.ai'), action: () => void onSmartComplete() },
             {
               id: 'toggleAutoLongWrite',
-              label: autoLongWriteEnabled ? '关闭 Auto 连续生成' : '开启 Auto 连续生成',
-              category: 'AI',
+              label: autoLongWriteEnabled ? t('app.command.disableAutoLongWrite') : t('app.command.enableAutoLongWrite'),
+              category: t('app.command.category.ai'),
 	              action: () => {
 	                const next = !autoLongWriteEnabled
 	                setAutoLongWriteEnabled(next)
@@ -5042,35 +4728,59 @@ function App() {
 	                }
 	              },
 	            },
-            { id: 'regenerateReply', label: '\u91cd\u65b0\u751f\u6210\u56de\u590d', category: 'AI', action: () => void onRegenerateAssistant(latestCompletedAssistantId ?? undefined) },
-            { id: 'candidateReplies', label: '\u751f\u6210 2 \u4e2a\u5019\u9009\u56de\u590d', category: 'AI', action: () => void onGenerateAssistantCandidates(latestCompletedAssistantId ?? undefined, 2) },
-            { id: 'modeNormal', label: '\u5207\u6362\u666e\u901a\u6a21\u5f0f', category: '\u0041\u0049\u89C4\u5212', action: () => void onWriterModeChange('normal') },
-            { id: 'modePlan', label: '\u5207\u6362\u5927\u7eb2\u6a21\u5f0f', category: '\u0041\u0049\u89C4\u5212', action: () => void onWriterModeChange('plan') },
-            { id: 'modeSpec', label: '\u5207\u6362\u7ec6\u7eb2\u6a21\u5f0f', category: '\u0041\u0049\u89C4\u5212', action: () => void onWriterModeChange('spec') },
-            { id: 'generatePlan', label: '\u751F\u6210\u5927\u7EB2\u4E0E\u7EC6\u7EB2', category: '\u0041\u0049\u89C4\u5212', action: () => void onGeneratePlanAndTasks() },
-            { id: 'runQueue', label: '\u6267\u884C\u7EC6\u7EB2\u961F\u5217', category: '\u0041\u0049\u89C4\u5212', action: () => void runPlannerQueue(chatInput) },
+            { id: 'regenerateReply', label: t('app.command.regenerateReply'), category: t('app.command.category.ai'), action: () => void onRegenerateAssistant(latestCompletedAssistantId ?? undefined) },
+            { id: 'candidateReplies', label: t('app.command.generateCandidates'), category: t('app.command.category.ai'), action: () => void onGenerateAssistantCandidates(latestCompletedAssistantId ?? undefined, 2) },
+            { id: 'modeNormal', label: t('app.command.modeNormal'), category: t('app.command.category.aiPlanner'), action: () => void onWriterModeChange('normal') },
+            { id: 'modePlan', label: t('app.command.modePlan'), category: t('app.command.category.aiPlanner'), action: () => void onWriterModeChange('plan') },
+            { id: 'modeSpec', label: t('app.command.modeSpec'), category: t('app.command.category.aiPlanner'), action: () => void onWriterModeChange('spec') },
+            { id: 'generatePlan', label: t('app.command.generatePlanTasks'), category: t('app.command.category.aiPlanner'), action: () => void onGeneratePlanAndTasks() },
+            { id: 'runQueue', label: t('app.command.runTaskQueue'), category: t('app.command.category.aiPlanner'), action: () => void runPlannerQueue(chatInput) },
             {
-              id: 'gitCommit',
-              label: 'Git 提交',
-              category: 'Git',
+              id: 'newOutline',
+              label: t('app.command.createOutline'),
+              category: t('app.command.category.writing'),
               action: () => {
-                openSidebarTab('git')
-                if (gitCommitMsg.trim()) {
-                  void onGitCommit()
-                  return
-                }
-                window.setTimeout(() => {
-                  gitCommitInputRef.current?.focus()
-                }, 0)
+                void onNewOutline()
               },
             },
             {
-              id: 'gitPush',
-              label: 'Git 推送',
-              category: 'Git',
-              action: async () => {
-                openSidebarTab('git')
-                await showErrorDialog('当前版本暂不支持 Git Push，请在外部终端执行。')
+              id: 'newConceptNote',
+              label: t('app.command.createConcept'),
+              category: t('app.command.category.writing'),
+              action: () => {
+                void onNewConceptNote()
+              },
+            },
+            {
+              id: 'openMasterPlan',
+              label: t('app.command.openMasterPlan'),
+              category: t('app.command.category.writing'),
+              action: () => {
+                void onOpenMasterPlanDoc()
+              },
+            },
+            {
+              id: 'openHistory',
+              label: t('app.command.openHistory'),
+              category: t('app.command.category.writing'),
+              action: () => {
+                openSidebarTab('history')
+              },
+            },
+            {
+              id: 'snapshotActive',
+              label: t('app.command.snapshotActive'),
+              category: t('app.command.category.writing'),
+              action: () => {
+                if (!activeFile) return
+                void (async () => {
+                  try {
+                    await createHistorySnapshot(activeFile.path, 'manual')
+                    openSidebarTab('history')
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : String(e))
+                  }
+                })()
               },
             },
           ]}
@@ -5082,19 +4792,6 @@ function App() {
 }
 
 export default App
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

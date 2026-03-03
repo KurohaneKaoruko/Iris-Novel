@@ -102,6 +102,10 @@ export async function getProjectPickerState(): Promise<ProjectPickerState> {
   return invoke<ProjectPickerState>('get_project_picker_state')
 }
 
+export async function createNovelProject(name: string): Promise<ProjectItem> {
+  return invoke<ProjectItem>('create_novel_project', { name })
+}
+
 export async function rememberExternalProject(path: string): Promise<void> {
   return invoke<void>('remember_external_project', { path })
 }
@@ -253,36 +257,33 @@ export async function importAgents(json: string): Promise<void> {
   return invoke<void>('import_agents', { json })
 }
 
-export type GitStatusItem = {
-  path: string
-  status: string
-}
-
-export type GitCommitInfo = {
+export type HistoryEntry = {
   id: string
+  file_path: string
+  created_at: number
+  reason: string
+  word_count: number
+  char_count: number
   summary: string
-  author: string
-  time: number
 }
 
-export async function gitInit(): Promise<void> {
-  return invoke<void>('git_init')
+export async function listHistoryEntries(max = 120): Promise<HistoryEntry[]> {
+  return invoke<HistoryEntry[]>('list_history_entries', { max })
 }
 
-export async function gitStatus(): Promise<GitStatusItem[]> {
-  return invoke<GitStatusItem[]>('git_status')
+export async function createHistorySnapshot(relativePath: string, reason?: string | null): Promise<HistoryEntry> {
+  return invoke<HistoryEntry>('create_history_snapshot', {
+    relativePath,
+    reason: reason ?? null,
+  })
 }
 
-export async function gitDiff(path: string): Promise<string> {
-  return invoke<string>('git_diff', { path })
+export async function readHistorySnapshot(id: string): Promise<string> {
+  return invoke<string>('read_history_snapshot', { id })
 }
 
-export async function gitCommit(message: string): Promise<string> {
-  return invoke<string>('git_commit', { message })
-}
-
-export async function gitLog(max = 20): Promise<GitCommitInfo[]> {
-  return invoke<GitCommitInfo[]>('git_log', { max })
+export async function restoreHistorySnapshot(id: string): Promise<string> {
+  return invoke<string>('restore_history_snapshot', { id })
 }
 
 export type ChatHistoryMessage = {

@@ -149,7 +149,7 @@ export const WritingGoalPanel: React.FC<WritingGoalPanelProps> = ({
       <div className="writing-goal-panel">
         <div className="writing-goal-error">
           <p>错误: {error}</p>
-          <button onClick={loadData}>重试</button>
+          <button onClick={loadData}>Retry</button>
         </div>
       </div>
     );
@@ -175,7 +175,7 @@ export const WritingGoalPanel: React.FC<WritingGoalPanelProps> = ({
       {error && goal && (
         <div className="writing-goal-error-banner">
           <span>错误: {error}</span>
-          <button onClick={() => setError(null)}>关闭</button>
+            <button onClick={() => setError(null)}>Close</button>
         </div>
       )}
       
@@ -202,13 +202,13 @@ export const WritingGoalPanel: React.FC<WritingGoalPanelProps> = ({
                       className="goal-input"
                       min="0"
                     />
-                    <button onClick={handleGoalSave} className="btn-save">保存</button>
-                    <button onClick={handleGoalCancel} className="btn-cancel">取消</button>
+                <button onClick={handleGoalSave} className="btn-save">Save</button>
+                <button onClick={handleGoalCancel} className="btn-cancel">Cancel</button>
                   </div>
                 ) : (
                   <>
                     {todayStats.goal.toLocaleString()} 字
-                    <button onClick={handleGoalEdit} className="btn-edit">编辑</button>
+                <button onClick={handleGoalEdit} className="btn-edit">Edit</button>
                   </>
                 )}
               </span>
