@@ -35,7 +35,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -53,10 +59,10 @@ jobs:
             patchelf
 
       - name: Install JavaScript dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Tauri bundles
-        run: npm run tauri:build
+        run: pnpm run tauri:build
 
       - name: Upload bundle artifacts
         uses: actions/upload-artifact@v4
