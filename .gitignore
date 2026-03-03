@@ -24,6 +24,9 @@ dist-ssr
 *.sw?
 
 .*/
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
 target/
 output/
 gen/

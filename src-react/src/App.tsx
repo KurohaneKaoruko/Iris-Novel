@@ -13,6 +13,7 @@ import {
   createHistorySnapshot,
   createFile,
   createDir,
+  deleteEntry,
   createNovelProject,
   getAgents,
   getApiKeyStatus,
@@ -1340,6 +1341,41 @@ function App() {
       setBusy(false)
     }
   }, [onOpenByPath, refreshTree, workspaceRoot])
+
+  const onDeleteStructurePath = useCallback(
+    async (path: string) => {
+      if (!workspaceRoot || !path) return
+      const normalizedPath = path.replaceAll('\\', '/')
+      const fileName = normalizedPath.split('/').filter(Boolean).pop() ?? normalizedPath
+      const targetFile = openFiles.find((file) => file.path === path)
+      const confirmText = targetFile?.dirty
+        ? t('app.confirm.deleteUnsavedEntry', { name: fileName })
+        : t('app.confirm.deleteEntry', { name: fileName })
+      const ok = await showConfirm(confirmText)
+      if (!ok) return
+      setError(null)
+      setBusy(true)
+      try {
+        await deleteEntry(path)
+        editorManager.destroyEditor(path)
+        clearBackupContent(path)
+        clearAutoSavedContent(path)
+        setOpenFiles((prev) => {
+          const next = prev.filter((f) => f.path !== path)
+          if (activePath === path) {
+            setActivePath(next[next.length - 1]?.path ?? null)
+          }
+          return next
+        })
+        await refreshTree()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [activePath, openFiles, refreshTree, showConfirm, t, workspaceRoot],
+  )
 
   const newId = useCallback(() => {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -3128,10 +3164,13 @@ function App() {
       const rawMessage = typeof p.message === 'string' ? p.message : 'AI call failed'
       const stage = typeof p.stage === 'string' ? p.stage : ''
       const provider = typeof p.provider === 'string' ? p.provider : ''
+      const lowerMessage = rawMessage.toLowerCase()
       const message =
         stage === 'timeout'
           ? 'AI request timed out and was stopped. Please retry with a smaller single task.'
-          : rawMessage
+          : lowerMessage.includes('no api key configured') || lowerMessage.includes('api key not found')
+            ? 'No API key is configured for the current provider. Please set an API key in Settings > Models.'
+            : rawMessage
       const extra = [provider ? `provider=${provider}` : '', stage ? `stage=${stage}` : ''].filter(Boolean).join(' ')
       setChatMessages((prev) =>
         prev.map((m) =>
@@ -3425,6 +3464,9 @@ function App() {
             onOpenProjectPicker={() => {
               setAppView('project-picker')
               void refreshProjectPickerState()
+            }}
+            onDeletePath={(path) => {
+              void onDeleteStructurePath(path)
             }}
           />
         ) : null}
@@ -4792,8 +4834,6 @@ function App() {
 }
 
 export default App
-
-
 
 
 

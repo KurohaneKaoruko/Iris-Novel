@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--bg-primary, #1e1e1e);
+  background-color: var(--surface-1, var(--bg-primary, #1e1e1e));
   color: var(--text-primary, #e0e0e0);
 }
 
@@ -22,17 +22,18 @@
 
 .btn-create {
   padding: 8px 16px;
-  background-color: var(--primary-color, #d0d0d0);
-  color: white;
-  border: none;
+  background-color: var(--accent-primary, #e8e8e8);
+  color: var(--accent-contrast, #111111);
+  border: 1px solid var(--border-strong, #666);
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
   transition: background-color 0.2s;
 }
 
 .btn-create:hover {
-  background-color: var(--primary-hover, #b5b5b5);
+  background-color: var(--accent-hover, #cfcfcf);
 }
 
 .plot-line-manager-loading,
@@ -49,20 +50,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 12px 20px;
-  background-color: var(--error-bg, #2f2f2f);
-  color: var(--error-text, #9c9c9c);
-  border-bottom: 1px solid var(--error-border, #4a4a4a);
+  background-color: var(--error-bg, #3a2525);
+  color: var(--error-text, #ffd7d7);
+  border-bottom: 1px solid var(--error-border, #805252);
 }
 
 .plot-line-manager-error button {
   padding: 4px 12px;
   background-color: transparent;
-  color: var(--error-text, #9c9c9c);
-  border: 1px solid var(--error-text, #9c9c9c);
+  color: var(--error-text, #ffd7d7);
+  border: 1px solid var(--error-border, #805252);
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
+}
+
+.plot-line-manager-error button:hover {
+  background-color: var(--error-border, #805252);
 }
 
 .plot-line-form-overlay {
@@ -153,17 +159,19 @@
 }
 
 .btn-submit {
-  background-color: var(--primary-color, #d0d0d0);
-  color: white;
+  background-color: var(--accent-primary, #e8e8e8);
+  color: var(--accent-contrast, #111111);
+  border: 1px solid var(--border-strong, #666);
 }
 
 .btn-submit:hover {
-  background-color: var(--primary-hover, #b5b5b5);
+  background-color: var(--accent-hover, #cfcfcf);
 }
 
 .btn-cancel {
-  background-color: var(--bg-tertiary, #3e3e3e);
+  background-color: var(--surface-3, var(--bg-tertiary, #3e3e3e));
   color: var(--text-primary, #e0e0e0);
+  border: 1px solid var(--border-hover, #555);
 }
 
 .btn-cancel:hover {
@@ -234,18 +242,21 @@
 }
 
 .status-ongoing {
-  background-color: var(--bg-hover, #2a2a2a);
-  color: var(--text-secondary, #b0b0b0);
+  background-color: color-mix(in srgb, var(--accent-primary, #d0d0d0) 24%, transparent);
+  color: var(--text-primary, #f0f0f0);
+  border: 1px solid color-mix(in srgb, var(--accent-primary, #d0d0d0) 52%, var(--border-subtle, #555));
 }
 
 .status-completed {
-  background-color: var(--bg-hover, #2a2a2a);
-  color: var(--text-secondary, #b0b0b0);
+  background-color: rgba(30, 170, 85, 0.2);
+  color: #9de0b4;
+  border: 1px solid rgba(30, 170, 85, 0.45);
 }
 
 .status-paused {
-  background-color: var(--bg-hover, #2a2a2a);
-  color: var(--text-secondary, #b0b0b0);
+  background-color: rgba(220, 165, 30, 0.22);
+  color: #ffd986;
+  border: 1px solid rgba(220, 165, 30, 0.48);
 }
 
 .plot-line-item-info {
@@ -255,7 +266,7 @@
 .plot-line-item-info p {
   margin: 6px 0;
   font-size: 14px;
-  color: var(--text-secondary, #b0b0b0);
+  color: var(--text-secondary, #bdbdbd);
 }
 
 .plot-line-item-info strong {
@@ -286,8 +297,9 @@
 
 .chapter-tag {
   padding: 4px 10px;
-  background-color: var(--bg-tertiary, #3e3e3e);
-  color: var(--text-secondary, #b0b0b0);
+  background-color: var(--surface-3, var(--bg-tertiary, #3e3e3e));
+  color: var(--text-primary, #e8e8e8);
+  border: 1px solid var(--border-subtle, #505050);
   border-radius: 4px;
   font-size: 12px;
 }
@@ -311,8 +323,9 @@
 }
 
 .btn-edit {
-  background-color: var(--bg-tertiary, #3e3e3e);
+  background-color: var(--surface-3, var(--bg-tertiary, #3e3e3e));
   color: var(--text-primary, #e0e0e0);
+  border: 1px solid var(--border-hover, #555);
 }
 
 .btn-edit:hover {
@@ -320,10 +333,11 @@
 }
 
 .btn-delete {
-  background-color: var(--error-bg, #2f2f2f);
-  color: var(--error-text, #9c9c9c);
+  background-color: var(--error-bg, #3a2525);
+  color: var(--error-text, #ffd7d7);
+  border: 1px solid var(--error-border, #805252);
 }
 
 .btn-delete:hover {
-  background-color: var(--error-hover, #3f3f3f);
+  background-color: var(--error-border, #805252);
 }

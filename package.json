@@ -23,7 +23,9 @@
     "tauri:ios:dev": "tauri ios dev",
     "tauri:ios:build": "tauri ios build",
     "clean": "powershell -ExecutionPolicy Bypass -File ./scripts/clean-build.ps1",
-    "clean:full": "powershell -ExecutionPolicy Bypass -File ./scripts/clean-build.ps1 && npm install"
+    "clean:full": "powershell -ExecutionPolicy Bypass -File ./scripts/clean-build.ps1 && npm install",
+    "release": "powershell -ExecutionPolicy Bypass -File ./scripts/release.ps1",
+    "release:sh": "bash ./scripts/release.sh"
   },
   "dependencies": {
     "@lexical/code": "^0.40.0",

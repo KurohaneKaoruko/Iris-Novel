@@ -59,3 +59,43 @@ If the script doesn't fix your build issue:
 - It only removes generated files, not source code
 - Your `node_modules` are preserved by default (faster rebuilds)
 - If you need a complete clean install, uncomment the node_modules section
+
+## release
+
+One-click release helper scripts:
+
+- `scripts/release.ps1` (Windows PowerShell)
+- `scripts/release.sh` (Linux/macOS Bash)
+
+They will:
+
+1. Validate version format (`x.y.z`).
+2. Update versions in:
+   - `package.json`
+   - `src-tauri/Cargo.toml`
+   - `src-tauri/tauri.conf.json`
+3. Run build checks (unless skipped).
+4. Create commit + tag (`v<version>`).
+5. Push commit and tag (unless disabled).
+
+### Usage
+
+Windows:
+
+```powershell
+.\scripts\release.ps1 -Version 0.2.0
+```
+
+Linux/macOS:
+
+```bash
+./scripts/release.sh 0.2.0
+```
+
+Optional flags:
+
+- Skip checks: `-SkipChecks` / `--skip-checks`
+- Allow dirty tree: `-AllowDirty` / `--allow-dirty`
+- Do not push: `-NoPush` / `--no-push`
+
+Tag push (`v*`) will trigger GitHub workflow `.github/workflows/tauri-release.yml` to build bundles and create a GitHub Release automatically.

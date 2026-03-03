@@ -1,4 +1,4 @@
-﻿use crate::app_settings;
+use crate::app_settings;
 use crate::agents;
 use crate::agent_system;
 use crate::ai_types::ChatMessage;
@@ -1356,12 +1356,12 @@ pub fn set_api_key(
   let pid = providerId.or(provider_id).unwrap_or_default();
   let pid = pid.trim();
   if pid.is_empty() {
-    return Err("provider_id 涓嶈兘涓虹┖".to_string());
+    return Err("provider_id is required".to_string());
   }
   let key = apiKey.or(api_key).unwrap_or_default();
   let key = key.trim();
   if key.is_empty() {
-    return Err("API Key 涓嶈兘涓虹┖".to_string());
+    return Err("api_key is required".to_string());
   }
   secrets::set_api_key(&app, pid, key)
 }
@@ -1372,6 +1372,52 @@ pub struct ProviderConnectivityResult {
   pub status_code: u16,
   pub latency_ms: u128,
   pub message: String,
+}
+
+fn provider_has_configured_api_key(
+  app: &AppHandle,
+  provider: &app_settings::ModelProvider,
+) -> bool {
+  if !provider.api_key.trim().is_empty() {
+    return true;
+  }
+  matches!(
+    secrets::get_api_key(app, provider.id.trim()),
+    Ok(Some(v)) if !v.trim().is_empty()
+  )
+}
+
+fn resolve_current_provider(
+  app: &AppHandle,
+  settings: &app_settings::AppSettings,
+) -> Result<app_settings::ModelProvider, String> {
+  if settings.providers.is_empty() {
+    return Err("no providers configured".to_string());
+  }
+
+  let active = settings
+    .providers
+    .iter()
+    .find(|p| p.id == settings.active_provider_id);
+
+  if let Some(provider) = active {
+    if provider_has_configured_api_key(app, provider) {
+      return Ok(provider.clone());
+    }
+  }
+
+  if let Some(provider) = settings
+    .providers
+    .iter()
+    .find(|p| provider_has_configured_api_key(app, p))
+  {
+    return Ok(provider.clone());
+  }
+
+  active
+    .cloned()
+    .or_else(|| settings.providers.first().cloned())
+    .ok_or_else(|| "provider not found".to_string())
 }
 
 fn resolve_provider_api_key(
@@ -1390,7 +1436,10 @@ fn resolve_provider_api_key(
     Ok(_) => {
       let fallback = provider.api_key.trim().to_string();
       if fallback.is_empty() {
-        Err(format!("api key not found for provider={}", provider.id))
+        Err(format!(
+          "no API key configured for provider={}. Set it in Settings > Models.",
+          provider.id
+        ))
       } else {
         Ok(fallback)
       }
@@ -1613,12 +1662,19 @@ fn clear_stream_task(app: &AppHandle, stream_id: &str) {
   tasks.remove(stream_id);
 }
 
+#[allow(non_snake_case)]
 #[tauri::command]
 pub fn chat_cancel_stream(
   window: tauri::Window,
   state: State<'_, AppState>,
-  stream_id: String,
+  streamId: Option<String>,
+  stream_id: Option<String>,
 ) -> Result<(), String> {
+  let stream_id = streamId.or(stream_id).unwrap_or_default();
+  let stream_id = stream_id.trim().to_string();
+  if stream_id.is_empty() {
+    return Err("stream_id is required".to_string());
+  }
   let handle = {
     let mut tasks = state
       .ai_stream_tasks
@@ -1767,16 +1823,28 @@ fn build_http_client() -> Result<reqwest::Client, String> {
     .map_err(|e| format!("http client build failed: {e}"))
 }
 
+#[allow(non_snake_case)]
 #[tauri::command]
 pub fn chat_generate_stream(
   app: AppHandle,
   window: tauri::Window,
   state: State<'_, AppState>,
-  stream_id: String,
+  streamId: Option<String>,
+  stream_id: Option<String>,
   messages: Vec<ChatMessage>,
-  use_markdown: bool,
+  useMarkdown: Option<bool>,
+  use_markdown: Option<bool>,
+  agentId: Option<String>,
   agent_id: Option<String>,
 ) -> Result<(), String> {
+  let stream_id = streamId.or(stream_id).unwrap_or_default();
+  let stream_id = stream_id.trim().to_string();
+  if stream_id.is_empty() {
+    return Err("stream_id is required".to_string());
+  }
+  let use_markdown = useMarkdown.or(use_markdown).unwrap_or(false);
+  let agent_id = agentId.or(agent_id);
+
   let app = app.clone();
   let workspace_root = get_workspace_root(&state)?;
   let stream_id_for_task = stream_id.clone();
@@ -1832,16 +1900,8 @@ pub fn chat_generate_stream(
       }
     };
 
-    let active_provider_id = settings.active_provider_id.clone();
-    let providers = settings.providers.clone();
-    let current_provider = providers
-      .iter()
-      .find(|p| p.id == active_provider_id)
-      .ok_or_else(|| "provider not found".to_string());
-    
-    // Fail early if provider config is missing
-    let current_provider = match current_provider {
-      Ok(p) => p.clone(),
+    let current_provider = match resolve_current_provider(&app, &settings) {
+      Ok(p) => p,
       Err(e) => {
         eprintln!("ai_error: {}", e);
         let _ = window_for_task.emit(
@@ -2477,13 +2537,8 @@ pub async fn ai_assistance_generate(
 ) -> Result<String, String> {
   let settings = app_settings::load(&app)?;
   let client = build_http_client()?;
-  
-  let active_provider_id = settings.active_provider_id.clone();
-  let providers = settings.providers.clone();
-  let current_provider = providers
-    .iter()
-    .find(|p| p.id == active_provider_id)
-    .ok_or_else(|| "provider not found".to_string())?;
+
+  let current_provider = resolve_current_provider(&app, &settings)?;
   
   // Create a simple message for AI assistance
   let messages = vec![ChatMessage {
@@ -2497,7 +2552,7 @@ pub async fn ai_assistance_generate(
       call_openai_unbounded(
         &app,
         &client,
-        current_provider,
+        &current_provider,
         &messages,
         "",
         None,
@@ -2508,7 +2563,7 @@ pub async fn ai_assistance_generate(
       call_anthropic_unbounded(
         &app,
         &client,
-        current_provider,
+        &current_provider,
         &messages,
         "",
         None,
@@ -2771,12 +2826,7 @@ pub async fn risk_scan_content(
   }
 
   let settings = app_settings::load(&app)?;
-  let current_provider = settings
-    .providers
-    .iter()
-    .find(|p| p.id == settings.active_provider_id)
-    .cloned()
-    .ok_or_else(|| "provider not found".to_string())?;
+  let current_provider = resolve_current_provider(&app, &settings)?;
   let client = build_http_client()?;
   let scanned_chars = content.chars().count();
   let payload_text = trim_for_risk_scan(trimmed, 30_000);
@@ -3515,3 +3565,4 @@ pub async fn book_extract_techniques(content: String) -> Result<Vec<WritingTechn
 
   Ok(techniques)
 }
+

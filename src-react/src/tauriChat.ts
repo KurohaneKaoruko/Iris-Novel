@@ -18,14 +18,18 @@ export async function chatGenerateStream(args: {
 }): Promise<void> {
   return invoke<void>('chat_generate_stream', {
     streamId: args.streamId,
+    stream_id: args.streamId,
     messages: args.messages,
     useMarkdown: args.useMarkdown,
+    use_markdown: args.useMarkdown,
     agentId: args.agentId ?? null,
+    agent_id: args.agentId ?? null,
   })
 }
 
 export async function chatCancelStream(streamId: string): Promise<void> {
   return invoke<void>('chat_cancel_stream', {
     streamId,
+    stream_id: streamId,
   })
 }
