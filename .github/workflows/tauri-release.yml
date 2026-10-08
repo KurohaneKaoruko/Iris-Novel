@@ -63,9 +63,7 @@ jobs:
 
       - name: Generate icon set
         shell: bash
-        run: |
-          magick src-tauri/icons/icon.png -resize 1024x1024 src-tauri/icons/icon-1024.png
-          pnpm exec tauri icon src-tauri/icons/icon-1024.png --output src-tauri/icons
+        run: pnpm exec tauri icon src-tauri/icons/icon.png --output src-tauri/icons
 
       - name: Build Tauri bundles
         run: pnpm run tauri:build
