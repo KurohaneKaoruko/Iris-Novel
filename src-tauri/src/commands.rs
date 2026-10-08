@@ -2,842 +2,94 @@ use crate::app_settings;
 use crate::agents;
 use crate::agent_system;
 use crate::ai_types::ChatMessage;
-use crate::app_data;
 use crate::chat_history;
 use crate::secrets;
 use crate::skills::{Skill, SkillManager};
 use crate::state::AppState;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
+use crate::services::bookshelf::{ProjectItem, ProjectPickerState};
+use crate::services::fs::{
+  ComposerDirectiveParseResult, FsEntry, NovelTaskQualityRequest, NovelTaskQualityResult,
+  ResolveInlineReferencesRequest, ResolveInlineReferencesResult,
+};
+use crate::services::settings::ProjectWritingSettings;
+pub(crate) use crate::services::settings::{
+  ProviderConnectivityResult, resolve_chat_provider, resolve_current_provider,
+};
+pub(crate) use crate::services::fs::write_text_internal;
+pub(crate) use crate::services::workspace::validate_relative_path;
+use crate::services::workspace::{HistoryEntry, WorkspaceInfo, get_workspace_root};
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri::State;
-use notify::{EventKind, RecursiveMode, Watcher};
 use futures_util::StreamExt;
-use regex::Regex;
 
 #[tauri::command]
 pub fn ping() -> &'static str {
   "pong"
 }
 
-#[derive(Serialize)]
-pub struct WorkspaceInfo {
-  pub root: String,
-}
-
-#[derive(Serialize, Clone)]
-pub struct ProjectItem {
-  pub name: String,
-  pub path: String,
-  pub source: String,
-  pub is_valid_workspace: bool,
-  pub last_opened_at: Option<i64>,
-  pub description: Option<String>,
-  pub chapters_count: u32,
-  pub total_words: u32,
-  pub updated_at: Option<i64>,
-}
-
-#[derive(Serialize, Clone)]
-pub struct ProjectPickerState {
-  pub default_root: String,
-  pub default_projects: Vec<ProjectItem>,
-  pub external_projects: Vec<ProjectItem>,
-  pub last_workspace: Option<String>,
-  pub launch_mode: app_settings::LaunchMode,
-}
-
-#[derive(Serialize, Clone)]
-pub struct HistoryEntry {
-  pub id: String,
-  pub file_path: String,
-  pub created_at: i64,
-  pub reason: String,
-  pub word_count: usize,
-  pub char_count: usize,
-  pub summary: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct HistoryEntryRecord {
-  id: String,
-  file_path: String,
-  snapshot_rel_path: String,
-  created_at: i64,
-  reason: String,
-  word_count: usize,
-  char_count: usize,
-  summary: String,
-}
-
-#[derive(Serialize, Deserialize, Default)]
-struct HistoryStore {
-  #[serde(default)]
-  entries: Vec<HistoryEntryRecord>,
-}
-
-const HISTORY_MAX_ENTRIES: usize = 800;
-static HISTORY_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-#[derive(Serialize, Deserialize, Default)]
-struct ExternalProjectsStore {
-  #[serde(default)]
-  projects: Vec<ExternalProjectRecord>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct ExternalProjectRecord {
-  path: String,
-  added_at: i64,
-}
-
 #[tauri::command]
 pub fn set_workspace(app: AppHandle, state: State<'_, AppState>, path: String) -> Result<WorkspaceInfo, String> {
-  let root = canonicalize_path(Path::new(&path))?;
-  *state.workspace_root.lock().map_err(|_| "workspace lock poisoned")? = Some(root.clone());
-  if let Ok(mut w) = state.fs_watcher.lock() {
-    *w = None;
-  }
-  if let Err(e) = start_fs_watcher(&app, &state, root.clone()) {
-    eprintln!("fs_watcher_start_error: {e}");
-    let _ = app.emit("fs_watch_error", serde_json::json!({ "message": e }));
-  }
-  if let Err(e) = save_last_workspace(&app, &root) {
-    eprintln!("save_last_workspace_failed: {e}");
-  }
-  Ok(WorkspaceInfo {
-    root: root.to_string_lossy().to_string(),
-  })
+  crate::services::workspace::set_workspace(&app, &state, &path)
 }
 
 #[tauri::command]
 pub fn get_last_workspace(app: AppHandle) -> Result<Option<String>, String> {
-  get_last_workspace_internal(&app)
-}
-
-fn get_last_workspace_internal(app: &AppHandle) -> Result<Option<String>, String> {
-  let path = last_workspace_path(&app)?;
-  if !path.exists() {
-    return Ok(None);
-  }
-  let raw = fs::read_to_string(&path).map_err(|e| format!("read last workspace failed: {e}"))?;
-  #[derive(Deserialize)]
-  struct LastWorkspace {
-    path: String,
-  }
-  let v: LastWorkspace = serde_json::from_str(&raw).map_err(|e| format!("parse last workspace failed: {e}"))?;
-  let p = v.path.trim().to_string();
-  if p.is_empty() {
-    return Ok(None);
-  }
-  if !Path::new(&p).exists() {
-    return Ok(None);
-  }
-  Ok(Some(p))
-}
-
-fn last_workspace_path(app: &AppHandle) -> Result<PathBuf, String> {
-  app_data::state_file_path(app, "last_workspace.json")
-}
-
-fn save_last_workspace(app: &AppHandle, root: &Path) -> Result<(), String> {
-  let path = last_workspace_path(app)?;
-  if let Some(parent) = path.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create last workspace dir failed: {e}"))?;
-  }
-  let payload = serde_json::json!({ "path": root.to_string_lossy().to_string() }).to_string();
-  fs::write(path, payload).map_err(|e| format!("write last workspace failed: {e}"))
-}
-
-fn external_projects_path(app: &AppHandle) -> Result<PathBuf, String> {
-  app_data::state_file_path(app, "external_projects.json")
-}
-
-fn load_external_projects(app: &AppHandle) -> Result<Vec<ExternalProjectRecord>, String> {
-  let path = external_projects_path(app)?;
-  if !path.exists() {
-    return Ok(Vec::new());
-  }
-  let raw = fs::read_to_string(&path).map_err(|e| format!("read external projects failed: {e}"))?;
-  let parsed = serde_json::from_str::<ExternalProjectsStore>(&raw)
-    .map_err(|e| format!("parse external projects failed: {e}"))?;
-  Ok(parsed.projects)
-}
-
-fn save_external_projects(app: &AppHandle, records: &[ExternalProjectRecord]) -> Result<(), String> {
-  let path = external_projects_path(app)?;
-  if let Some(parent) = path.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create external projects dir failed: {e}"))?;
-  }
-  let payload = ExternalProjectsStore {
-    projects: records.to_vec(),
-  };
-  let raw = serde_json::to_string_pretty(&payload).map_err(|e| format!("serialize external projects failed: {e}"))?;
-  fs::write(path, raw).map_err(|e| format!("write external projects failed: {e}"))
-}
-
-fn default_projects_root() -> Result<PathBuf, String> {
-  let exe = std::env::current_exe().map_err(|e| format!("resolve current executable failed: {e}"))?;
-  let install_dir = exe
-    .parent()
-    .ok_or_else(|| "resolve install directory failed".to_string())?;
-  Ok(install_dir.join("projects"))
-}
-
-fn is_valid_workspace_root(path: &Path) -> bool {
-  path.join("concept").is_dir() || path.join("outline").is_dir() || path.join("stories").is_dir()
-}
-
-fn work_meta_path(root: &Path) -> PathBuf {
-  root.join(".novel").join("work.json")
-}
-
-fn read_work_description(root: &Path) -> Option<String> {
-  #[derive(Deserialize)]
-  struct WorkMeta {
-    #[serde(default)]
-    description: Option<String>,
-  }
-  let raw = fs::read_to_string(work_meta_path(root)).ok()?;
-  let meta: WorkMeta = serde_json::from_str(&raw).ok()?;
-  meta
-    .description
-    .map(|d| d.trim().to_string())
-    .filter(|d| !d.is_empty())
-}
-
-fn write_work_description(root: &Path, description: Option<String>) -> Result<(), String> {
-  let meta_path = work_meta_path(root);
-  if let Some(parent) = meta_path.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create .novel dir failed: {e}"))?;
-  }
-  let payload = serde_json::json!({ "description": description });
-  let raw = serde_json::to_string_pretty(&payload)
-    .map_err(|e| format!("serialize work meta failed: {e}"))?;
-  fs::write(meta_path, raw).map_err(|e| format!("write work meta failed: {e}"))
-}
-
-/// Mirrors the web app's word-count convention: count non-whitespace
-/// characters, which behaves sensibly for CJK manuscripts.
-fn count_content_chars(text: &str) -> usize {
-  text.chars().filter(|c| !c.is_whitespace()).count()
-}
-
-struct WorkStats {
-  chapters_count: u32,
-  total_words: u32,
-  updated_at: Option<i64>,
-}
-
-fn scan_work_stats(root: &Path) -> WorkStats {
-  let mut stats = WorkStats {
-    chapters_count: 0,
-    total_words: 0,
-    updated_at: None,
-  };
-  let Ok(entries) = fs::read_dir(root.join("stories")) else {
-    return stats;
-  };
-  for entry in entries.flatten() {
-    let path = entry.path();
-    if !path.is_file() {
-      continue;
-    }
-    let ext = path
-      .extension()
-      .and_then(|e| e.to_str())
-      .map(|e| e.to_ascii_lowercase());
-    if !matches!(ext.as_deref(), Some("md") | Some("markdown") | Some("txt")) {
-      continue;
-    }
-    stats.chapters_count += 1;
-    if let Ok(modified) = entry.metadata().and_then(|m| m.modified()) {
-      if let Ok(ts) = modified.duration_since(std::time::UNIX_EPOCH) {
-        let ts = ts.as_secs() as i64;
-        let is_newer = match stats.updated_at {
-          Some(current) => ts > current,
-          None => true,
-        };
-        if is_newer {
-          stats.updated_at = Some(ts);
-        }
-      }
-    }
-    if let Ok(content) = fs::read_to_string(&path) {
-      stats.total_words += count_content_chars(&content) as u32;
-    }
-  }
-  stats
-}
-
-fn to_project_item(path: &Path, source: &str, last_opened_at: Option<i64>) -> ProjectItem {
-  let name = path
-    .file_name()
-    .map(|v| v.to_string_lossy().to_string())
-    .unwrap_or_else(|| path.to_string_lossy().to_string());
-  let description = read_work_description(path);
-  let stats = scan_work_stats(path);
-  ProjectItem {
-    name,
-    path: path.to_string_lossy().to_string(),
-    source: source.to_string(),
-    is_valid_workspace: is_valid_workspace_root(path),
-    last_opened_at,
-    description,
-    chapters_count: stats.chapters_count,
-    total_words: stats.total_words,
-    updated_at: stats.updated_at,
-  }
-}
-
-fn list_default_projects(root: &Path) -> Result<Vec<ProjectItem>, String> {
-  let mut projects: Vec<ProjectItem> = Vec::new();
-  if !root.exists() {
-    return Ok(projects);
-  }
-  for entry in fs::read_dir(root).map_err(|e| format!("read default projects failed: {e}"))? {
-    let entry = entry.map_err(|e| format!("read default project entry failed: {e}"))?;
-    let path = entry.path();
-    if !path.is_dir() {
-      continue;
-    }
-    let canonical = canonicalize_path(&path).unwrap_or(path);
-    projects.push(to_project_item(&canonical, "default", None));
-  }
-  projects.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-  Ok(projects)
-}
-
-fn sanitize_project_folder_name(input: &str) -> String {
-  let mut out = String::new();
-  for ch in input.trim().chars() {
-    let allowed = ch.is_ascii_alphanumeric()
-      || ch == '-'
-      || ch == '_'
-      || ('\u{4E00}'..='\u{9FFF}').contains(&ch);
-    if allowed {
-      out.push(ch);
-    } else if ch.is_whitespace() {
-      out.push('-');
-    }
-  }
-  let compact = out
-    .split('-')
-    .filter(|part| !part.is_empty())
-    .collect::<Vec<_>>()
-    .join("-");
-  if compact.is_empty() {
-    "novel".to_string()
-  } else {
-    compact
-  }
-}
-
-fn build_unique_project_path(root: &Path, base_name: &str) -> PathBuf {
-  let mut idx = 1usize;
-  loop {
-    let candidate = if idx == 1 {
-      root.join(base_name)
-    } else {
-      root.join(format!("{base_name}-{idx:02}"))
-    };
-    if !candidate.exists() {
-      return candidate;
-    }
-    idx += 1;
-  }
-}
-
-fn write_file_if_absent(path: &Path, content: &str) -> Result<(), String> {
-  if path.exists() {
-    return Ok(());
-  }
-  if let Some(parent) = path.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create dir failed: {e}"))?;
-  }
-  fs::write(path, content).map_err(|e| format!("write file failed: {e}"))
-}
-
-fn parse_launch_mode(mode: &str) -> Result<app_settings::LaunchMode, String> {
-  match mode.trim() {
-    "picker" => Ok(app_settings::LaunchMode::Picker),
-    "auto_last" => Ok(app_settings::LaunchMode::AutoLast),
-    _ => Err("invalid launch mode".to_string()),
-  }
+  crate::services::bookshelf::get_last_workspace(&app)
 }
 
 #[tauri::command]
 pub fn get_project_picker_state(app: AppHandle) -> Result<ProjectPickerState, String> {
-  let default_root = default_projects_root()?;
-  let default_projects = list_default_projects(&default_root)?;
-  let settings = app_settings::load(&app)?;
-  let last_workspace = get_last_workspace_internal(&app)?;
-
-  let mut seen_paths: HashSet<String> = HashSet::new();
-  for item in &default_projects {
-    seen_paths.insert(item.path.to_lowercase());
-  }
-
-  let mut external_projects: Vec<ProjectItem> = Vec::new();
-  for record in load_external_projects(&app)? {
-    let path = PathBuf::from(&record.path);
-    if !path.exists() || !path.is_dir() {
-      continue;
-    }
-    let canonical = canonicalize_path(&path).unwrap_or(path);
-    let path_key = canonical.to_string_lossy().to_lowercase();
-    if seen_paths.contains(&path_key) {
-      continue;
-    }
-    seen_paths.insert(path_key);
-    external_projects.push(to_project_item(&canonical, "external", Some(record.added_at)));
-  }
-  external_projects.sort_by(|a, b| match (a.last_opened_at, b.last_opened_at) {
-    (Some(a_ts), Some(b_ts)) => b_ts.cmp(&a_ts),
-    _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-  });
-
-  Ok(ProjectPickerState {
-    default_root: default_root.to_string_lossy().to_string(),
-    default_projects,
-    external_projects,
-    last_workspace,
-    launch_mode: settings.launch_mode,
-  })
+  crate::services::bookshelf::get_project_picker_state(&app)
 }
 
 #[tauri::command]
 pub fn create_novel_project(name: String, description: Option<String>) -> Result<ProjectItem, String> {
-  let trimmed = name.trim();
-  if trimmed.is_empty() {
-    return Err("project name is empty".to_string());
-  }
-
-  let default_root = default_projects_root()?;
-  fs::create_dir_all(&default_root).map_err(|e| format!("create default projects root failed: {e}"))?;
-
-  let folder_name = sanitize_project_folder_name(trimmed);
-  let target_root = build_unique_project_path(&default_root, &folder_name);
-  fs::create_dir_all(&target_root).map_err(|e| format!("create project dir failed: {e}"))?;
-
-  init_novel_workspace(&target_root)?;
-
-  let clean_description = description
-    .map(|d| d.trim().to_string())
-    .filter(|d| !d.is_empty());
-  if clean_description.is_some() {
-    write_work_description(&target_root, clean_description)?;
-  }
-
-  let canonical = canonicalize_path(&target_root).unwrap_or(target_root);
-  Ok(to_project_item(
-    &canonical,
-    "default",
-    Some(Utc::now().timestamp()),
-  ))
+  crate::services::bookshelf::create_novel_project(&name, description)
 }
 
 #[tauri::command]
 pub fn remember_external_project(app: AppHandle, path: String) -> Result<(), String> {
-  let canonical = canonicalize_path(Path::new(path.trim()))?;
-  let metadata = fs::metadata(&canonical).map_err(|e| format!("stat project path failed: {e}"))?;
-  if !metadata.is_dir() {
-    return Err("external project path must be a directory".to_string());
-  }
-  let canonical_str = canonical.to_string_lossy().to_string();
-  let now = Utc::now().timestamp();
-
-  let mut records = load_external_projects(&app)?;
-  if let Some(existing) = records
-    .iter_mut()
-    .find(|v| v.path.eq_ignore_ascii_case(&canonical_str))
-  {
-    existing.added_at = now;
-  } else {
-    records.push(ExternalProjectRecord {
-      path: canonical_str,
-      added_at: now,
-    });
-  }
-  records.sort_by(|a, b| b.added_at.cmp(&a.added_at));
-  save_external_projects(&app, &records)
+  crate::services::bookshelf::remember_external_project(&app, &path)
 }
 
 #[tauri::command]
 pub fn remember_imported_work(app: AppHandle, path: String) -> Result<(), String> {
-  remember_external_project(app, path)
+  crate::services::bookshelf::remember_external_project(&app, &path)
 }
 
 #[tauri::command]
 pub fn forget_external_project(app: AppHandle, path: String) -> Result<(), String> {
-  let trimmed = path.trim();
-  if trimmed.is_empty() {
-    return Ok(());
-  }
-  let canonical = canonicalize_path(Path::new(trimmed))
-    .ok()
-    .map(|v| v.to_string_lossy().to_string());
-  let mut records = load_external_projects(&app)?;
-  records.retain(|v| {
-    if let Some(canon) = &canonical {
-      !v.path.eq_ignore_ascii_case(canon)
-    } else {
-      !v.path.eq_ignore_ascii_case(trimmed)
-    }
-  });
-  save_external_projects(&app, &records)
+  crate::services::bookshelf::forget_external_project(&app, &path)
 }
 
 #[tauri::command]
 pub fn forget_imported_work(app: AppHandle, path: String) -> Result<(), String> {
-  forget_external_project(app, path)
+  crate::services::bookshelf::forget_external_project(&app, &path)
 }
 
 #[tauri::command]
 pub fn set_launch_mode(app: AppHandle, mode: String) -> Result<(), String> {
-  let mut settings = app_settings::load(&app)?;
-  settings.launch_mode = parse_launch_mode(&mode)?;
-  app_settings::save(&app, &settings)
-}
-
-fn init_novel_workspace(root: &Path) -> Result<(), String> {
-  let novel_dir = root.join(".novel");
-
-  let dirs = [
-    novel_dir.join(".settings"),
-    novel_dir.join(".cache"),
-    novel_dir.join(".history"),
-    novel_dir.join(".history").join("snapshots"),
-    novel_dir.join("plans"),
-    novel_dir.join("tasks"),
-    novel_dir.join("state"),
-    root.join("stories"),
-    root.join("concept"),
-    root.join("outline"),
-  ];
-
-  for d in dirs {
-    fs::create_dir_all(d).map_err(|e| format!("create dir failed: {e}"))?;
-  }
-
-  let concept_index = novel_dir.join(".cache").join("concept_index.json");
-  if !concept_index.exists() {
-    let raw = serde_json::json!({
-      "revision": 0,
-      "updated_at": "",
-      "files": {}
-    })
-    .to_string();
-    fs::write(concept_index, raw).map_err(|e| format!("write concept index failed: {e}"))?;
-  }
-
-  let outline_path = novel_dir.join(".cache").join("outline.json");
-  if !outline_path.exists() {
-    let raw = serde_json::json!({ "events": [] }).to_string();
-    fs::write(outline_path, raw).map_err(|e| format!("write outline failed: {e}"))?;
-  }
-
-  let project_settings = novel_dir.join(".settings").join("project.json");
-  if !project_settings.exists() {
-    let raw = serde_json::to_string_pretty(&ProjectWritingSettings::default())
-      .map_err(|e| format!("serialize default project settings failed: {e}"))?;
-    fs::write(project_settings, raw).map_err(|e| format!("write project settings failed: {e}"))?;
-  }
-
-  let characters_path = novel_dir.join(".cache").join("characters.json");
-  if !characters_path.exists() {
-    let raw = serde_json::json!({ "characters": [] }).to_string();
-    fs::write(characters_path, raw).map_err(|e| format!("write characters failed: {e}"))?;
-  }
-
-  let relations_path = novel_dir.join(".cache").join("relations.json");
-  if !relations_path.exists() {
-    let raw = serde_json::json!({ "relations": [] }).to_string();
-    fs::write(relations_path, raw).map_err(|e| format!("write relations failed: {e}"))?;
-  }
-
-  let session_state = novel_dir.join("state").join("session-state.json");
-  if !session_state.exists() {
-    let raw = serde_json::json!({ "sessions": {} }).to_string();
-    fs::write(session_state, raw).map_err(|e| format!("write session state failed: {e}"))?;
-  }
-
-  let continuity_index = novel_dir.join("state").join("continuity-index.md");
-  if !continuity_index.exists() {
-    let raw = "# Continuity Index\n\nTrack characters, timeline, and callbacks here.\n";
-    fs::write(continuity_index, raw).map_err(|e| format!("write continuity index failed: {e}"))?;
-  }
-
-  let character_state_index = novel_dir.join("state").join("character-state-index.md");
-  if !character_state_index.exists() {
-    let raw = "# Character State Index\n\nTrack recent character state shifts here.\n";
-    fs::write(character_state_index, raw).map_err(|e| format!("write character state index failed: {e}"))?;
-  }
-
-  let foreshadow_index = novel_dir.join("state").join("foreshadow-index.md");
-  if !foreshadow_index.exists() {
-    let raw = "# Foreshadow Index\n\nTrack active clues, hooks, and unresolved signals here.\n";
-    fs::write(foreshadow_index, raw).map_err(|e| format!("write foreshadow index failed: {e}"))?;
-  }
-
-  let history_store = novel_dir.join(".history").join("revisions.json");
-  write_file_if_absent(&history_store, "{\n  \"entries\": []\n}")?;
-
-  let work_meta = work_meta_path(root);
-  if !work_meta.exists() {
-    write_file_if_absent(&work_meta, "{\n  \"description\": null\n}")?;
-  }
-
-  let outline_md = root.join("outline").join("outline.md");
-  write_file_if_absent(
-    &outline_md,
-    "# Story Outline\n\n## Act 1\n- Setup\n\n## Act 2\n- Conflict escalates\n\n## Act 3\n- Resolution\n",
-  )?;
-
-  let characters_md = root.join("concept").join("characters.md");
-  write_file_if_absent(
-    &characters_md,
-    "# Character Sheet\n\n## Protagonist\n- Goal:\n- Flaw:\n- Arc:\n",
-  )?;
-
-  let relations_md = root.join("concept").join("relations.md");
-  write_file_if_absent(
-    &relations_md,
-    "# Character Relations\n\n- Protagonist -> Mentor : Trust and conflict\n",
-  )?;
-
-  let first_chapter = root.join("stories").join("chapter-0001-opening.md");
-  write_file_if_absent(
-    &first_chapter,
-    "# Chapter 1: Opening\n\nWrite your first scene here.\n",
-  )?;
-
-  Ok(())
+  crate::services::bookshelf::set_launch_mode(&app, &mode)
 }
 
 #[tauri::command]
 pub fn init_novel(state: State<'_, AppState>) -> Result<(), String> {
-  let root = get_workspace_root(&state)?;
-  init_novel_workspace(&root)
-}
-
-#[derive(Serialize, Clone)]
-pub struct FsEntry {
-  pub name: String,
-  pub path: String,
-  pub kind: String,
-  pub children: Vec<FsEntry>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ProjectWritingSettings {
-  pub chapter_word_target: u32,
-  pub auto_min_chars: u32,
-  pub auto_max_chars: u32,
-  pub auto_max_rounds: u32,
-  pub auto_max_chapter_advances: u32,
-}
-
-impl Default for ProjectWritingSettings {
-  fn default() -> Self {
-    Self {
-      chapter_word_target: 2000,
-      auto_min_chars: 500,
-      auto_max_chars: 2400,
-      auto_max_rounds: 120,
-      auto_max_chapter_advances: 24,
-    }
-  }
-}
-
-#[derive(Deserialize, Default)]
-struct PartialProjectWritingSettings {
-  chapter_word_target: Option<u32>,
-  auto_min_chars: Option<u32>,
-  auto_max_chars: Option<u32>,
-  auto_max_rounds: Option<u32>,
-  auto_max_chapter_advances: Option<u32>,
-}
-
-#[derive(Deserialize)]
-pub struct NovelTaskQualityTask {
-  pub id: String,
-  pub target_words: u32,
-  pub scope: String,
-  #[serde(default)]
-  pub depends_on: Vec<String>,
-  #[serde(default)]
-  pub acceptance_checks: Vec<String>,
-}
-
-#[derive(Deserialize)]
-pub struct NovelTaskQualityRequest {
-  pub task: NovelTaskQualityTask,
-  pub assistant_text: String,
-  #[serde(default)]
-  pub task_pool: Vec<NovelTaskQualityTask>,
-}
-
-#[derive(Serialize)]
-pub struct NovelTaskQualityResult {
-  pub ok: bool,
-  pub reason: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct ComposerDirectiveParseResult {
-  pub requested_mode: Option<String>,
-  pub auto_action: Option<String>,
-  pub content: String,
-  pub matched: bool,
-}
-
-#[derive(Deserialize)]
-pub struct ResolveInlineReferencesRequest {
-  pub input: String,
-  pub selection_text: Option<String>,
-  pub active_file_path: Option<String>,
-  pub active_file_content: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct ResolveInlineReferencesResult {
-  pub resolved_input: String,
-  pub blocks_added: usize,
-}
-
-fn normalize_project_writing_settings(mut v: ProjectWritingSettings) -> ProjectWritingSettings {
-  v.chapter_word_target = v.chapter_word_target.clamp(0, 200_000);
-  v.auto_min_chars = v.auto_min_chars.clamp(120, 20_000);
-  v.auto_max_chars = v.auto_max_chars.clamp(180, 60_000);
-  if v.auto_max_chars < v.auto_min_chars {
-    v.auto_max_chars = v.auto_min_chars;
-  }
-  v.auto_max_rounds = v.auto_max_rounds.clamp(1, 1_000);
-  v.auto_max_chapter_advances = v.auto_max_chapter_advances.clamp(0, 200);
-  v
-}
-
-fn project_settings_path(root: &Path) -> PathBuf {
-  root.join(".novel").join(".settings").join("project.json")
-}
-
-fn load_project_writing_settings_internal(root: &Path) -> Result<ProjectWritingSettings, String> {
-  let path = project_settings_path(root);
-  let mut settings = ProjectWritingSettings::default();
-  if path.exists() {
-    let raw = fs::read_to_string(&path).map_err(|e| format!("read project settings failed: {e}"))?;
-    let parsed = serde_json::from_str::<PartialProjectWritingSettings>(&raw)
-      .map_err(|e| format!("parse project settings failed: {e}"))?;
-    if let Some(v) = parsed.chapter_word_target {
-      settings.chapter_word_target = v;
-    }
-    if let Some(v) = parsed.auto_min_chars {
-      settings.auto_min_chars = v;
-    }
-    if let Some(v) = parsed.auto_max_chars {
-      settings.auto_max_chars = v;
-    }
-    if let Some(v) = parsed.auto_max_rounds {
-      settings.auto_max_rounds = v;
-    }
-    if let Some(v) = parsed.auto_max_chapter_advances {
-      settings.auto_max_chapter_advances = v;
-    }
-  }
-  Ok(normalize_project_writing_settings(settings))
-}
-
-fn save_project_writing_settings_internal(root: &Path, settings: &ProjectWritingSettings) -> Result<(), String> {
-  let path = project_settings_path(root);
-  if let Some(parent) = path.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create project settings dir failed: {e}"))?;
-  }
-  let normalized = normalize_project_writing_settings(settings.clone());
-  let raw = serde_json::to_string_pretty(&normalized).map_err(|e| format!("serialize project settings failed: {e}"))?;
-  fs::write(path, raw).map_err(|e| format!("write project settings failed: {e}"))
-}
-
-fn normalize_no_whitespace(input: &str) -> String {
-  input.chars().filter(|ch| !ch.is_whitespace()).collect()
-}
-
-fn normalize_rel_path_for_read(path: &str) -> Result<PathBuf, String> {
-  validate_relative_path(path)
-}
-
-fn parse_writer_mode_alias(token: &str) -> Option<&'static str> {
-  let lower = token.trim().to_lowercase();
-  match lower.as_str() {
-    "normal" | "普通" => Some("normal"),
-    "plan" | "大纲" => Some("plan"),
-    "spec" | "细纲" => Some("spec"),
-    _ => None,
-  }
+  crate::services::workspace::init_novel(&state)
 }
 
 #[tauri::command]
 pub fn parse_composer_directive(input: String) -> ComposerDirectiveParseResult {
-  let trimmed = input.trim();
-  if !trimmed.starts_with('/') {
-    return ComposerDirectiveParseResult {
-      requested_mode: None,
-      auto_action: None,
-      content: trimmed.to_string(),
-      matched: false,
-    };
-  }
-
-  let mut chars = trimmed.chars();
-  let _slash = chars.next();
-  let after_slash = chars.as_str();
-  let mut parts = after_slash.splitn(2, char::is_whitespace);
-  let command = parts.next().unwrap_or("").trim();
-  let rest = parts.next().unwrap_or("").trim();
-
-  if command.eq_ignore_ascii_case("auto") {
-    let arg = rest
-      .split_whitespace()
-      .next()
-      .unwrap_or("")
-      .trim()
-      .to_lowercase();
-    let auto_action = match arg.as_str() {
-      "on" => Some("on".to_string()),
-      "off" => Some("off".to_string()),
-      _ => Some("toggle".to_string()),
-    };
-    return ComposerDirectiveParseResult {
-      requested_mode: None,
-      auto_action,
-      content: String::new(),
-      matched: true,
-    };
-  }
-
-  if let Some(mode) = parse_writer_mode_alias(command) {
-    return ComposerDirectiveParseResult {
-      requested_mode: Some(mode.to_string()),
-      auto_action: None,
-      content: rest.to_string(),
-      matched: true,
-    };
-  }
-
-  ComposerDirectiveParseResult {
-    requested_mode: None,
-    auto_action: None,
-    content: trimmed.to_string(),
-    matched: false,
-  }
+  crate::services::fs::parse_composer_directive(input)
 }
 
 #[tauri::command]
@@ -845,135 +97,7 @@ pub fn resolve_inline_references(
   state: State<'_, AppState>,
   payload: ResolveInlineReferencesRequest,
 ) -> Result<ResolveInlineReferencesResult, String> {
-  let source = payload.input.trim().to_string();
-  if !source.contains('#') {
-    return Ok(ResolveInlineReferencesResult {
-      resolved_input: source,
-      blocks_added: 0,
-    });
-  }
-
-  let selection_regex = Regex::new(r"#(?:閫夊尯|selection)\b").map_err(|e| format!("selection regex invalid: {e}"))?;
-  let current_file_regex =
-    Regex::new(r"#(?:褰撳墠鏂囦欢|current_file|current)\b").map_err(|e| format!("current file regex invalid: {e}"))?;
-  let file_prefix_regex = Regex::new(r"#(?:鏂囦欢|file):([^\s#]+)").map_err(|e| format!("file prefix regex invalid: {e}"))?;
-  let file_path_regex =
-    Regex::new(r"#([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]{1,16})").map_err(|e| format!("file path regex invalid: {e}"))?;
-
-  let mut blocks: Vec<String> = Vec::new();
-  let mut file_refs: Vec<String> = Vec::new();
-  let mut seen_file_refs: HashSet<String> = HashSet::new();
-  let mut cleaned = source.clone();
-
-  let mut push_block = |title: String, body: String| {
-    let normalized = body.trim().to_string();
-    let final_body = if normalized.is_empty() { "(empty)".to_string() } else { normalized };
-    blocks.push(format!("[{title}]\n{final_body}"));
-  };
-
-  if selection_regex.is_match(source.as_str()) {
-    let selected = payload.selection_text.unwrap_or_default().trim().to_string();
-    let body = if selected.is_empty() {
-      "(no selection detected; select text in editor first)".to_string()
-    } else {
-      selected
-    };
-    push_block("selection".to_string(), body);
-    cleaned = selection_regex.replace_all(cleaned.as_str(), "").to_string();
-  }
-
-  if current_file_regex.is_match(source.as_str()) {
-    if let Some(path) = payload.active_file_path.as_ref() {
-      let content = payload.active_file_content.unwrap_or_default();
-      push_block(format!("current file {path}"), content);
-    } else {
-      push_block("current file".to_string(), "(no active file)".to_string());
-    }
-    cleaned = current_file_regex.replace_all(cleaned.as_str(), "").to_string();
-  }
-
-  for captures in file_prefix_regex.captures_iter(source.as_str()) {
-    let Some(value) = captures.get(1) else {
-      continue;
-    };
-    let reference = value.as_str().trim().replace('\\', "/");
-    if reference.is_empty() {
-      continue;
-    }
-    let key = reference.to_lowercase();
-    if seen_file_refs.insert(key) {
-      file_refs.push(reference);
-    }
-  }
-
-  for captures in file_path_regex.captures_iter(source.as_str()) {
-    let Some(value) = captures.get(1) else {
-      continue;
-    };
-    let reference = value.as_str().trim().replace('\\', "/");
-    if reference.is_empty() {
-      continue;
-    }
-    let key = reference.to_lowercase();
-    if seen_file_refs.insert(key) {
-      file_refs.push(reference);
-    }
-  }
-
-  cleaned = file_prefix_regex.replace_all(cleaned.as_str(), "").to_string();
-  cleaned = file_path_regex.replace_all(cleaned.as_str(), "").to_string();
-  cleaned = cleaned.trim().to_string();
-
-  let root = get_workspace_root(&state).ok();
-  for reference in file_refs {
-    let normalized_ref = reference.trim_start_matches("./").trim_start_matches('/');
-    if normalized_ref.is_empty() {
-      continue;
-    }
-    if root.is_none() {
-      push_block(
-        format!("file {normalized_ref}"),
-        "(project files are unavailable in current environment)".to_string(),
-      );
-      continue;
-    }
-    let relative = match validate_relative_path(normalized_ref) {
-      Ok(value) => value,
-      Err(err) => {
-        push_block(format!("file {normalized_ref}"), format!("read failed: {err}"));
-        continue;
-      }
-    };
-    let Some(root_path) = root.as_ref() else {
-      continue;
-    };
-    let absolute = root_path.join(relative);
-    match fs::read_to_string(&absolute) {
-      Ok(content) => push_block(format!("file {normalized_ref}"), content),
-      Err(err) => push_block(format!("file {normalized_ref}"), format!("read failed: {err}")),
-    }
-  }
-
-  if blocks.is_empty() {
-    return Ok(ResolveInlineReferencesResult {
-      resolved_input: source,
-      blocks_added: 0,
-    });
-  }
-
-  let resolved_input = if cleaned.is_empty() {
-    format!(
-      "Please continue writing based on the following references.\n\n{}",
-      blocks.join("\n\n")
-    )
-  } else {
-    format!("{cleaned}\n\n[References]\n{}", blocks.join("\n\n"))
-  };
-
-  Ok(ResolveInlineReferencesResult {
-    resolved_input,
-    blocks_added: blocks.len(),
-  })
+  crate::services::fs::resolve_inline_references(&state, payload)
 }
 
 #[tauri::command]
@@ -981,88 +105,12 @@ pub fn validate_novel_task_quality(
   state: State<'_, AppState>,
   payload: NovelTaskQualityRequest,
 ) -> Result<NovelTaskQualityResult, String> {
-  let root = get_workspace_root(&state)?;
-  let task = payload.task;
-  let text = payload.assistant_text.trim();
-  if text.is_empty() {
-    return Ok(NovelTaskQualityResult {
-      ok: false,
-      reason: Some("AI returned empty content".to_string()),
-    });
-  }
-  if !text.contains(&format!("TASK_DONE: {}", task.id)) {
-    return Ok(NovelTaskQualityResult {
-      ok: false,
-      reason: Some(format!("Missing completion tag TASK_DONE: {}", task.id)),
-    });
-  }
-
-  let scope_rel = normalize_rel_path_for_read(task.scope.as_str())?;
-  let scope_path = root.join(scope_rel);
-  let content = fs::read_to_string(&scope_path)
-    .map_err(|_| format!("target file is missing or unreadable: {}", task.scope))?;
-  let compact = normalize_no_whitespace(content.as_str());
-  let min_length = std::cmp::max(600usize, ((task.target_words as f32) * 0.42_f32) as usize);
-  if compact.len() < min_length {
-    return Ok(NovelTaskQualityResult {
-      ok: false,
-      reason: Some(format!("file content is too short ({}/{})", compact.len(), min_length)),
-    });
-  }
-
-  let lowered = content.to_lowercase();
-  let placeholder_tokens = ["todo", "lorem", "xxx", "[待写]", "待补全", "待完善", "待续"];
-  if placeholder_tokens.iter().any(|token| lowered.contains(token)) {
-    return Ok(NovelTaskQualityResult {
-      ok: false,
-      reason: Some("chapter contains placeholder text".to_string()),
-    });
-  }
-
-  if !content.trim().is_empty()
-    && task.acceptance_checks.iter().any(|check| check.contains("閽╁瓙"))
-  {
-    let tail: String = content.chars().rev().take(80).collect::<String>().chars().rev().collect();
-    let has_hook_end = tail.chars().any(|ch| ['?', '!', '.', '？', '！', '。', '…'].contains(&ch));
-    if !has_hook_end {
-      return Ok(NovelTaskQualityResult {
-        ok: false,
-        reason: Some("chapter ending lacks a valid hook/closure sentence".to_string()),
-      });
-    }
-  }
-
-  if let Some(dep_id) = task.depends_on.first() {
-    if let Some(dep_task) = payload.task_pool.iter().find(|item| item.id == *dep_id) {
-      if dep_task.scope != task.scope {
-        if let Ok(dep_rel) = normalize_rel_path_for_read(dep_task.scope.as_str()) {
-          if let Ok(dep_content) = fs::read_to_string(root.join(dep_rel)) {
-            let current_head: String = normalize_no_whitespace(content.as_str()).chars().take(140).collect();
-            let dep_head: String = normalize_no_whitespace(dep_content.as_str()).chars().take(140).collect();
-            if current_head.len() > 80 && dep_head.len() > 80 && current_head == dep_head {
-              return Ok(NovelTaskQualityResult {
-                ok: false,
-                reason: Some("chapter opening is highly duplicated from dependency task".to_string()),
-              });
-            }
-          }
-        }
-      }
-    }
-  }
-
-  Ok(NovelTaskQualityResult {
-    ok: true,
-    reason: None,
-  })
+  crate::services::fs::validate_novel_task_quality(&state, payload)
 }
 
 #[tauri::command]
 pub fn get_project_writing_settings(state: State<'_, AppState>) -> Result<ProjectWritingSettings, String> {
-  let root = get_workspace_root(&state)?;
-  let settings = load_project_writing_settings_internal(&root)?;
-  save_project_writing_settings_internal(&root, &settings)?;
-  Ok(settings)
+  crate::services::settings::get_project_writing_settings(&state)
 }
 
 #[tauri::command]
@@ -1070,151 +118,17 @@ pub fn set_project_writing_settings(
   state: State<'_, AppState>,
   settings: ProjectWritingSettings,
 ) -> Result<ProjectWritingSettings, String> {
-  let root = get_workspace_root(&state)?;
-  let normalized = normalize_project_writing_settings(settings);
-  save_project_writing_settings_internal(&root, &normalized)?;
-  Ok(normalized)
-}
-
-fn history_dir(root: &Path) -> PathBuf {
-  root.join(".novel").join(".history")
-}
-
-fn history_index_path(root: &Path) -> PathBuf {
-  history_dir(root).join("revisions.json")
-}
-
-fn history_snapshots_dir(root: &Path) -> PathBuf {
-  history_dir(root).join("snapshots")
-}
-
-fn ensure_history_workspace(root: &Path) -> Result<(), String> {
-  fs::create_dir_all(history_snapshots_dir(root)).map_err(|e| format!("create history dir failed: {e}"))?;
-  let index = history_index_path(root);
-  if !index.exists() {
-    fs::write(&index, "{\n  \"entries\": []\n}").map_err(|e| format!("init history index failed: {e}"))?;
-  }
-  Ok(())
-}
-
-fn load_history_store(root: &Path) -> Result<HistoryStore, String> {
-  ensure_history_workspace(root)?;
-  let raw = fs::read_to_string(history_index_path(root)).map_err(|e| format!("read history index failed: {e}"))?;
-  serde_json::from_str::<HistoryStore>(&raw).map_err(|e| format!("parse history index failed: {e}"))
-}
-
-fn save_history_store(root: &Path, store: &HistoryStore) -> Result<(), String> {
-  ensure_history_workspace(root)?;
-  let raw = serde_json::to_string_pretty(store).map_err(|e| format!("serialize history index failed: {e}"))?;
-  fs::write(history_index_path(root), raw).map_err(|e| format!("write history index failed: {e}"))
-}
-
-fn next_history_id() -> String {
-  let seq = HISTORY_ID_COUNTER.fetch_add(1, Ordering::Relaxed) % 10_000;
-  format!("hist-{}-{seq:04}", Utc::now().timestamp_millis())
-}
-
-fn summarize_snapshot(text: &str) -> String {
-  let line = text.lines().find(|line| !line.trim().is_empty()).unwrap_or("").trim();
-  if line.is_empty() {
-    "(empty)".to_string()
-  } else if line.chars().count() > 80 {
-    let short = line.chars().take(80).collect::<String>();
-    format!("{short}...")
-  } else {
-    line.to_string()
-  }
-}
-
-fn history_entry_from_record(record: &HistoryEntryRecord) -> HistoryEntry {
-  HistoryEntry {
-    id: record.id.clone(),
-    file_path: record.file_path.clone(),
-    created_at: record.created_at,
-    reason: record.reason.clone(),
-    word_count: record.word_count,
-    char_count: record.char_count,
-    summary: record.summary.clone(),
-  }
-}
-
-fn should_track_history_path(relative_path: &str) -> bool {
-  let norm = relative_path.replace('\\', "/").to_lowercase();
-  if norm.starts_with(".novel/.history/")
-    || norm.starts_with(".novel/.cache/")
-    || norm.starts_with(".novel/state/")
-    || norm.starts_with(".git/")
-  {
-    return false;
-  }
-  norm.starts_with("stories/")
-    || norm.starts_with("outline/")
-    || norm.starts_with("concept/")
-    || norm.ends_with(".md")
-    || norm.ends_with(".txt")
-}
-
-fn create_history_snapshot_internal(
-  root: &Path,
-  file_path: &str,
-  snapshot_content: &str,
-  reason: &str,
-) -> Result<HistoryEntryRecord, String> {
-  ensure_history_workspace(root)?;
-
-  let normalized_file_path = file_path.replace('\\', "/");
-  let ext = Path::new(&normalized_file_path)
-    .extension()
-    .and_then(|v| v.to_str())
-    .unwrap_or("txt");
-  let id = next_history_id();
-  let snapshot_rel_path = format!(".novel/.history/snapshots/{id}.{ext}");
-  let snapshot_abs_path = root.join(validate_relative_path(&snapshot_rel_path)?);
-  fs::write(&snapshot_abs_path, snapshot_content).map_err(|e| format!("write history snapshot failed: {e}"))?;
-
-  let mut store = load_history_store(root)?;
-  let record = HistoryEntryRecord {
-    id: id.clone(),
-    file_path: normalized_file_path,
-    snapshot_rel_path,
-    created_at: Utc::now().timestamp_millis(),
-    reason: reason.to_string(),
-    word_count: count_content_chars(snapshot_content),
-    char_count: snapshot_content.chars().count(),
-    summary: summarize_snapshot(snapshot_content),
-  };
-  store.entries.insert(0, record.clone());
-
-  if store.entries.len() > HISTORY_MAX_ENTRIES {
-    let dropped = store.entries.split_off(HISTORY_MAX_ENTRIES);
-    for old in dropped {
-      if let Ok(rel) = validate_relative_path(&old.snapshot_rel_path) {
-        let old_path = root.join(rel);
-        let _ = fs::remove_file(old_path);
-      }
-    }
-  }
-
-  save_history_store(root, &store)?;
-  Ok(record)
-}
-
-fn find_history_entry_record(store: &HistoryStore, id: &str) -> Option<HistoryEntryRecord> {
-  store.entries.iter().find(|entry| entry.id == id).cloned()
+  crate::services::settings::set_project_writing_settings(&state, settings)
 }
 
 #[tauri::command]
 pub fn list_workspace_tree(state: State<'_, AppState>, max_depth: usize) -> Result<FsEntry, String> {
-  let root = get_workspace_root(&state)?;
-  build_tree(&root, &root, max_depth)
+  crate::services::fs::list_workspace_tree(&state, max_depth)
 }
 
 #[tauri::command]
 pub fn read_text(state: State<'_, AppState>, relative_path: String) -> Result<String, String> {
-  let root = get_workspace_root(&state)?;
-  let rel = validate_relative_path(&relative_path)?;
-  let target = root.join(rel);
-  fs::read_to_string(target).map_err(|e| format!("read failed: {e}"))
+  crate::services::fs::read_text(&state, &relative_path)
 }
 
 #[tauri::command]
@@ -1223,93 +137,28 @@ pub fn write_text(
   relative_path: String,
   content: String,
 ) -> Result<(), String> {
-  let root = get_workspace_root(&state)?;
-  write_text_internal(&root, &relative_path, &content, false, "auto-save")
+  crate::services::fs::write_text(&state, &relative_path, &content)
 }
 
 #[tauri::command]
 pub fn create_novel_work(name: String, description: Option<String>) -> Result<ProjectItem, String> {
-  create_novel_project(name, description)
+  crate::services::bookshelf::create_novel_project(&name, description)
 }
 
 #[tauri::command]
 pub fn update_work_description(path: String, description: Option<String>) -> Result<(), String> {
-  let trimmed_path = path.trim();
-  if trimmed_path.is_empty() {
-    return Err("work path is empty".to_string());
-  }
-  let root = canonicalize_path(Path::new(trimmed_path))?;
-  if !root.is_dir() {
-    return Err("work path must be a directory".to_string());
-  }
-  let clean = description
-    .map(|d| d.trim().to_string())
-    .filter(|d| !d.is_empty());
-  write_work_description(&root, clean)
+  crate::services::bookshelf::update_work_description(&path, description)
 }
 
 #[tauri::command]
 pub fn get_bookshelf_state(app: AppHandle) -> Result<ProjectPickerState, String> {
-  get_project_picker_state(app)
-}
-
-pub(crate) fn write_text_internal(
-  root: &Path,
-  relative_path: &str,
-  content: &str,
-  create_parent_dirs: bool,
-  history_reason: &str,
-) -> Result<(), String> {
-  let rel = validate_relative_path(relative_path)?;
-  let target = root.join(rel);
-  let rel_norm = relative_path.replace('\\', "/");
-
-  if rel_norm == ".novel/.cache/outline.json" {
-    let existing = if target.exists() {
-      fs::read_to_string(&target).unwrap_or_default()
-    } else {
-      String::new()
-    };
-    validate_outline(&existing, content)?;
-  }
-
-  if let Some(parent) = target.parent() {
-    if create_parent_dirs {
-      fs::create_dir_all(parent).map_err(|e| format!("create parent dir failed: {e}"))?;
-    } else if !parent.exists() {
-      return Err("parent directory does not exist; create it first".to_string());
-    }
-  }
-
-  if target.exists() && should_track_history_path(&rel_norm) {
-    if let Ok(previous_content) = fs::read_to_string(&target) {
-      if previous_content != content {
-        let _ = create_history_snapshot_internal(root, &rel_norm, &previous_content, history_reason);
-      }
-    }
-  }
-  fs::write(&target, content).map_err(|e| format!("write failed: {e}"))?;
-
-  if rel_norm.starts_with("concept/") && rel_norm.to_lowercase().ends_with(".md") {
-    update_concept_index(root, &rel_norm, content)?;
-  }
-
-  Ok(())
+  crate::services::bookshelf::get_project_picker_state(&app)
 }
 
 #[tauri::command]
 pub fn list_history_entries(state: State<'_, AppState>, max: Option<usize>) -> Result<Vec<HistoryEntry>, String> {
   let root = get_workspace_root(&state)?;
-  let store = load_history_store(&root)?;
-  let limit = max.unwrap_or(120).clamp(1, 500);
-  Ok(
-    store
-      .entries
-      .iter()
-      .take(limit)
-      .map(history_entry_from_record)
-      .collect(),
-  )
+  crate::services::workspace::list_history_entries(&root, max)
 }
 
 #[tauri::command]
@@ -1319,197 +168,55 @@ pub fn create_history_snapshot(
   reason: Option<String>,
 ) -> Result<HistoryEntry, String> {
   let root = get_workspace_root(&state)?;
-  let rel = validate_relative_path(&relative_path)?;
-  let rel_norm = rel.to_string_lossy().replace('\\', "/");
-  let target = root.join(rel);
-  if !target.exists() {
-    return Err("target file does not exist".to_string());
-  }
-  let content = fs::read_to_string(target).map_err(|e| format!("read snapshot source failed: {e}"))?;
-  let reason_text = reason
-    .as_deref()
-    .map(str::trim)
-    .filter(|v| !v.is_empty())
-    .unwrap_or("manual");
-  let entry = create_history_snapshot_internal(&root, &rel_norm, &content, reason_text)?;
-  Ok(history_entry_from_record(&entry))
+  crate::services::workspace::create_history_snapshot(&root, &relative_path, reason)
 }
 
 #[tauri::command]
 pub fn read_history_snapshot(state: State<'_, AppState>, id: String) -> Result<String, String> {
   let root = get_workspace_root(&state)?;
-  let store = load_history_store(&root)?;
-  let record = find_history_entry_record(&store, id.trim())
-    .ok_or_else(|| "history entry not found".to_string())?;
-  let rel = validate_relative_path(&record.snapshot_rel_path)?;
-  fs::read_to_string(root.join(rel)).map_err(|e| format!("read snapshot failed: {e}"))
+  crate::services::workspace::read_history_snapshot(&root, &id)
 }
 
 #[tauri::command]
 pub fn restore_history_snapshot(state: State<'_, AppState>, id: String) -> Result<String, String> {
   let root = get_workspace_root(&state)?;
-  let store = load_history_store(&root)?;
-  let record = find_history_entry_record(&store, id.trim())
-    .ok_or_else(|| "history entry not found".to_string())?;
-  let file_rel = validate_relative_path(&record.file_path)?;
-  let snapshot_rel = validate_relative_path(&record.snapshot_rel_path)?;
-  let target = root.join(file_rel);
-  let snapshot_path = root.join(snapshot_rel);
-  let snapshot_content = fs::read_to_string(snapshot_path).map_err(|e| format!("read snapshot failed: {e}"))?;
-
-  if let Some(parent) = target.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create parent dir failed: {e}"))?;
-  }
-
-  if target.exists() {
-    if let Ok(current) = fs::read_to_string(&target) {
-      if current != snapshot_content {
-        let _ = create_history_snapshot_internal(&root, &record.file_path, &current, "restore-backup");
-      }
-    }
-  }
-
-  fs::write(&target, &snapshot_content).map_err(|e| format!("restore snapshot failed: {e}"))?;
-  if record.file_path.starts_with("concept/") && record.file_path.to_lowercase().ends_with(".md") {
-    update_concept_index(&root, &record.file_path, &snapshot_content)?;
-  }
-  Ok(record.file_path)
+  crate::services::workspace::restore_history_snapshot(&root, &id)
 }
 
 #[tauri::command]
 pub fn create_file(state: State<'_, AppState>, relative_path: String) -> Result<(), String> {
-  let root = get_workspace_root(&state)?;
-  let rel = validate_relative_path(&relative_path)?;
-  let target = root.join(rel);
-  if let Some(parent) = target.parent() {
-    if !parent.exists() {
-      return Err("parent directory does not exist; create it first".to_string());
-    }
-  }
-  fs::write(target, "").map_err(|e| format!("create file failed: {e}"))
+  crate::services::fs::create_file(&state, &relative_path)
 }
 
 #[tauri::command]
 pub fn create_dir(state: State<'_, AppState>, relative_path: String) -> Result<(), String> {
-  if relative_path.trim().is_empty() {
-    return Err("empty path is not allowed".to_string());
-  }
-  let root = get_workspace_root(&state)?;
-  let rel = validate_relative_path(&relative_path)?;
-  let target = root.join(rel);
-  fs::create_dir_all(target).map_err(|e| format!("create dir failed: {e}"))
+  crate::services::fs::create_dir(&state, &relative_path)
 }
 
 #[tauri::command]
 pub fn delete_entry(state: State<'_, AppState>, relative_path: String) -> Result<(), String> {
-  if relative_path.trim().is_empty() {
-    return Err("empty path is not allowed".to_string());
-  }
-  let root = get_workspace_root(&state)?;
-  let rel = validate_relative_path(&relative_path)?;
-  let target = root.join(rel);
-  let md = fs::metadata(&target).map_err(|e| format!("stat failed: {e}"))?;
-  if md.is_dir() {
-    fs::remove_dir_all(target).map_err(|e| format!("delete dir failed: {e}"))
-  } else {
-    fs::remove_file(target).map_err(|e| format!("delete file failed: {e}"))
-  }
+  crate::services::fs::delete_entry(&state, &relative_path)
 }
 
 #[tauri::command]
 pub fn rename_entry(state: State<'_, AppState>, from_relative_path: String, to_relative_path: String) -> Result<(), String> {
-  if from_relative_path.trim().is_empty() || to_relative_path.trim().is_empty() {
-    return Err("empty path is not allowed".to_string());
-  }
-  let root = get_workspace_root(&state)?;
-  let from_rel = validate_relative_path(&from_relative_path)?;
-  let to_rel = validate_relative_path(&to_relative_path)?;
-  let from = root.join(from_rel);
-  let to = root.join(to_rel);
-  if let Some(parent) = to.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create dir failed: {e}"))?;
-  }
-  fs::rename(from, to).map_err(|e| format!("rename failed: {e}"))
-}
-
-fn normalize_active_agent_id(app: &AppHandle, settings: &mut app_settings::AppSettings) {
-  let agents_list = agents::load(app).unwrap_or_else(|_| agents::default_agents());
-  if agents_list.is_empty() {
-    settings.active_writing_assistant_id.clear();
-    settings.active_agent_id.clear();
-    return;
-  }
-  let current = if settings.active_writing_assistant_id.trim().is_empty() {
-    settings.active_agent_id.trim().to_string()
-  } else {
-    settings.active_writing_assistant_id.trim().to_string()
-  };
-  let exists = !current.is_empty() && agents_list.iter().any(|a| a.id == current);
-  if exists {
-    settings.active_writing_assistant_id = current.clone();
-    settings.active_agent_id = current;
-    return;
-  }
-  let fallback = agents_list
-    .iter()
-    .find(|a| a.id == "general")
-    .or_else(|| agents_list.first())
-    .map(|a| a.id.clone())
-    .unwrap_or_default();
-  settings.active_writing_assistant_id = fallback.clone();
-  settings.active_agent_id = fallback;
+  crate::services::fs::rename_entry(&state, &from_relative_path, &to_relative_path)
 }
 
 #[tauri::command]
 pub fn get_app_settings(app: AppHandle) -> Result<app_settings::AppSettings, String> {
-  let mut s = app_settings::load(&app)?;
-  let prev_agent_id = s.active_agent_id.clone();
-  let prev_active_writing_assistant_id = s.active_writing_assistant_id.clone();
-  normalize_active_agent_id(&app, &mut s);
-  if s.active_agent_id != prev_agent_id || s.active_writing_assistant_id != prev_active_writing_assistant_id {
-    let _ = app_settings::save(&app, &s);
-  }
-  // Clear keys for display security
-  for p in &mut s.providers {
-    p.api_key.clear();
-  }
-  Ok(s)
+  crate::services::settings::get_app_settings(&app)
 }
 
 #[tauri::command]
 pub fn set_app_settings(app: AppHandle, settings: app_settings::AppSettings) -> Result<(), String> {
-  let mut s = settings.clone();
-
-  if s.providers.is_empty() {
-    s.providers = app_settings::AppSettings::default().providers;
-  }
-  if s.active_provider_id.trim().is_empty() || !s.providers.iter().any(|p| p.id == s.active_provider_id) {
-    s.active_provider_id = s.providers[0].id.clone();
-  }
-  normalize_active_agent_id(&app, &mut s);
-
-  // Save API keys to secrets if present
-  for p in &mut s.providers {
-    if !p.api_key.trim().is_empty() {
-      secrets::set_api_key(&app, &p.id, p.api_key.trim())?;
-      p.api_key.clear();
-    }
-  }
-  
-  app_settings::save(&app, &s)
+  crate::services::settings::set_app_settings(&app, settings)
 }
 
 #[allow(non_snake_case)]
 #[tauri::command]
 pub fn get_api_key_status(app: AppHandle, providerId: Option<String>, provider_id: Option<String>) -> Result<bool, String> {
-  let pid = providerId
-    .or(provider_id)
-    .unwrap_or_default();
-  match secrets::get_api_key(&app, pid.trim()) {
-    Ok(Some(v)) => Ok(!v.trim().is_empty()),
-    Ok(None) => Ok(false),
-    Err(e) => Err(e),
-  }
+  crate::services::settings::get_api_key_status(&app, providerId, provider_id)
 }
 
 #[allow(non_snake_case)]
@@ -1521,238 +228,7 @@ pub fn set_api_key(
   apiKey: Option<String>,
   api_key: Option<String>,
 ) -> Result<(), String> {
-  let pid = providerId.or(provider_id).unwrap_or_default();
-  let pid = pid.trim();
-  if pid.is_empty() {
-    return Err("provider_id is required".to_string());
-  }
-  let key = apiKey.or(api_key).unwrap_or_default();
-  let key = key.trim();
-  if key.is_empty() {
-    return Err("api_key is required".to_string());
-  }
-  secrets::set_api_key(&app, pid, key)
-}
-
-#[derive(Serialize)]
-pub struct ProviderConnectivityResult {
-  pub ok: bool,
-  pub status_code: u16,
-  pub latency_ms: u128,
-  pub message: String,
-}
-
-fn provider_has_configured_api_key(
-  app: &AppHandle,
-  provider: &app_settings::ModelProvider,
-) -> bool {
-  if !provider.api_key.trim().is_empty() {
-    return true;
-  }
-  matches!(
-    secrets::get_api_key(app, provider.id.trim()),
-    Ok(Some(v)) if !v.trim().is_empty()
-  )
-}
-
-fn resolve_current_provider(
-  app: &AppHandle,
-  settings: &app_settings::AppSettings,
-) -> Result<app_settings::ModelProvider, String> {
-  if settings.providers.is_empty() {
-    return Err("no providers configured".to_string());
-  }
-
-  let active = settings
-    .providers
-    .iter()
-    .find(|p| p.id == settings.active_provider_id);
-
-  if let Some(provider) = active {
-    if provider_has_configured_api_key(app, provider) {
-      return Ok(provider.clone());
-    }
-  }
-
-  if let Some(provider) = settings
-    .providers
-    .iter()
-    .find(|p| provider_has_configured_api_key(app, p))
-  {
-    return Ok(provider.clone());
-  }
-
-  active
-    .cloned()
-    .or_else(|| settings.providers.first().cloned())
-    .ok_or_else(|| "provider not found".to_string())
-}
-
-fn ensure_provider_ready(
-  app: &AppHandle,
-  provider: &app_settings::ModelProvider,
-) -> Result<(), String> {
-  if provider.base_url.trim().is_empty() {
-    return Err(format!(
-      "provider={} base_url is empty. Set it in Settings > Models.",
-      provider.id
-    ));
-  }
-  if provider.model_name.trim().is_empty() {
-    return Err(format!(
-      "provider={} model_name is empty. Set it in Settings > Models.",
-      provider.id
-    ));
-  }
-  if !provider_has_configured_api_key(app, provider) {
-    return Err(format!(
-      "no API key configured for provider={}. Set it in Settings > Models.",
-      provider.id
-    ));
-  }
-  Ok(())
-}
-
-fn resolve_chat_provider(
-  app: &AppHandle,
-  settings: &app_settings::AppSettings,
-  requested_provider_id: Option<&str>,
-) -> Result<app_settings::ModelProvider, String> {
-  if settings.providers.is_empty() {
-    return Err("no providers configured".to_string());
-  }
-
-  if let Some(provider_id) = requested_provider_id {
-    let provider_id = provider_id.trim();
-    if !provider_id.is_empty() {
-      let provider = settings
-        .providers
-        .iter()
-        .find(|p| p.id == provider_id)
-        .cloned()
-        .ok_or_else(|| format!("provider not found: {}", provider_id))?;
-      ensure_provider_ready(app, &provider)?;
-      return Ok(provider);
-    }
-  }
-
-  let provider = resolve_current_provider(app, settings)?;
-  ensure_provider_ready(app, &provider)?;
-  Ok(provider)
-}
-
-fn resolve_provider_api_key(
-  app: &AppHandle,
-  provider: &app_settings::ModelProvider,
-  override_key: Option<String>,
-) -> Result<String, String> {
-  if let Some(raw) = override_key {
-    let trimmed = raw.trim().to_string();
-    if !trimmed.is_empty() {
-      return Ok(trimmed);
-    }
-  }
-  match secrets::get_api_key(app, provider.id.trim()) {
-    Ok(Some(v)) if !v.trim().is_empty() => Ok(v),
-    Ok(_) => {
-      let fallback = provider.api_key.trim().to_string();
-      if fallback.is_empty() {
-        Err(format!(
-          "no API key configured for provider={}. Set it in Settings > Models.",
-          provider.id
-        ))
-      } else {
-        Ok(fallback)
-      }
-    }
-    Err(e) => Err(format!("keyring read failed: {e}")),
-  }
-}
-
-async fn probe_provider_connectivity(
-  client: &reqwest::Client,
-  provider: &app_settings::ModelProvider,
-  api_key: &str,
-) -> Result<ProviderConnectivityResult, String> {
-  let started = Instant::now();
-  match provider.kind {
-    app_settings::ProviderKind::OpenAI | app_settings::ProviderKind::OpenAICompatible => {
-      let base = provider.base_url.trim().trim_end_matches('/');
-      if base.is_empty() {
-        return Err("base_url is empty".to_string());
-      }
-      let url = format!("{base}/chat/completions");
-      let body = serde_json::json!({
-        "model": provider.model_name,
-        "messages": [{"role":"user","content":"Reply with OK."}],
-        "max_tokens": 8,
-        "temperature": 0.0,
-        "stream": false
-      });
-      let resp = client
-        .post(url.as_str())
-        .bearer_auth(api_key.trim())
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("request failed: {e}"))?;
-      let status = resp.status();
-      if status.is_success() {
-        return Ok(ProviderConnectivityResult {
-          ok: true,
-          status_code: status.as_u16(),
-          latency_ms: started.elapsed().as_millis(),
-          message: "Provider reachable and model responded.".to_string(),
-        });
-      }
-      let raw = resp.text().await.unwrap_or_else(|_| String::new());
-      let snippet = if raw.chars().count() > 260 {
-        format!("{}...", raw.chars().take(260).collect::<String>())
-      } else {
-        raw
-      };
-      Err(format!("http {}: {}", status.as_u16(), snippet))
-    }
-    app_settings::ProviderKind::Anthropic => {
-      let base = provider.base_url.trim().trim_end_matches('/');
-      let endpoint = if base.is_empty() {
-        "https://api.anthropic.com/v1/messages".to_string()
-      } else if base.ends_with("/messages") {
-        base.to_string()
-      } else {
-        format!("{base}/messages")
-      };
-      let body = serde_json::json!({
-        "model": provider.model_name,
-        "max_tokens": 16,
-        "messages": [{"role":"user","content":"Reply with OK."}]
-      });
-      let resp = client
-        .post(endpoint.as_str())
-        .header("x-api-key", api_key.trim())
-        .header("anthropic-version", "2023-06-01")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("request failed: {e}"))?;
-      let status = resp.status();
-      if status.is_success() {
-        return Ok(ProviderConnectivityResult {
-          ok: true,
-          status_code: status.as_u16(),
-          latency_ms: started.elapsed().as_millis(),
-          message: "Provider reachable and model responded.".to_string(),
-        });
-      }
-      let raw = resp.text().await.unwrap_or_else(|_| String::new());
-      let snippet = if raw.chars().count() > 260 {
-        format!("{}...", raw.chars().take(260).collect::<String>())
-      } else {
-        raw
-      };
-      Err(format!("http {}: {}", status.as_u16(), snippet))
-    }
-  }
+  crate::services::settings::set_api_key(&app, providerId, provider_id, apiKey, api_key)
 }
 
 #[allow(non_snake_case)]
@@ -1763,115 +239,62 @@ pub async fn test_provider_connectivity(
   apiKey: Option<String>,
   api_key: Option<String>,
 ) -> Result<ProviderConnectivityResult, String> {
-  if provider.id.trim().is_empty() {
-    return Err("provider id is empty".to_string());
-  }
-  if provider.base_url.trim().is_empty() {
-    return Err("base_url is empty".to_string());
-  }
-  if provider.model_name.trim().is_empty() {
-    return Err("model_name is empty".to_string());
-  }
-  let merged_key = apiKey.or(api_key);
-  let key = resolve_provider_api_key(&app, &provider, merged_key)?;
-  let client = build_http_client()?;
-  probe_provider_connectivity(&client, &provider, key.as_str()).await
+  crate::services::settings::test_provider_connectivity(&app, provider, apiKey, api_key).await
 }
 
 #[tauri::command]
 pub fn get_agents(app: AppHandle) -> Result<Vec<agents::Agent>, String> {
-  agents::load(&app)
+  crate::services::settings::get_agents(&app)
 }
 
 #[tauri::command]
 pub fn get_writing_assistants(app: AppHandle) -> Result<Vec<agents::Agent>, String> {
-  get_agents(app)
+  crate::services::settings::get_agents(&app)
 }
 
 #[tauri::command]
 pub fn set_agents(app: AppHandle, agents_list: Vec<agents::Agent>) -> Result<(), String> {
-  agents::save(&app, &agents_list)
+  crate::services::settings::set_agents(&app, agents_list)
 }
 
 #[tauri::command]
 pub fn set_writing_assistants(app: AppHandle, assistants: Vec<agents::Agent>) -> Result<(), String> {
-  set_agents(app, assistants)
+  crate::services::settings::set_agents(&app, assistants)
 }
 
 #[tauri::command]
 pub fn export_agents(app: AppHandle) -> Result<String, String> {
-  let list = agents::load_custom(&app)?;
-  serde_json::to_string_pretty(&list).map_err(|e| format!("export agents failed: {e}"))
+  crate::services::settings::export_agents(&app)
 }
 
 #[tauri::command]
 pub fn export_writing_assistants(app: AppHandle) -> Result<String, String> {
-  export_agents(app)
+  crate::services::settings::export_agents(&app)
 }
 
 #[tauri::command]
 pub fn import_agents(app: AppHandle, json: String) -> Result<(), String> {
-  let list: Vec<agents::Agent> = serde_json::from_str(&json).map_err(|e| format!("import agents failed: {e}"))?;
-  agents::save_custom(&app, &list)
+  crate::services::settings::import_agents(&app, json)
 }
 
 #[tauri::command]
 pub fn import_writing_assistants(app: AppHandle, json: String) -> Result<(), String> {
-  import_agents(app, json)
+  crate::services::settings::import_agents(&app, json)
 }
 
 #[tauri::command]
 pub fn save_chat_session(app: AppHandle, session: chat_history::ChatSession) -> Result<(), String> {
-  let mut sessions = chat_history::load(&app)?;
-  let now = std::time::SystemTime::now()
-    .duration_since(std::time::UNIX_EPOCH)
-    .unwrap_or_default()
-    .as_secs() as i64;
-
-  let mut incoming = session.clone();
-  if incoming.created_at <= 0 {
-    incoming.created_at = now;
-  }
-  incoming.updated_at = now;
-
-  if let Some(pos) = sessions.iter().position(|s| s.id == incoming.id) {
-    sessions[pos] = incoming;
-  } else {
-    sessions.push(incoming);
-  }
-
-  sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-  if sessions.len() > 50 {
-    sessions.truncate(50);
-  }
-
-  chat_history::save(&app, &sessions)
+  crate::services::chat::save_chat_session(&app, session)
 }
 
 #[tauri::command]
 pub fn list_chat_sessions(app: AppHandle, workspace_root: Option<String>) -> Result<Vec<chat_history::ChatSessionSummary>, String> {
-  let sessions = chat_history::load(&app)?;
-  let mut out: Vec<chat_history::ChatSessionSummary> = Vec::new();
-  for s in sessions {
-    if let Some(root) = &workspace_root {
-      if &s.workspace_root != root {
-        continue;
-      }
-    }
-    out.push(chat_history::ChatSessionSummary {
-      id: s.id,
-      workspace_root: s.workspace_root,
-      updated_at: s.updated_at,
-      message_count: s.messages.len(),
-    });
-  }
-  Ok(out)
+  crate::services::chat::list_chat_sessions(&app, workspace_root)
 }
 
 #[tauri::command]
 pub fn get_chat_session(app: AppHandle, id: String) -> Result<chat_history::ChatSession, String> {
-  let sessions = chat_history::load(&app)?;
-  sessions.into_iter().find(|s| s.id == id).ok_or_else(|| "session not found".to_string())
+  crate::services::chat::get_chat_session(&app, &id)
 }
 
 fn emit_stream_status(window: &tauri::Window, stream_id: &str, phase: &str) {
@@ -2109,14 +532,6 @@ fn sse_take_line(buffer: &mut String) -> Option<String> {
   Some(line)
 }
 
-fn build_http_client() -> Result<reqwest::Client, String> {
-  reqwest::Client::builder()
-    .connect_timeout(Duration::from_secs(15))
-    .timeout(Duration::from_secs(300))
-    .pool_idle_timeout(Duration::from_secs(90))
-    .build()
-    .map_err(|e| format!("http client build failed: {e}"))
-}
 
 #[allow(non_snake_case)]
 #[tauri::command]
@@ -2194,7 +609,7 @@ pub fn chat_generate_stream(
     let agent_system = agent.map(|a| a.system_prompt.clone()).unwrap_or_default();
     let agent_temp = agent.map(|a| a.temperature);
     let ai_edit_apply_mode = settings.ai_edit_apply_mode.clone();
-    let client = match build_http_client() {
+    let client = match crate::services::build_http_client() {
       Ok(v) => v,
       Err(e) => {
         let payload = serde_json::json!({
@@ -2943,7 +1358,7 @@ pub async fn ai_assistance_generate(
   prompt: String,
 ) -> Result<String, String> {
   let settings = app_settings::load(&app)?;
-  let client = build_http_client()?;
+  let client = crate::services::build_http_client()?;
 
   let current_provider = resolve_current_provider(&app, &settings)?;
   
@@ -3234,7 +1649,7 @@ pub async fn risk_scan_content(
 
   let settings = app_settings::load(&app)?;
   let current_provider = resolve_current_provider(&app, &settings)?;
-  let client = build_http_client()?;
+  let client = crate::services::build_http_client()?;
   let scanned_chars = content.chars().count();
   let payload_text = trim_for_risk_scan(trimmed, 30_000);
   let snippets = collect_related_chapter_snippets(&root, file_path.as_deref());
@@ -3308,69 +1723,6 @@ pub async fn risk_scan_content(
   Ok(result)
 }
 
-fn get_workspace_root(state: &State<'_, AppState>) -> Result<PathBuf, String> {
-  state
-    .workspace_root
-    .lock()
-    .map_err(|_| "workspace lock poisoned")?
-    .clone()
-    .ok_or_else(|| "workspace not set".to_string())
-}
-
-fn canonicalize_path(path: &Path) -> Result<PathBuf, String> {
-  fs::canonicalize(path).map_err(|e| format!("invalid path: {e}"))
-}
-
-fn start_fs_watcher(app: &AppHandle, state: &State<'_, AppState>, root: PathBuf) -> Result<(), String> {
-  let app_handle = app.clone();
-  let root_for_strip = root.clone();
-  let mut watcher =
-    notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| match res {
-      Ok(event) => {
-        let kind = match event.kind {
-          EventKind::Create(_) => "create",
-          EventKind::Modify(_) => "modify",
-          EventKind::Remove(_) => "remove",
-          EventKind::Access(_) => "access",
-          EventKind::Other => "other",
-          EventKind::Any => "any",
-        };
-        for p in event.paths {
-          let rel = p
-            .strip_prefix(&root_for_strip)
-            .unwrap_or(&p)
-            .to_string_lossy()
-            .to_string()
-            .replace('\\', "/");
-          let _ = app_handle.emit("fs_changed", serde_json::json!({ "kind": kind, "path": rel }));
-        }
-      }
-      Err(e) => {
-        let _ = app_handle.emit("fs_watch_error", serde_json::json!({ "message": e.to_string() }));
-      }
-    })
-    .map_err(|e| format!("create watcher failed: {e}"))?;
-  watcher
-    .watch(&root, RecursiveMode::Recursive)
-    .map_err(|e| format!("watch failed: {e}"))?;
-  *state.fs_watcher.lock().map_err(|_| "watcher lock poisoned")? = Some(watcher);
-  Ok(())
-}
-
-pub(crate) fn validate_relative_path(relative_path: &str) -> Result<PathBuf, String> {
-  let p = PathBuf::from(relative_path);
-  if p.is_absolute() {
-    return Err("absolute path is not allowed".to_string());
-  }
-  for c in p.components() {
-    match c {
-      Component::Normal(_) | Component::CurDir => {}
-      _ => return Err("invalid relative path".to_string()),
-    }
-  }
-  Ok(p)
-}
-
 fn normalize_plaintext(s: &str) -> String {
   let mut out: Vec<&str> = Vec::new();
   for line in s.lines() {
@@ -3383,189 +1735,6 @@ fn normalize_plaintext(s: &str) -> String {
   out.join("\n").trim().to_string()
 }
 
-pub(crate) fn update_concept_index(root: &Path, rel_path: &str, content: &str) -> Result<(), String> {
-  #[derive(Serialize, Deserialize, Default)]
-  struct ConceptIndex {
-    revision: u64,
-    updated_at: String,
-    files: std::collections::BTreeMap<String, ConceptFileInfo>,
-  }
-
-  #[derive(Serialize, Deserialize, Default)]
-  struct ConceptFileInfo {
-    hash: String,
-    revision: u64,
-    updated_at: String,
-  }
-
-  let index_path = root.join(".novel").join(".cache").join("concept_index.json");
-  let mut index: ConceptIndex = if index_path.exists() {
-    let raw = fs::read_to_string(&index_path).unwrap_or_default();
-    serde_json::from_str(&raw).unwrap_or_default()
-  } else {
-    ConceptIndex::default()
-  };
-
-  let hash = blake3::hash(content.as_bytes()).to_hex().to_string();
-  let now = std::time::SystemTime::now()
-    .duration_since(std::time::UNIX_EPOCH)
-    .unwrap_or_default()
-    .as_secs()
-    .to_string();
-
-  let changed = index.files.get(rel_path).map(|f| f.hash.as_str() != hash).unwrap_or(true);
-  if changed {
-    index.revision = index.revision.saturating_add(1);
-    index.updated_at = now.clone();
-    index.files.insert(
-      rel_path.to_string(),
-      ConceptFileInfo {
-        hash,
-        revision: index.revision,
-        updated_at: now,
-      },
-    );
-  }
-
-  if let Some(parent) = index_path.parent() {
-    fs::create_dir_all(parent).map_err(|e| format!("create concept index dir failed: {e}"))?;
-  }
-  let raw = serde_json::to_string_pretty(&index).map_err(|e| format!("serialize concept index failed: {e}"))?;
-  fs::write(index_path, raw).map_err(|e| format!("write concept index failed: {e}"))
-}
-
-pub(crate) fn validate_outline(existing_json: &str, new_json: &str) -> Result<(), String> {
-  #[derive(Deserialize, Default)]
-  struct Outline {
-    #[serde(default)]
-    events: Vec<Event>,
-  }
-
-  #[derive(Deserialize, Default)]
-  struct Event {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    time: String,
-    #[serde(default)]
-    location: String,
-    #[serde(default)]
-    characters: Vec<String>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    description: String,
-  }
-
-  let existing: Outline = if existing_json.trim().is_empty() {
-    Outline::default()
-  } else {
-    serde_json::from_str(existing_json).unwrap_or_default()
-  };
-  let incoming: Outline = serde_json::from_str(new_json).map_err(|e| format!("outline json invalid: {e}"))?;
-
-  let mut combined = Vec::new();
-  combined.extend(existing.events.into_iter());
-  combined.extend(incoming.events.into_iter());
-
-  let mut id_set = std::collections::BTreeMap::<String, usize>::new();
-  let mut conflicts: Vec<String> = Vec::new();
-
-  for (idx, ev) in combined.iter().enumerate() {
-    if !ev.id.trim().is_empty() {
-      if let Some(prev) = id_set.insert(ev.id.clone(), idx) {
-        conflicts.push(format!("事件 id 重复：{}（第{}条 与 第{}条）", ev.id, prev + 1, idx + 1));
-      }
-    }
-  }
-
-  let mut per_character: std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>> =
-    std::collections::BTreeMap::new();
-
-  for ev in combined {
-    if ev.time.trim().is_empty() {
-      continue;
-    }
-    if ev.characters.is_empty() {
-      continue;
-    }
-    for ch in ev.characters {
-      let by_time = per_character.entry(ch.clone()).or_default();
-      if let Some(prev_loc) = by_time.get(&ev.time) {
-        if !ev.location.trim().is_empty() && prev_loc != &ev.location {
-          conflicts.push(format!("鏃堕棿绾垮啿绐侊細{} 鍦?{} 鍚屾椂鍑虹幇鍦?{} 涓?{}", ch, ev.time, prev_loc, ev.location));
-        }
-      } else if !ev.location.trim().is_empty() {
-        by_time.insert(ev.time.clone(), ev.location.clone());
-      }
-    }
-  }
-
-  if conflicts.is_empty() {
-    Ok(())
-  } else {
-    Err(conflicts.join("\n"))
-  }
-}
-
-fn build_tree(root: &Path, path: &Path, max_depth: usize) -> Result<FsEntry, String> {
-  let meta = fs::metadata(path).map_err(|e| format!("metadata failed: {e}"))?;
-  let name = if path == root {
-    root
-      .file_name()
-      .map(|s| s.to_string_lossy().to_string())
-      .unwrap_or_else(|| root.to_string_lossy().to_string())
-  } else {
-    path
-      .file_name()
-      .map(|s| s.to_string_lossy().to_string())
-      .unwrap_or_else(|| path.to_string_lossy().to_string())
-  };
-  let rel_path = path
-    .strip_prefix(root)
-    .unwrap_or(path)
-    .to_string_lossy()
-    .to_string()
-    .replace('\\', "/");
-
-  if meta.is_dir() {
-    if max_depth == 0 {
-      return Ok(FsEntry {
-        name,
-        path: rel_path,
-        kind: "dir".to_string(),
-        children: vec![],
-      });
-    }
-
-    let mut children: Vec<FsEntry> = vec![];
-    for entry in fs::read_dir(path).map_err(|e| format!("read dir failed: {e}"))? {
-      let entry = entry.map_err(|e| format!("read dir entry failed: {e}"))?;
-      let child_path = entry.path();
-      let child = build_tree(root, &child_path, max_depth - 1)?;
-      children.push(child);
-    }
-
-    children.sort_by(|a, b| match (a.kind.as_str(), b.kind.as_str()) {
-      ("dir", "file") => std::cmp::Ordering::Less,
-      ("file", "dir") => std::cmp::Ordering::Greater,
-      _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
-
-    Ok(FsEntry {
-      name,
-      path: rel_path,
-      kind: "dir".to_string(),
-      children,
-    })
-  } else {
-    Ok(FsEntry {
-      name,
-      path: rel_path,
-      kind: "file".to_string(),
-      children: vec![],
-    })
-  }
-}
 
 // ============ Skill Commands ============
 
