@@ -77,6 +77,7 @@ import { HistoryPanel } from './components/HistoryPanel'
 import { AppIcon } from './components/icons/AppIcon'
 import { AIChatPanel } from './components/chat/AIChatPanel'
 import { AgentCliPanel } from './components/AgentCliPanel'
+import { ExportPanel, type ExportOptions } from './components/Export'
 import {
   COMMON_PROVIDER_PRESETS,
   CUSTOM_PROVIDER_PRESET_KEY,
@@ -630,6 +631,8 @@ function App() {
   const [previewHtml, setPreviewHtml] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showExportPanel, setShowExportPanel] = useState(false)
+  const [exportBusy, setExportBusy] = useState(false)
 
   // New state for model modal
   const [showModelModal, setShowModelModal] = useState(false)
@@ -1898,6 +1901,34 @@ function App() {
     const { dialogMessage } = await import('./transport')
     await dialogMessage(text, '\u63d0\u793a')
   }, [])
+
+  const onExportWork = useCallback(async (options: ExportOptions) => {
+    if (!workRoot) return
+    setExportBusy(true)
+    try {
+      const { exportWork } = await import('./services/ExportService')
+      const result = await exportWork(options)
+      setShowExportPanel(false)
+      await showErrorDialog(
+        result.downloaded
+          ? t('app.export.done.downloaded', {
+              name: result.fileName,
+              count: result.chapterCount,
+              chars: result.totalChars,
+            })
+          : t('app.export.done.savedTo', {
+              path: result.savedTo ?? '',
+              count: result.chapterCount,
+              chars: result.totalChars,
+            }),
+      )
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await showErrorDialog(`${t('app.export.failed')}：${msg.includes('no chapters') ? t('app.export.empty') : msg}`)
+    } finally {
+      setExportBusy(false)
+    }
+  }, [workRoot, showErrorDialog, t])
 
   const persistAppSettings = useCallback(
     async (next: AppSettings, prev?: AppSettings | null) => {
@@ -4206,6 +4237,14 @@ function App() {
             <button className="icon-button" disabled={!workRoot} onClick={() => void onNewChapter()} title={t('app.action.newChapter')}>
               <AppIcon name="add" size={14} />
             </button>
+            <button
+              className="icon-button"
+              disabled={!workRoot}
+              onClick={() => setShowExportPanel(true)}
+              title={t('app.action.export')}
+            >
+              <AppIcon name="preview" size={15} />
+            </button>
             <button className="icon-button" disabled={!activeFile || !activeFile.dirty} onClick={() => void onSaveActive()} title={t('app.action.save')}>
               <AppIcon name="save" size={15} />
             </button>
@@ -5407,6 +5446,14 @@ function App() {
         onClose={() => setShowSearchPanel(false)}
         onSearch={onSearchInFiles}
         onResultClick={onSearchResultClick}
+      />
+
+      <ExportPanel
+        isOpen={showExportPanel}
+        onClose={() => setShowExportPanel(false)}
+        onExport={(options) => void onExportWork(options)}
+        busy={exportBusy}
+        workspaceName={activeWorkLabel ?? ''}
       />
     </div>
   )
