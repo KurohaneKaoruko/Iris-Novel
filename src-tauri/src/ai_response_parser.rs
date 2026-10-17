@@ -6,9 +6,9 @@ use regex::Regex;
 use std::path::{Path, PathBuf};
 
 /// Parse AI response text to extract file modification instructions
-/// 
+///
 /// Expected format:
-/// ```
+/// ```text
 /// <file_edit path="stories/chapter-001.txt">
 /// <replace lines="10-15">
 /// New content here
