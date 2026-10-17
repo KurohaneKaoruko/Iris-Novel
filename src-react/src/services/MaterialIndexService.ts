@@ -148,7 +148,7 @@ function parseCache(raw: string): MaterialIndex | null {
   }
 }
 
-async function listMaterialFiles(dir: 'concept' | 'outline'): Promise<string[]> {
+async function listMaterialFiles(dir: 'concept' | 'outline', opts?: { strict?: boolean }): Promise<string[]> {
   type TreeItem = { name: string; kind: string; path: string; children?: TreeItem[] }
   try {
     const tree = await callCommand<TreeItem>('list_workspace_tree', { maxDepth: 2 })
@@ -158,7 +158,10 @@ async function listMaterialFiles(dir: 'concept' | 'outline'): Promise<string[]> 
       .filter((c) => c.kind === 'file' && c.name.endsWith('.md'))
       .map((c) => c.path)
       .sort()
-  } catch {
+  } catch (e) {
+    // strict：工作区树都拿不到时向上传播（调用方据此标注降级），
+    // 非严格场景（如手动重建按钮）保持宽容返回空。
+    if (opts?.strict) throw e
     return []
   }
 }
@@ -169,8 +172,8 @@ async function listMaterialFiles(dir: 'concept' | 'outline'): Promise<string[]> 
  */
 export async function buildMaterialIndex(): Promise<MaterialIndex> {
   const [conceptFiles, outlineFiles] = await Promise.all([
-    listMaterialFiles('concept'),
-    listMaterialFiles('outline'),
+    listMaterialFiles('concept', { strict: true }),
+    listMaterialFiles('outline', { strict: true }),
   ])
 
   let cached: MaterialIndex | null = null
@@ -236,8 +239,8 @@ export async function getMaterialIndex(): Promise<MaterialIndex> {
   if (cached) {
     // 快速校验：源文件集合与内容一致则直接用缓存
     const [conceptFiles, outlineFiles] = await Promise.all([
-      listMaterialFiles('concept'),
-      listMaterialFiles('outline'),
+      listMaterialFiles('concept', { strict: true }),
+      listMaterialFiles('outline', { strict: true }),
     ])
     const files = [...conceptFiles, ...outlineFiles]
     const cachedFiles = Object.keys(cached.sourceFiles)
@@ -261,7 +264,12 @@ export async function getMaterialIndex(): Promise<MaterialIndex> {
   return buildMaterialIndex()
 }
 
-/** 手动重建入口 */
+/** 手动重建入口（宽容：失败时由调用方提示，不中断界面） */
 export async function rebuildMaterialIndex(): Promise<MaterialIndex> {
-  return buildMaterialIndex()
+  try {
+    return await buildMaterialIndex()
+  } catch (e) {
+    // 工作区树不可用等场景：返回空索引而非抛错，避免界面崩溃
+    return { entries: [], builtAt: new Date().toISOString(), sourceFiles: {} }
+  }
 }

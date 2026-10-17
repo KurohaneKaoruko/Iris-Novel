@@ -3,6 +3,8 @@ import { useI18n } from '../../i18n'
 import type { AIActionTraceItem, ChangeSet, NovelTask, WriterMode } from '../../services'
 import type { MemoryIndexMeta } from '../../services/memoryIndex'
 import { AppIcon } from '../icons/AppIcon'
+import { ContextInjectionCard } from '../ContextInjectionCard'
+import type { InjectionPlan } from '../../services/ContextInjectionService'
 
 export type AIChatMessage = {
   id: string
@@ -54,6 +56,10 @@ type AIChatPanelProps = {
   plannerTasks: NovelTask[]
   plannerBusy: boolean
   plannerQueueRunning: boolean
+  /** 上下文注入计划（6.1-6.3）；null = 无注入 */
+  injectionPlan?: InjectionPlan | null
+  injectionRemovedKeys?: Set<string>
+  onInjectionToggle?: (key: string) => void
   onRunNextPlannerTask: () => void | Promise<unknown>
   onRetryPlannerTask: (taskId: string) => void | Promise<unknown>
   onMarkPlannerTaskDone: (taskId: string) => void | Promise<unknown>
@@ -626,6 +632,9 @@ export function AIChatPanel(props: AIChatPanelProps) {
     plannerTasks,
     plannerBusy,
     plannerQueueRunning,
+    injectionPlan = null,
+    injectionRemovedKeys,
+    onInjectionToggle,
     onRunNextPlannerTask,
     onRetryPlannerTask,
     onMarkPlannerTaskDone,
@@ -2903,6 +2912,11 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
       <div className="ai-chat-bottom">
       <div className="ai-input-area ai-input-area-compact">
+        <ContextInjectionCard
+          plan={injectionPlan}
+          removedKeys={injectionRemovedKeys}
+          onToggle={onInjectionToggle}
+        />
         {autoLongWriteStatus ? <div className="ai-auto-status">{autoLongWriteStatus}</div> : null}
         <div className="ai-composer-shell">
           <div className="ai-composer-head">

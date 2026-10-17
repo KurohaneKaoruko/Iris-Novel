@@ -1,0 +1,126 @@
+.ctx-injection-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface-1, var(--bg-secondary));
+  margin: 6px 10px;
+  overflow: hidden;
+}
+
+.ctx-injection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-2, var(--bg-tertiary));
+}
+
+.ctx-injection-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ctx-injection-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ctx-injection-degraded {
+  font-size: 10px;
+  color: var(--status-warning, #d29922);
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ctx-injection-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.ctx-injection-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+}
+
+.ctx-injection-item:hover {
+  background: var(--bg-active);
+}
+
+.ctx-injection-item.removed {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.ctx-injection-toggle {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ctx-injection-toggle:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.ctx-injection-toggle:disabled {
+  cursor: not-allowed;
+}
+
+.ctx-injection-kind {
+  flex-shrink: 0;
+  font-size: 9px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.ctx-injection-kind.chapter { color: var(--accent-primary, #58a6ff); }
+.ctx-injection-kind.character { color: var(--status-success, #3fb950); }
+
+.ctx-injection-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.ctx-injection-source {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.ctx-injection-footer {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-top: 1px solid var(--border-subtle);
+}
