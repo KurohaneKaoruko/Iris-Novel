@@ -1,6 +1,6 @@
-# Contributing to Novel-IDE
+# Contributing to Iris-Novel
 
-感谢你对 Novel-IDE 的兴趣！欢迎贡献代码。
+感谢你对 Iris-Novel 的兴趣！欢迎贡献代码。
 
 ## 开发环境
 

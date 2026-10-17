@@ -11,7 +11,7 @@
 ## 2. 事件抽象与本地服务端
 
 - [ ] 2.1 定义 `EventSink` trait，Tauri 实现包装 `app.emit`，ai_stream 全部事件（start/token/step/change_set/done/error）改经 trait 发射，桌面端流式手测不回归
-- [ ] 2.2 `src-tauri` 调整为 lib + 双 bin（`novel-ide`、`novel-ide-server`），共享服务层，两 bin 均 `cargo build` 成功
+- [ ] 2.2 `src-tauri` 调整为 lib + 双 bin（`iris-novel`、`iris-novel-server`），共享服务层，两 bin 均 `cargo build` 成功
 - [ ] 2.3 实现 WS 端点：per-session broadcast 通道转发事件、取消指令路由，集成测试覆盖"订阅 → 收 token → 取消"
 - [ ] 2.4 axum 暴露与 61 个 Tauri 命令等价的 HTTP 路由（薄壳调服务层），抽样对照测试：同一命令 IPC 与 HTTP 返回一致
 - [ ] 2.5 服务端默认绑定 `127.0.0.1`、端口可配置、托管前端静态产物，集成测试验证回环访问与来源校验
@@ -22,7 +22,7 @@
 - [ ] 3.1 在 `tauri.ts` 内实现双通道分派：`isTauriApp()` 为真走 IPC，否则走 fetch 封装；61 个导出签名不变，现有前端测试通过
 - [ ] 3.2 事件订阅（`listen`/`tauriChat.ts`）双通道化：浏览器端改连 WS 并自动重连，事件回调语义不变
 - [ ] 3.3 浏览器环境对话框/导出降级（下载或页内流程），手测 Web 端导出等效可用
-- [ ] 3.4 `pnpm run dev` 起前端 + `novel-ide-server` 联调：浏览器完成"选书 → 打开章节 → 编辑保存"，与桌面端结果一致
+- [ ] 3.4 `pnpm run dev` 起前端 + `iris-novel-server` 联调：浏览器完成"选书 → 打开章节 → 编辑保存"，与桌面端结果一致
 
 ## 4. 四区布局重构与沉浸模式
 

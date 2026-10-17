@@ -1,17 +1,15 @@
 {
-  "displayName": "Novel-IDE",
-  "npmName": "novel-ide",
-  "crateName": "novel-ide",
-  "tauriIdentifier": "com.novelide.novel",
-  "dataDirName": "Novel-IDE",
+  "displayName": "Iris-Novel",
+  "npmName": "iris-novel",
+  "crateName": "iris-novel",
+  "tauriIdentifier": "com.irisnovel.app",
+  "dataDirName": "Iris-Novel",
   "gitSignature": {
-    "name": "Novel-IDE",
-    "email": "novel-ide@local"
+    "name": "Iris-Novel",
+    "email": "iris-novel@local"
   },
   "editor": {
-    "namespace": "NovelIDEEditor",
-    "configStorageKey": "novel-ide-editor-config",
-    "legacyConfigStorageKey": "novel-ide-editor-config"
-  },
-  "legacyDataDirName": "Novel IDE"
+    "namespace": "IrisNovelEditor",
+    "configStorageKey": "iris-novel-editor-config"
+  }
 }

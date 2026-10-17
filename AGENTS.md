@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-Novel-IDE 是一个基于 **Tauri v2 + React + Lexical** 构建的桌面小说写作工作台。它不是通用 IDE，而是专注于小说作者需求的工具：
+Iris-Novel 是一个基于 **Tauri v2 + React + Lexical** 构建的桌面小说写作工作台。它不是通用 IDE，而是专注于小说作者需求的工具：
 - 作品与资料管理
 - 章节写作与改稿
 - AI 规划、审阅与长期记忆

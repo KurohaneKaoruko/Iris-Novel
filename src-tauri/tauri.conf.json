@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Novel-IDE",
+  "productName": "Iris-Novel",
   "version": "0.0.2-test.1",
-  "identifier": "com.novelide.novel",
+  "identifier": "com.irisnovel.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Novel-IDE",
+        "title": "Iris-Novel",
         "width": 1280,
         "height": 800,
         "resizable": true
@@ -21,7 +21,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "dmg", "appimage", "deb", "rpm"],
+    "targets": [
+      "nsis",
+      "dmg",
+      "appimage",
+      "deb",
+      "rpm"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

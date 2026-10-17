@@ -27,7 +27,7 @@ function extractCharacterNames(raw: string): string[] {
     .slice(0, 16)
 }
 
-const STORAGE_KEY = 'novel-ide-document-summary-cache'
+const STORAGE_KEY = 'iris-novel-document-summary-cache'
 const memoryCache = new Map<string, CachedSummaryEntry>()
 
 function hashContent(text: string): string {

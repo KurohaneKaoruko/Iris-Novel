@@ -2,7 +2,7 @@
 
 ## Overview
 
-Novel-IDE 的 AI 已经从“单纯聊天”重构成一套写作工作流系统：
+Iris-Novel 的 AI 已经从“单纯聊天”重构成一套写作工作流系统：
 
 - `Chat`：对话与即时写作协作
 - `Planner`：规划任务与执行队列

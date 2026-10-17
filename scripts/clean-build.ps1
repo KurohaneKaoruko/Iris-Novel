@@ -1,7 +1,7 @@
-# Clean Build Script for Novel IDE
+# Clean Build Script for Iris-Novel
 # This script cleans all build artifacts and caches to fix path reference issues
 
-Write-Host "Cleaning Novel IDE build artifacts..." -ForegroundColor Cyan
+Write-Host "Cleaning Iris-Novel build artifacts..." -ForegroundColor Cyan
 Write-Host ""
 
 # Clean Rust/Cargo build cache

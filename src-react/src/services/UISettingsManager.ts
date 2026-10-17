@@ -1,4 +1,4 @@
-const UI_SETTINGS_STORAGE_KEY = 'novel-ide-ui-settings'
+const UI_SETTINGS_STORAGE_KEY = 'iris-novel-ui-settings'
 
 export type UITheme = 'light' | 'dark'
 export type UIDensity = 'compact' | 'comfortable'

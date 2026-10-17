@@ -4287,7 +4287,7 @@ function App() {
             </>
           ) : (
             <div className="welcome-screen">
-              <h1>Novel-IDE</h1>
+              <h1>Iris-Novel</h1>
               <div className="welcome-actions">
                 <button
                   className="welcome-btn"

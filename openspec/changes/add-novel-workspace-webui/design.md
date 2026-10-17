@@ -39,7 +39,7 @@
 
 ### D3. Web 服务以同一 crate 的第二个二进制交付
 
-`src-tauri` 调整为 lib + 双 bin：`novel-ide`（现有 Tauri 应用）与 `novel-ide-server`（headless axum 服务，复用 lib）。服务端默认绑定 `127.0.0.1`，端口默认固定值可配置，启动时输出访问地址；托管前端构建产物（静态目录）。
+`src-tauri` 调整为 lib + 双 bin：`iris-novel`（现有 Tauri 应用）与 `iris-novel-server`（headless axum 服务，复用 lib）。服务端默认绑定 `127.0.0.1`，端口默认固定值可配置，启动时输出访问地址；托管前端构建产物（静态目录）。
 
 - 备选：Tauri 应用内嵌 server 随桌面启动 —— 可作为后续增强（LAN 访问场景），首版不做，避免桌面路径复杂化。
 - 备选：独立 server crate —— 增加构建编排成本，共享类型收益不明显。
@@ -90,7 +90,7 @@
 按可独立验证的六个阶段推进（详见 tasks.md）：
 
 1. 服务层提取（纯等价搬移，桌面端行为不变）
-2. `EventSink` + WS 通道 + `novel-ide-server` 骨架（桌面端仍为主要使用路径）
+2. `EventSink` + WS 通道 + `iris-novel-server` 骨架（桌面端仍为主要使用路径）
 3. 前端传输适配层（IPC 路径行为不变，Web 通道贯通）
 4. 布局拆分与四区重构 + 沉浸模式（双端共用）
 5. 资料管理三视图
