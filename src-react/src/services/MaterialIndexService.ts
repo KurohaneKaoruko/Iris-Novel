@@ -66,7 +66,7 @@ export function parseMaterialFile(sourcePath: string, raw: string): MaterialEntr
 
   const sections: Array<{ title: string; lines: string[] }> = []
   let current: { title: string; lines: string[] } | null = null
-  let preamble: string[] = []
+  const preamble: string[] = []
 
   for (const line of lines) {
     const heading = line.match(/^(#{1,3})\s+(.*)$/)

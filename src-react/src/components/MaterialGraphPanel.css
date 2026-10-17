@@ -1,0 +1,165 @@
+.material-graph {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-1, var(--bg-secondary));
+}
+
+.material-graph-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-2, var(--bg-tertiary));
+}
+
+.material-graph-title {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.material-graph-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1, var(--bg-primary));
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.material-graph-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.material-graph-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.material-graph-btn.open {
+  margin-top: 8px;
+  color: var(--text-accent);
+  border-color: var(--accent-primary);
+}
+
+.material-graph-empty,
+.material-graph-error {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 10px;
+}
+
+.material-graph-error {
+  color: var(--danger, #d1242f);
+}
+
+.material-graph-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.material-graph-svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.material-graph-edge {
+  stroke: var(--border-subtle, #30363d);
+  stroke-width: 1;
+}
+
+.material-graph-node {
+  cursor: pointer;
+}
+
+.material-graph-node circle {
+  stroke: var(--surface-1, var(--bg-secondary));
+  stroke-width: 2;
+  transition: r 0.12s;
+}
+
+.material-graph-node:hover circle,
+.material-graph-node.selected circle {
+  r: 11;
+}
+
+.material-graph-label {
+  font-size: 10px;
+  fill: var(--text-secondary);
+  paint-order: stroke;
+  stroke: var(--surface-1, var(--bg-secondary));
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.material-graph-detail {
+  flex-shrink: 0;
+  max-height: 45%;
+  overflow: auto;
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px;
+  background: var(--surface-2, var(--bg-tertiary));
+}
+
+.material-graph-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.material-graph-kind {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: var(--bg-active);
+  color: var(--text-secondary);
+}
+
+.material-graph-kind.character {
+  color: var(--accent-primary, #58a6ff);
+}
+
+.material-graph-kind.setting {
+  color: var(--status-success, #3fb950);
+}
+
+.material-graph-attr {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  padding: 2px 0;
+}
+
+.material-graph-attr .k {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  min-width: 56px;
+}
+
+.material-graph-attr .v {
+  color: var(--text-secondary);
+}
+
+.material-graph-body-text {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
