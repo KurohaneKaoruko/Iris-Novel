@@ -76,6 +76,7 @@ import { NovelStructurePanel } from './components/NovelStructurePanel'
 import { HistoryPanel } from './components/HistoryPanel'
 import { AppIcon } from './components/icons/AppIcon'
 import { AIChatPanel } from './components/chat/AIChatPanel'
+import { AgentCliPanel } from './components/AgentCliPanel'
 import {
   COMMON_PROVIDER_PRESETS,
   CUSTOM_PROVIDER_PRESET_KEY,
@@ -613,7 +614,7 @@ function App() {
 
   // Activity Bar State
   const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'history' | 'chapters' | 'characters' | 'plotlines' | 'risk'>('files')
-  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | 'writing-goal' | null>('chat')
+  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | 'writing-goal' | 'agent-cli' | null>('chat')
 
   // Workspace & Files
   const [appView, setAppView] = useState<'bookshelf' | 'studio'>('bookshelf')
@@ -1282,7 +1283,7 @@ function App() {
   )
 
   const toggleRightTab = useCallback(
-    (tab: 'chat' | 'graph' | 'writing-goal') => {
+    (tab: 'chat' | 'graph' | 'writing-goal' | 'agent-cli') => {
       setActiveRightTab((prev) => {
         const next = prev === tab ? null : tab
         if (next === 'graph') {
@@ -4418,6 +4419,8 @@ function App() {
                 }}
               />
             ) : null}
+
+            {activeRightTab === 'agent-cli' ? <AgentCliPanel workspaceRoot={workRoot} /> : null}
           </aside>
         ) : null}
 
@@ -4442,6 +4445,13 @@ function App() {
             title={t('app.panel.writingGoal')}
           >
             <span className="right-activity-icon"><AppIcon name="target" /></span>
+          </div>
+          <div
+            className={`right-activity-item ${activeRightTab === 'agent-cli' ? 'active' : ''}`}
+            onClick={() => toggleRightTab('agent-cli')}
+            title={t('app.panel.agentCli')}
+          >
+            <span className="right-activity-icon"><AppIcon name="terminal" /></span>
           </div>
         </div>
       </div>

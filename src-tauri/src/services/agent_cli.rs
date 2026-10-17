@@ -157,7 +157,15 @@ async fn which_binary(bin: &str) -> Option<PathBuf> {
 async fn probe_version(bin: &str) -> Option<String> {
   let output = tokio::time::timeout(
     Duration::from_secs(10),
-    tokio::process::Command::new(bin).arg("--version").output(),
+    tokio::process::Command::new(bin)
+      .arg("--version")
+      // 探测进程不继承业务进程 CWD：即使被探程序行为异常（如写相对路径文件），
+      // 也只会落到临时目录，绝不污染应用目录或作品目录。
+      .current_dir(std::env::temp_dir())
+      .stdout(std::process::Stdio::piped())
+      .stderr(std::process::Stdio::piped())
+      .stdin(std::process::Stdio::null())
+      .output(),
   )
   .await
   .ok()?
