@@ -517,7 +517,6 @@ async function preflightChatProviderIssue(
   if (!provider.model_name.trim()) {
     return t('app.chat.preflight.modelMissing', { provider: provider.name })
   }
-  if (!isTauriApp()) return null
   try {
     const hasApiKey = await getApiKeyStatus(provider.id)
     if (!hasApiKey) {
@@ -533,7 +532,6 @@ function getProviderAvailability(
   provider: ModelProvider,
   hasApiKey: boolean,
   apiKeyKnown: boolean,
-  tauriRuntime: boolean,
   t: TranslateText,
 ): { ready: boolean; statusLabel: string } {
   if (!provider.base_url.trim()) {
@@ -542,7 +540,7 @@ function getProviderAvailability(
   if (!provider.model_name.trim()) {
     return { ready: false, statusLabel: t('chat.provider.missingModel') }
   }
-  if (tauriRuntime && apiKeyKnown && !hasApiKey) {
+  if (apiKeyKnown && !hasApiKey) {
     return { ready: false, statusLabel: t('chat.provider.missingApiKey') }
   }
   return { ready: true, statusLabel: t('chat.provider.ready') }
@@ -827,12 +825,11 @@ function App() {
   const chatAssistantOptions = useMemo(() => writingAssistantsState.map((assistant) => ({ id: assistant.id, name: assistant.name })), [writingAssistantsState])
   const chatProviderOptions = useMemo(
     () => {
-      const tauriRuntime = isTauriApp()
       return (appSettings?.providers ?? []).map((provider) => {
         const hasInlineKey = provider.api_key.trim().length > 0
         const hasPersistedKey = apiKeyStatus[provider.id] === true
         const apiKeyKnown = hasInlineKey || Object.prototype.hasOwnProperty.call(apiKeyStatus, provider.id)
-        const availability = getProviderAvailability(provider, hasInlineKey || hasPersistedKey, apiKeyKnown, tauriRuntime, t)
+        const availability = getProviderAvailability(provider, hasInlineKey || hasPersistedKey, apiKeyKnown, t)
         return {
           id: provider.id,
           name: provider.name,
@@ -2680,7 +2677,6 @@ function App() {
           fallbackProvider = provider
           break
         }
-        if (!isTauriApp()) continue
         try {
           const hasKey = await getApiKeyStatus(provider.id)
           if (hasKey) {
@@ -3316,7 +3312,6 @@ function App() {
   }, [activeWritingAssistantId, writingAssistantsState, appSettings, persistAppSettings])
 
   useEffect(() => {
-    if (!isTauriApp()) return
     if (!appSettings) return
     void (async () => {
       const entries = await Promise.all(
@@ -5198,6 +5193,9 @@ function App() {
                       editingProvider.id && apiKeyStatus[editingProvider.id] ? t('app.model.apiKeyAlreadySetPlaceholder') : 'sk-...'
                     }
                   />
+                  <div className="settings-key-storage-hint">
+                    {isTauriApp() ? t('app.model.apiKeyStorageLocal') : t('app.model.apiKeyStorageServer')}
+                  </div>
                 </div>
 	                {providerProbeResult ? (
 	                  <div className={`settings-connectivity-result ${providerProbeResult.kind === 'ok' ? 'ok' : 'error'}`}>

@@ -4819,6 +4819,13 @@ button.ai-session-row-main {
   color: var(--text-muted);
 }
 
+.settings-key-storage-hint {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
 .settings-subsection {
   margin-bottom: 10px;
 }
