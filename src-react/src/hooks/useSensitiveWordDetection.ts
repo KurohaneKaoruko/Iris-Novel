@@ -80,16 +80,21 @@ export function useSensitiveWordDetection({
 
   useEffect(() => {
     if (!enabled) {
-      setIsDetecting(false);
-      setSensitiveWordCount(0);
-      clearDecorations();
-      return;
+      // 外部系统（编辑器装饰）同步重置，微任务调度避免 effect 体内同步 setState
+      const raf = window.requestAnimationFrame(() => {
+        setIsDetecting(false);
+        setSensitiveWordCount(0);
+        clearDecorations();
+      })
+      return () => window.cancelAnimationFrame(raf)
     }
 
     if (!editor) {
-      setIsDetecting(false);
-      setSensitiveWordCount(0);
-      return;
+      const raf = window.requestAnimationFrame(() => {
+        setIsDetecting(false);
+        setSensitiveWordCount(0);
+      })
+      return () => window.cancelAnimationFrame(raf)
     }
 
     const model = editor.getModel?.();
@@ -126,9 +131,11 @@ export function useSensitiveWordDetection({
       scheduleDetect();
     });
 
-    detectNow();
+    // 初始检测经微任务调度，避免 effect 体内同步 setState 级联渲染
+    const raf = window.requestAnimationFrame(() => detectNow());
 
     return () => {
+      window.cancelAnimationFrame(raf);
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
       if (disposable?.dispose) disposable.dispose();
       if (workerRef.current) {

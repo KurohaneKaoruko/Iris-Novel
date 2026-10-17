@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import type { ChangeSet } from '../services/ModificationService'
 import { useDiff } from '../contexts/DiffContext'
 
@@ -19,13 +19,13 @@ export function useAutoOpenModifiedFiles(
   const { changeSets, activeChangeSetId } = useDiff()
 
   // Track which files have been auto-opened
-  const openedFilesRef = new Set<string>()
+  const openedFilesRef = useRef(new Set<string>())
 
   const openModifiedFile = useCallback(
     async (changeSet: ChangeSet) => {
       // Open the first modified file
-      if (changeSet.filePath && !openedFilesRef.has(changeSet.id)) {
-        openedFilesRef.add(changeSet.id)
+      if (changeSet.filePath && !openedFilesRef.current.has(changeSet.id)) {
+        openedFilesRef.current.add(changeSet.id)
         await onOpenFile(changeSet.filePath)
       }
     },
@@ -46,13 +46,9 @@ export function useAutoOpenModifiedFiles(
   // Reset when all change sets are cleared
   useEffect(() => {
     if (changeSets.size === 0) {
-      openedFilesRef.clear()
+      openedFilesRef.current.clear()
     }
   }, [changeSets])
-
-  return {
-    openedFiles: Array.from(openedFilesRef),
-  }
 }
 
 /**

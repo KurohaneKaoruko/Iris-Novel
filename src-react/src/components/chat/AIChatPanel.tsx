@@ -540,7 +540,7 @@ function stripToolTraceContent(content: string): string {
   if (!content.trim()) return ''
   const tracePrefix = /^\s*(ACTION|INPUT|OBSERVATION|OUTPUT|TOOL|TOOL_RESULT)\s*:/i
   const traceFence = /^\s*```(?:json|tool|text)?\s*$/i
-  const traceJsonLine = /^\s*[\[{].*(?:"(path|name|kind|exists|text|error|ok|from|to|lines|chars)")/i
+  const traceJsonLine = /^\s*[[{].*(?:"(path|name|kind|exists|text|error|ok|from|to|lines|chars)")/i
   const traceJsonTail = /^\s*[\],]\s*$/
   const next = content
     .split(/\r?\n/)
@@ -728,7 +728,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
   const [liveStageFilter, setLiveStageFilter] = useState<ToolStageFilter>('all')
   const [collapsedLiveStages, setCollapsedLiveStages] = useState<Record<string, boolean>>({})
   const [expandedLiveItems, setExpandedLiveItems] = useState<Record<string, boolean>>({})
-  const [toolNowTick, setToolNowTick] = useState(Date.now())
+  const [toolNowTick, setToolNowTick] = useState(() => Date.now())
   const [activeWorkbenchTab, setActiveWorkbenchTab] = useState<'chat' | 'planner' | 'review' | 'memory'>('chat')
   const [activeChatDrawer, setActiveChatDrawer] = useState<'sessions' | 'workspace' | null>(null)
   const [showComposerOptions, setShowComposerOptions] = useState(false)
@@ -841,7 +841,9 @@ export function AIChatPanel(props: AIChatPanelProps) {
       onChatInputChange(nextValue)
       window.setTimeout(() => chatInputRef.current?.focus(), 0)
     },
-    [chatInput, chatInputRef, onChatInputChange, onWriterModeChange, writerMode],
+    // chatInputRef 是稳定 ref，读取发生在回调运行时而非渲染期
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chatInput, onChatInputChange, onWriterModeChange, writerMode],
   )
 
   const sessionTimeLabel = useCallback(
@@ -1076,7 +1078,9 @@ export function AIChatPanel(props: AIChatPanelProps) {
       onChatInputChange(prompt)
       window.setTimeout(() => chatInputRef.current?.focus(), 0)
     },
-    [chatInputRef, onChatInputChange, onWriterModeChange, writerMode],
+    // chatInputRef 是稳定 ref，读取发生在回调运行时而非渲染期
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onChatInputChange, onWriterModeChange, writerMode],
   )
 
   const slashCommands = useMemo<AISlashCommand[]>(
@@ -1339,7 +1343,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
     },
     [copyWithFeedback, rememberRetryPrompt],
   )
-  const useRetryPrompt = useCallback(
+  const applyRetryPrompt = useCallback(
     (messageId: string, mode: RetryPromptMode, prompt: string) => {
       const payload = prompt.trim()
       if (!payload) return
@@ -2086,9 +2090,9 @@ export function AIChatPanel(props: AIChatPanelProps) {
                                     className="message-tool-filter"
                                     type="button"
                                     disabled={!retryPromptTemplate.trim()}
-                                    onClick={() => useRetryPrompt(message.id, retryPromptMode, retryPromptTemplate)}
+                                    onClick={() => applyRetryPrompt(message.id, retryPromptMode, retryPromptTemplate)}
                                   >
-                                    {t('chat.useRetryPrompt')}
+                                    {t('chat.applyRetryPrompt')}
                                   </button>
                                 </div>
                                 <div className="message-retry-history">
@@ -2114,7 +2118,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
                                             <button
                                               className="message-tool-filter"
                                               type="button"
-                                              onClick={() => useRetryPrompt(message.id, entry.mode, entry.text)}
+                                              onClick={() => applyRetryPrompt(message.id, entry.mode, entry.text)}
                                             >
                                               {t('chat.retryPrompt.historyUse')}
                                             </button>
@@ -2166,7 +2170,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
                                             <button
                                               className="message-tool-filter"
                                               type="button"
-                                              onClick={() => useRetryPrompt(message.id, entry.mode, entry.text)}
+                                              onClick={() => applyRetryPrompt(message.id, entry.mode, entry.text)}
                                             >
                                               {t('chat.retryPrompt.historyUse')}
                                             </button>
@@ -2250,9 +2254,9 @@ export function AIChatPanel(props: AIChatPanelProps) {
                                     className="message-tool-filter"
                                     type="button"
                                     disabled={!retryPromptTemplate.trim()}
-                                    onClick={() => useRetryPrompt(message.id, retryPromptMode, retryPromptTemplate)}
+                                    onClick={() => applyRetryPrompt(message.id, retryPromptMode, retryPromptTemplate)}
                                   >
-                                    {t('chat.useRetryPrompt')}
+                                    {t('chat.applyRetryPrompt')}
                                   </button>
                                   <button
                                     className="message-tool-filter"

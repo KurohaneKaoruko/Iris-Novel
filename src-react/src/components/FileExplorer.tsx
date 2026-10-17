@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useMemo, useState, type MouseEvent } from 'react'
+import React, { useMemo, useState, type MouseEvent } from 'react'
 import type { FsEntry } from '../tauri'
 import './FileExplorer.css'
 
@@ -64,7 +64,7 @@ export function FileExplorer({ tree, activePath, query, onQueryChange, onFileCli
     return walk(tree)
   }, [tree, query])
 
-  const renderEntry = useCallback(
+  const renderEntry =
     (entry: FsEntry, depth: number): React.JSX.Element => {
       const isActive = entry.path === activePath
       const paddingLeft = `${depth * 16 + 8}px`
@@ -116,9 +116,7 @@ export function FileExplorer({ tree, activePath, query, onQueryChange, onFileCli
           <span className="file-explorer-name">{entry.name}</span>
         </div>
       )
-    },
-    [activePath, onFileClick, onContextMenu, openDirs]
-  )
+    }
 
   return (
     <div className="file-explorer">

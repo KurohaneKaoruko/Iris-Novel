@@ -339,6 +339,8 @@ const AUTO_RETRY_MAX_PER_GROUP = 1
 const STREAM_MANUAL_CANCEL_GRACE_MS = 6_000
 const STREAM_PRETOKEN_HARD_TIMEOUT_MS = 360_000
 const STREAM_IDLE_HARD_TIMEOUT_MS = 120_000
+/** 旧版设置页内置代理区块：功能已迁移，代码保留备查（常量避免 no-constant-condition） */
+const SHOW_LEGACY_AGENT_SETTINGS = false
 const STREAM_TOTAL_HARD_TIMEOUT_MS = 900_000
 const FILE_SEARCH_RESULT_LIMIT = 300
 const SEARCHABLE_TEXT_EXTENSIONS = new Set(['md', 'txt', 'json', 'toml', 'yaml', 'yml'])
@@ -5017,7 +5019,7 @@ function App() {
                   </div>
 	                </div>
 	                ) : null}
-	                {false ? (
+	                {SHOW_LEGACY_AGENT_SETTINGS ? (
 	                <div className="settings-section">
                   <h3 className="settings-section-title">{t('app.settings.agentTitle')}</h3>
 

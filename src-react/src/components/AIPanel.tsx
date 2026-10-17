@@ -70,7 +70,7 @@ export function AIPanel({
         }
       }
     },
-    [disabled, onSend]
+    [disabled, input, onSend]
   )
 
   const handleCloseChangeSet = useCallback(
