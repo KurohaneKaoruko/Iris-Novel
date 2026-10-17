@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::AppHandle;
 
 #[derive(Serialize, Clone)]
 pub struct ProjectItem {
@@ -44,7 +43,7 @@ pub(crate) struct ExternalProjectRecord {
   pub(crate) added_at: i64,
 }
 
-pub fn get_last_workspace(_app: &AppHandle) -> Result<Option<String>, String> {
+pub fn get_last_workspace() -> Result<Option<String>, String> {
   let path = last_workspace_path()?;
   if !path.exists() {
     return Ok(None);
@@ -69,7 +68,7 @@ fn last_workspace_path() -> Result<PathBuf, String> {
   app_data::state_file_path("last_workspace.json")
 }
 
-pub(crate) fn save_last_workspace(_app: &AppHandle, root: &Path) -> Result<(), String> {
+pub(crate) fn save_last_workspace(root: &Path) -> Result<(), String> {
   let path = last_workspace_path()?;
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent).map_err(|e| format!("create last workspace dir failed: {e}"))?;
@@ -82,7 +81,7 @@ fn external_projects_path() -> Result<PathBuf, String> {
   app_data::state_file_path("external_projects.json")
 }
 
-fn load_external_projects(_app: &AppHandle) -> Result<Vec<ExternalProjectRecord>, String> {
+fn load_external_projects() -> Result<Vec<ExternalProjectRecord>, String> {
   let path = external_projects_path()?;
   if !path.exists() {
     return Ok(Vec::new());
@@ -93,7 +92,7 @@ fn load_external_projects(_app: &AppHandle) -> Result<Vec<ExternalProjectRecord>
   Ok(parsed.projects)
 }
 
-fn save_external_projects(_app: &AppHandle, records: &[ExternalProjectRecord]) -> Result<(), String> {
+fn save_external_projects(records: &[ExternalProjectRecord]) -> Result<(), String> {
   let path = external_projects_path()?;
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent).map_err(|e| format!("create external projects dir failed: {e}"))?;
@@ -285,11 +284,11 @@ fn parse_launch_mode(mode: &str) -> Result<app_settings::LaunchMode, String> {
   }
 }
 
-pub fn get_project_picker_state(app: &AppHandle) -> Result<ProjectPickerState, String> {
+pub fn get_project_picker_state() -> Result<ProjectPickerState, String> {
   let default_root = default_projects_root()?;
   let default_projects = list_default_projects(&default_root)?;
   let settings = app_settings::load()?;
-  let last_workspace = get_last_workspace(app)?;
+  let last_workspace = get_last_workspace()?;
 
   let mut seen_paths: HashSet<String> = HashSet::new();
   for item in &default_projects {
@@ -297,7 +296,7 @@ pub fn get_project_picker_state(app: &AppHandle) -> Result<ProjectPickerState, S
   }
 
   let mut external_projects: Vec<ProjectItem> = Vec::new();
-  for record in load_external_projects(app)? {
+  for record in load_external_projects()? {
     let path = PathBuf::from(&record.path);
     if !path.exists() || !path.is_dir() {
       continue;
@@ -354,7 +353,7 @@ pub fn create_novel_project(name: &str, description: Option<String>) -> Result<P
   ))
 }
 
-pub fn remember_external_project(app: &AppHandle, path: &str) -> Result<(), String> {
+pub fn remember_external_project(path: &str) -> Result<(), String> {
   let canonical = canonicalize_path(Path::new(path.trim()))?;
   let metadata = fs::metadata(&canonical).map_err(|e| format!("stat project path failed: {e}"))?;
   if !metadata.is_dir() {
@@ -363,7 +362,7 @@ pub fn remember_external_project(app: &AppHandle, path: &str) -> Result<(), Stri
   let canonical_str = canonical.to_string_lossy().to_string();
   let now = Utc::now().timestamp();
 
-  let mut records = load_external_projects(app)?;
+  let mut records = load_external_projects()?;
   if let Some(existing) = records
     .iter_mut()
     .find(|v| v.path.eq_ignore_ascii_case(&canonical_str))
@@ -376,10 +375,10 @@ pub fn remember_external_project(app: &AppHandle, path: &str) -> Result<(), Stri
     });
   }
   records.sort_by(|a, b| b.added_at.cmp(&a.added_at));
-  save_external_projects(app, &records)
+  save_external_projects(&records)
 }
 
-pub fn forget_external_project(app: &AppHandle, path: &str) -> Result<(), String> {
+pub fn forget_external_project(path: &str) -> Result<(), String> {
   let trimmed = path.trim();
   if trimmed.is_empty() {
     return Ok(());
@@ -387,7 +386,7 @@ pub fn forget_external_project(app: &AppHandle, path: &str) -> Result<(), String
   let canonical = canonicalize_path(Path::new(trimmed))
     .ok()
     .map(|v| v.to_string_lossy().to_string());
-  let mut records = load_external_projects(app)?;
+  let mut records = load_external_projects()?;
   records.retain(|v| {
     if let Some(canon) = &canonical {
       !v.path.eq_ignore_ascii_case(canon)
@@ -395,10 +394,10 @@ pub fn forget_external_project(app: &AppHandle, path: &str) -> Result<(), String
       !v.path.eq_ignore_ascii_case(trimmed)
     }
   });
-  save_external_projects(app, &records)
+  save_external_projects(&records)
 }
 
-pub fn set_launch_mode(_app: &AppHandle, mode: &str) -> Result<(), String> {
+pub fn set_launch_mode(mode: &str) -> Result<(), String> {
   let mut settings = app_settings::load()?;
   settings.launch_mode = parse_launch_mode(mode)?;
   app_settings::save(&settings)

@@ -5,11 +5,10 @@
 //! 聊天域：会话持久化业务逻辑。
 
 use crate::chat_history;
-use tauri::AppHandle;
 
 // ---- 由 commands.rs 等价搬移（会话持久化）----
-pub fn save_chat_session(app: &AppHandle, session: chat_history::ChatSession) -> Result<(), String> {
-  let mut sessions = chat_history::load(app)?;
+pub fn save_chat_session(session: chat_history::ChatSession) -> Result<(), String> {
+  let mut sessions = chat_history::load()?;
   let now = std::time::SystemTime::now()
     .duration_since(std::time::UNIX_EPOCH)
     .unwrap_or_default()
@@ -32,11 +31,11 @@ pub fn save_chat_session(app: &AppHandle, session: chat_history::ChatSession) ->
     sessions.truncate(50);
   }
 
-  chat_history::save(app, &sessions)
+  chat_history::save(&sessions)
 }
 
-pub fn list_chat_sessions(app: &AppHandle, workspace_root: Option<String>) -> Result<Vec<chat_history::ChatSessionSummary>, String> {
-  let sessions = chat_history::load(app)?;
+pub fn list_chat_sessions(workspace_root: Option<String>) -> Result<Vec<chat_history::ChatSessionSummary>, String> {
+  let sessions = chat_history::load()?;
   let mut out: Vec<chat_history::ChatSessionSummary> = Vec::new();
   for s in sessions {
     if let Some(root) = &workspace_root {
@@ -54,8 +53,8 @@ pub fn list_chat_sessions(app: &AppHandle, workspace_root: Option<String>) -> Re
   Ok(out)
 }
 
-pub fn get_chat_session(app: &AppHandle, id: &str) -> Result<chat_history::ChatSession, String> {
-  let sessions = chat_history::load(app)?;
+pub fn get_chat_session(id: &str) -> Result<chat_history::ChatSession, String> {
+  let sessions = chat_history::load()?;
   sessions.into_iter().find(|s| s.id == id).ok_or_else(|| "session not found".to_string())
 }
 

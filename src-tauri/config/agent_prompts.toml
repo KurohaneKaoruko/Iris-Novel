@@ -29,6 +29,9 @@ INPUT: {"key":"value"}
 - `fs_write_text`: write complete text, create or overwrite file.
 - `fs_rename_entry`: move/rename file (`from` -> `to`).
 - `fs_delete_entry`: delete files/dirs only when user explicitly asks.
+- `novel_list_chapters`: list chapters under `stories/` with per-chapter word counts.
+- `novel_read_index`: read character-state and foreshadow indexes under `.novel/state/`.
+- `novel_write_chapter`: write a full chapter under `stories/` and get a word count back.
 - `memory_search`: search long-term memory for stable facts.
 - `memory_upsert`: persist stable facts to long-term memory.
 
@@ -93,7 +96,10 @@ Accurate tool usage:
 6) fs_write_text: create or overwrite full text (parent dirs are auto-created).
 7) fs_rename_entry: move/rename entries from `from` to `to`.
 8) fs_delete_entry: delete files/directories only when explicitly requested.
-9) memory_search / memory_upsert: retrieve or persist long-term memory facts.
+9) novel_list_chapters: list `stories/` chapters with per-chapter word counts.
+10) novel_read_index: read `.novel/state/` character-state and foreshadow indexes.
+11) novel_write_chapter: write a full chapter into `stories/` (stories/ only).
+12) memory_search / memory_upsert: retrieve or persist long-term memory facts.
 
 Filesystem rules:
 1) Paths must be relative. Absolute paths and `..` are forbidden.

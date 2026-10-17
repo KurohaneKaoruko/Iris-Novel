@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use tauri::{AppHandle, Emitter};
 
 #[derive(Serialize)]
 pub struct WorkspaceInfo {
@@ -78,17 +77,17 @@ pub(crate) fn validate_relative_path(relative_path: &str) -> Result<PathBuf, Str
   Ok(p)
 }
 
-pub fn set_workspace(app: &AppHandle, state: &AppState, path: &str) -> Result<WorkspaceInfo, String> {
+pub fn set_workspace(state: &AppState, path: &str) -> Result<WorkspaceInfo, String> {
   let root = canonicalize_path(Path::new(path))?;
   *state.workspace_root.lock().map_err(|_| "workspace lock poisoned")? = Some(root.clone());
   if let Ok(mut w) = state.fs_watcher.lock() {
     *w = None;
   }
-  if let Err(e) = start_fs_watcher(app, state, root.clone()) {
+  if let Err(e) = start_fs_watcher(state, root.clone()) {
     eprintln!("fs_watcher_start_error: {e}");
-    let _ = app.emit("fs_watch_error", serde_json::json!({ "message": e }));
+    crate::event_sink::global::emit("fs_watch_error", serde_json::json!({ "message": e }));
   }
-  if let Err(e) = save_last_workspace(app, &root) {
+  if let Err(e) = save_last_workspace(&root) {
     eprintln!("save_last_workspace_failed: {e}");
   }
   Ok(WorkspaceInfo {
@@ -96,8 +95,7 @@ pub fn set_workspace(app: &AppHandle, state: &AppState, path: &str) -> Result<Wo
   })
 }
 
-fn start_fs_watcher(app: &AppHandle, state: &AppState, root: PathBuf) -> Result<(), String> {
-  let app_handle = app.clone();
+fn start_fs_watcher(state: &AppState, root: PathBuf) -> Result<(), String> {
   let root_for_strip = root.clone();
   let mut watcher =
     notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| match res {
@@ -117,11 +115,11 @@ fn start_fs_watcher(app: &AppHandle, state: &AppState, root: PathBuf) -> Result<
             .to_string_lossy()
             .to_string()
             .replace('\\', "/");
-          let _ = app_handle.emit("fs_changed", serde_json::json!({ "kind": kind, "path": rel }));
+          crate::event_sink::global::emit("fs_changed", serde_json::json!({ "kind": kind, "path": rel }));
         }
       }
       Err(e) => {
-        let _ = app_handle.emit("fs_watch_error", serde_json::json!({ "message": e.to_string() }));
+        crate::event_sink::global::emit("fs_watch_error", serde_json::json!({ "message": e.to_string() }));
       }
     })
     .map_err(|e| format!("create watcher failed: {e}"))?;
