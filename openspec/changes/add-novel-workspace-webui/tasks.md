@@ -35,7 +35,7 @@
 
 ## 5. 资料工程化管理视图
 
-- [ ] 5.1 实现 concept/outline Markdown → 结构化条目解析器与 `.novel/index/` 缓存（沿用 source/locked 语义），解析器单元测试通过
+- [x] 5.1 实现 concept/outline Markdown → 结构化条目解析器与 `.novel/index/` 缓存（沿用 source/locked 语义），解析器单元测试通过
 - [ ] 5.2 角色卡视图（列表 + 详情、编辑写回 `.md`），测试覆盖"卡片编辑 → 文件更新 → 重开一致"
 - [ ] 5.3 设定关联图谱视图（自绘 SVG 力导向、节点点击定位源文件），手测图谱生成与定位
 - [ ] 5.4 剧情线视图（复用 `PlotLineService`，按章节轴展示进展），手测剧情线展示
