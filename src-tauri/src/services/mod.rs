@@ -3,6 +3,7 @@
 //! 迁移约定（等价搬移）：命令实现逐步改为对服务层函数的薄壳调用，
 //! 保持入参、返回结构与行为不变。
 
+pub mod agent_cli;
 pub mod ai_stream;
 pub mod bookshelf;
 pub mod chat;

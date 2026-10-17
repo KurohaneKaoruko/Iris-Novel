@@ -1137,3 +1137,65 @@ pub async fn book_extract_techniques(content: String) -> Result<Vec<WritingTechn
   Ok(techniques)
 }
 
+// ============ External Agent CLI Commands ============
+
+#[tauri::command]
+pub async fn agent_cli_detect() -> Result<Vec<crate::services::agent_cli::CliInfo>, String> {
+  crate::services::agent_cli::detect_clis().await
+}
+
+#[tauri::command]
+pub async fn agent_cli_run_task(
+  state: State<'_, AppState>,
+  cliId: Option<String>,
+  cli_id: Option<String>,
+  workspaceRoot: Option<String>,
+  workspace_root: Option<String>,
+  prompt: String,
+  writeMode: Option<String>,
+  write_mode: Option<String>,
+) -> Result<String, String> {
+  let cli_id = cliId.or(cli_id).unwrap_or_default();
+  let workspace_root = workspaceRoot.or(workspace_root).unwrap_or_default();
+  let write_mode = writeMode.or(write_mode);
+  let settings = app_settings::load()?;
+  crate::services::agent_cli::run_task(
+    &state,
+    crate::services::agent_cli::CliTaskRequest {
+      cli_id,
+      workspace_root,
+      prompt,
+      write_mode,
+    },
+    &settings.agent_cli_write_mode,
+  )
+  .await
+}
+
+#[tauri::command]
+pub fn agent_cli_list_tasks() -> Result<Vec<crate::services::agent_cli::CliTaskStatus>, String> {
+  Ok(crate::services::agent_cli::list_tasks())
+}
+
+#[tauri::command]
+pub fn agent_cli_get_task(taskId: Option<String>, task_id: Option<String>) -> Result<crate::services::agent_cli::CliTaskStatus, String> {
+  let task_id = taskId.or(task_id).unwrap_or_default();
+  crate::services::agent_cli::get_task(&task_id).ok_or_else(|| format!("task not found: {task_id}"))
+}
+
+#[tauri::command]
+pub fn agent_cli_cancel_task(taskId: Option<String>, task_id: Option<String>) -> Result<(), String> {
+  let task_id = taskId.or(task_id).unwrap_or_default();
+  crate::services::agent_cli::cancel_task(&task_id)
+}
+
+#[tauri::command]
+pub fn agent_cli_decide_change(
+  taskId: Option<String>,
+  task_id: Option<String>,
+  path: String,
+  accept: bool,
+) -> Result<crate::services::agent_cli::CliChangeEntry, String> {
+  let task_id = taskId.or(task_id).unwrap_or_default();
+  crate::services::agent_cli::decide_change(&task_id, &path, accept)
+}

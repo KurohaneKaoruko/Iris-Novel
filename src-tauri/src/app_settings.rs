@@ -15,6 +15,13 @@ pub struct AppSettings {
   pub active_agent_id: String,
   pub launch_mode: LaunchMode,
   pub ai_edit_apply_mode: AiEditApplyMode,
+  /// 外部 Agent CLI 写入模式：review（快照+审阅，默认）| direct（直接写入）
+  #[serde(default = "default_cli_write_mode")]
+  pub agent_cli_write_mode: String,
+}
+
+fn default_cli_write_mode() -> String {
+  "review".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -66,6 +73,7 @@ impl Default for AppSettings {
       active_agent_id: "fantasy".to_string(),
       launch_mode: LaunchMode::default(),
       ai_edit_apply_mode: AiEditApplyMode::default(),
+      agent_cli_write_mode: default_cli_write_mode(),
     }
   }
 }
@@ -194,6 +202,9 @@ fn ensure_sane(mut s: AppSettings) -> AppSettings {
   if s.providers.is_empty() {
     s.providers = AppSettings::default().providers;
   }
+  if s.agent_cli_write_mode != "direct" {
+    s.agent_cli_write_mode = "review".to_string();
+  }
   if s.active_provider_id.trim().is_empty() || !s.providers.iter().any(|p| p.id == s.active_provider_id) {
     s.active_provider_id = s.providers[0].id.clone();
   }
@@ -268,6 +279,7 @@ pub fn load() -> Result<AppSettings, String> {
           active_agent_id: legacy.active_agent_id,
           launch_mode: LaunchMode::default(),
           ai_edit_apply_mode: AiEditApplyMode::default(),
+          agent_cli_write_mode: default_cli_write_mode(),
         };
         migrated = ensure_sane(migrated);
 

@@ -15,6 +15,12 @@ fn main() {
     .manage(iris_novel::state::AppState::default())
     .invoke_handler(tauri::generate_handler![
       commands::ping,
+      commands::agent_cli_detect,
+      commands::agent_cli_run_task,
+      commands::agent_cli_list_tasks,
+      commands::agent_cli_get_task,
+      commands::agent_cli_cancel_task,
+      commands::agent_cli_decide_change,
       commands::set_workspace,
       commands::get_last_workspace,
       commands::get_project_picker_state,

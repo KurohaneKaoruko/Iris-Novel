@@ -344,6 +344,52 @@ pub async fn dispatch(ctx: &ServerContext, command: &str, args: Value) -> Result
       Ok(json!(manager.apply_skill(&skill_id, &content)))
     }
 
+    // ---- external agent cli ----
+    "agent_cli_detect" => {
+      let v = crate::services::agent_cli::detect_clis().await?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "agent_cli_run_task" => {
+      let cli_id = arg_str(&args, &["cliId", "cli_id"])?;
+      let workspace_root = arg_str(&args, &["workspaceRoot", "workspace_root"])?;
+      let prompt = arg_str(&args, &["prompt"])?;
+      let write_mode = arg_opt_str(&args, &["writeMode", "write_mode"]);
+      let settings = crate::app_settings::load()?;
+      let v = crate::services::agent_cli::run_task(
+        state,
+        crate::services::agent_cli::CliTaskRequest {
+          cli_id,
+          workspace_root,
+          prompt,
+          write_mode,
+        },
+        &settings.agent_cli_write_mode,
+      )
+      .await?;
+      Ok(json!(v))
+    }
+    "agent_cli_list_tasks" => {
+      let v = crate::services::agent_cli::list_tasks();
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "agent_cli_get_task" => {
+      let id = arg_str(&args, &["taskId", "task_id"])?;
+      let v = crate::services::agent_cli::get_task(&id).ok_or("task not found")?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "agent_cli_cancel_task" => {
+      let id = arg_str(&args, &["taskId", "task_id"])?;
+      crate::services::agent_cli::cancel_task(&id)?;
+      Ok(json!(null))
+    }
+    "agent_cli_decide_change" => {
+      let id = arg_str(&args, &["taskId", "task_id"])?;
+      let path = arg_str(&args, &["path"])?;
+      let accept = args.get("accept").and_then(|v| v.as_bool()).unwrap_or(false);
+      let v = crate::services::agent_cli::decide_change(&id, &path, accept)?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+
     _ => Err(format!("unknown command: {command}")),
   }
 }

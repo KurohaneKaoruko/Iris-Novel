@@ -57,6 +57,8 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
     .map_err(|e| format!("invalid bind address: {e}"))?;
 
   let broadcast = BroadcastEventSink::new(256);
+  // fs_watcher 等经 global sink 发射的事件也进 WS 广播
+  crate::event_sink::global::init(Arc::new(broadcast.clone()));
   let ctx = ServerContext {
     app_state: Arc::new(AppState::default()),
     event_sink: Arc::new(broadcast.clone()),
