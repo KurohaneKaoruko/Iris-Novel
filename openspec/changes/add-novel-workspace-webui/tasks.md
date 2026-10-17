@@ -50,8 +50,8 @@
 
 ## 7. 内置 AI 小说特化
 
-- [ ] 7.1 `agent_system.rs` 工具注册收敛为白名单并补充小说专用工具（`novel_list_chapters`、`novel_read_index`、`novel_write_chapter`），Rust 单测覆盖三个新工具
-- [ ] 7.2 新增守护测试：注册表无 exec/shell/network 类工具名、fs 工具 `../` 路径逃逸被拒
+- [x] 7.1 `agent_system.rs` 工具注册收敛为白名单并补充小说专用工具（`novel_list_chapters`、`novel_read_index`、`novel_write_chapter`），Rust 单测覆盖三个新工具
+- [x] 7.2 新增守护测试：注册表无 exec/shell/network 类工具名、fs 工具 `../` 路径逃逸被拒
 - [ ] 7.3 内置 AI 系统提示词改为小说创作规范（视角/文风/章节结构/设定一致性），与既有写作技能协同，手测生成行为
 - [ ] 7.4 桌面端手测：内置 AI 全流程（续写/改写/规划）不回归，确认无命令执行类行为
 
