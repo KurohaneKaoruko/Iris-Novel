@@ -72,8 +72,10 @@ export function SensitiveWordHoverPlugin({ enabled = true }: SensitiveWordHoverP
 
   useEffect(() => {
     if (!enabled) {
-      setTooltip(prev => ({ ...prev, visible: false }))
-      return
+      // 隐藏提示属于外部系统（DOM 悬浮状态）同步，用事件循环微任务避免
+      // effect 体内同步 setState 级联渲染
+      const raf = window.requestAnimationFrame(() => setTooltip(prev => ({ ...prev, visible: false })))
+      return () => window.cancelAnimationFrame(raf)
     }
 
     const rootElement = editor.getRootElement()

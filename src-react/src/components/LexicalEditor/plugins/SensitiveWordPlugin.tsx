@@ -174,38 +174,6 @@ export function SensitiveWordPlugin({
     }
   }, [editor, enabled, dictionary.length, detectSensitiveWords, detectDebounced])
 
-  /**
-   * Expose API via editor instance
-   */
-  useEffect(() => {
-    const api: SensitiveWordPluginAPI = {
-      getSensitiveWordCount: () => matchesRef.current.length,
-      
-      getSensitiveWordPositions: () => {
-        return matchesRef.current.map(match => ({
-          word: match.word,
-          startOffset: match.startIndex,
-          endOffset: match.endIndex,
-          severity: match.severity,
-        }))
-      },
-      
-      loadDictionary: (words: string[]) => {
-        loadDictionary(words)
-        // Trigger immediate detection after loading dictionary
-        detectSensitiveWords()
-      },
-      
-      detectNow: () => {
-        detectSensitiveWords()
-      },
-    }
-
-    // Extend editor with API
-    const extendedEditor = editor as any
-    extendedEditor.sensitiveWordAPI = api
-  }, [editor, loadDictionary, detectSensitiveWords])
-
   return null
 }
 

@@ -49,10 +49,6 @@ export function useAutoSave({
 
     return () => clearInterval(timer)
   }, [filePath, content, enabled, intervalMs])
-
-  return {
-    lastSavedTime: lastSavedTimeRef.current,
-  }
 }
 
 /**

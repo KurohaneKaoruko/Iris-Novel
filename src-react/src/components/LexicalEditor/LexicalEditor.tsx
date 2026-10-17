@@ -384,16 +384,17 @@ export function LexicalEditor({
   
   // Initial config for LexicalComposer - include SensitiveWordNode and Markdown nodes
   // Memoize to prevent unnecessary re-initialization
+  const { namespace, theme, onError, nodes } = config
   const initialConfig = useMemo(() => ({
-    namespace: config.namespace,
-    theme: config.theme,
+    namespace,
+    theme,
     onError: (error: Error) => {
       console.error('Lexical Editor Error:', error)
       logError('Lexical editor error', error, {
-        namespace: config.namespace,
+        namespace,
         fileType,
       })
-      config.onError(error)
+      onError(error)
     },
     nodes: [
       SensitiveWordNode,
@@ -403,10 +404,10 @@ export function LexicalEditor({
       ListItemNode,
       CodeNode,
       LinkNode,
-      ...(config.nodes || [])
+      ...(nodes || [])
     ],
     editable: !readOnly,
-  }), [config.namespace, config.theme, config.onError, config.nodes, fileType, readOnly])
+  }), [namespace, theme, onError, nodes, fileType, readOnly])
   
   const handleRetry = () => {
     setRetryKey((prev) => prev + 1)
