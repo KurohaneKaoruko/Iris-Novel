@@ -13,9 +13,10 @@ type Props = {
   workspaceRoot: string | null
   activePath: string | null
   onOpenChapter: (filePath: string) => void
+  onCreateChapter?: () => void
 }
 
-export function ChapterList({ workspaceRoot, activePath, onOpenChapter }: Props) {
+export function ChapterList({ workspaceRoot, activePath, onOpenChapter, onCreateChapter }: Props) {
   const { t } = useI18n()
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [loading, setLoading] = useState(false)
@@ -49,15 +50,27 @@ export function ChapterList({ workspaceRoot, activePath, onOpenChapter }: Props)
           <AppIcon name="chapters" size={13} />
           <span>{t('chapterList.title')}</span>
         </span>
-        <button
-          type="button"
-          className="chapter-list-reload"
-          onClick={() => void reload()}
-          disabled={loading}
-          title={t('chapterList.reload')}
-        >
-          <AppIcon name="refresh" size={13} />
-        </button>
+        <span className="chapter-list-actions">
+          {onCreateChapter ? (
+            <button
+              type="button"
+              className="chapter-list-reload"
+              onClick={onCreateChapter}
+              title={t('chapterList.newChapter')}
+            >
+              <AppIcon name="add" size={13} />
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="chapter-list-reload"
+            onClick={() => void reload()}
+            disabled={loading}
+            title={t('chapterList.reload')}
+          >
+            <AppIcon name="refresh" size={13} />
+          </button>
+        </span>
       </div>
       <div className="chapter-list-body">
         {error ? <div className="chapter-list-error">{error}</div> : null}

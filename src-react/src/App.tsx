@@ -54,7 +54,7 @@ import { resolveInlineReferencesInput } from './services/inlineReferences'
 import { useMemoryWorkbench } from './hooks/useMemoryWorkbench'
 import DiffView from './components/DiffView'
 import EditorContextMenu from './components/EditorContextMenu'
-import { ChapterManager } from './components/ChapterManager'
+// ChapterManager 已由 WorkspaceLayout 左区 ChapterList 替代（4.3）
 import { CharacterManager } from './components/CharacterManager'
 import { PlotLineManager } from './components/PlotLineManager'
 import { WritingGoalPanel } from './components/WritingGoalPanel'
@@ -67,6 +67,7 @@ import { useAutoSave, clearAutoSavedContent } from './hooks/useAutoSave'
 import { useProjectWritingSettings } from './hooks/useProjectWritingSettings'
 import { useAutoStoryNavigation } from './hooks/useAutoStoryNavigation'
 import { useWorkspaceTabs } from './hooks/useWorkspaceTabs'
+import { WorkspaceLayout } from './components/WorkspaceLayout'
 import { useTaskQualityValidator } from './hooks/useTaskQualityValidator'
 import { useChatSessionWorkbench } from './hooks/useChatSessionWorkbench'
 import { APP_LOCALES, type AppLocale, useI18n } from './i18n'
@@ -602,7 +603,7 @@ function App() {
   >(null)
 
   // Activity Bar State
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'history' | 'chapters' | 'characters' | 'plotlines' | 'risk'>('files')
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'history' | 'chapters' | 'characters' | 'plotlines' | 'risk'>('characters')
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | 'writing-goal' | 'agent-cli' | null>('chat')
 
   // Workspace & Files
@@ -636,6 +637,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [showExportPanel, setShowExportPanel] = useState(false)
   const [exportBusy, setExportBusy] = useState(false)
+  const [immersiveMode, setImmersiveMode] = useState(false)
 
   // New state for model modal
   const [showModelModal, setShowModelModal] = useState(false)
@@ -1025,19 +1027,7 @@ function App() {
     [isMobileLayout, sidebarCollapsed, sidebarWidth],
   )
 
-  const startRightPanelResize = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      if (isMobileLayout || !activeRightTab) return
-      resizeStateRef.current = {
-        target: 'right',
-        startX: event.clientX,
-        startWidth: rightPanelWidth,
-      }
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    },
-    [activeRightTab, isMobileLayout, rightPanelWidth],
-  )
+  // 右栏拖宽已由 WorkspaceLayout 内部 resize handle 承载（4.3）。
 
   const layoutCssVars = useMemo(() => {
     if (isMobileLayout) return undefined
@@ -3986,10 +3976,10 @@ function App() {
   }
 
   return (
-    <div className="app-container" data-theme={theme} data-density={uiDensity} data-motion={uiMotion} style={layoutCssVars}>
+    <div className={`app-container ${immersiveMode ? 'immersive-active' : ''}`} data-theme={theme} data-density={uiDensity} data-motion={uiMotion} style={layoutCssVars}>
       <div className="workbench-body">
         {/* Activity Bar (Left) */}
-        <div className="activity-bar">
+        <div className={`activity-bar ${immersiveMode ? 'immersive-hidden' : ''}`}>
           <div
             className={`activity-bar-item ${activeSidebarTab === 'files' ? 'active' : ''}`}
             onClick={() => toggleSidebarTab('files')}
@@ -3997,13 +3987,7 @@ function App() {
           >
             <span className="activity-bar-icon"><AppIcon name="chapters" /></span>
           </div>
-          <div
-            className={`activity-bar-item ${activeSidebarTab === 'chapters' ? 'active' : ''}`}
-            onClick={() => toggleSidebarTab('chapters')}
-            title={t('app.activity.chapters')}
-          >
-            <span className="activity-bar-icon"><AppIcon name="chapters" /></span>
-          </div>
+          {/* 章节导航已由 WorkspaceLayout 左区 ChapterList 承载（四区布局主导航） */}
           <div
             className={`activity-bar-item ${activeSidebarTab === 'characters' ? 'active' : ''}`}
             onClick={() => toggleSidebarTab('characters')}
@@ -4056,7 +4040,7 @@ function App() {
         </div>
 
         {/* Sidebar Panel (Left) */}
-        <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${immersiveMode ? 'immersive-hidden' : ''}`}>
                 {activeSidebarTab === 'files' ? (
           <NovelStructurePanel
             workRoot={workRoot}
@@ -4097,20 +4081,7 @@ function App() {
           />
         ) : null}
 
-        {activeSidebarTab === 'chapters' ? (
-          <ChapterManager
-            onChapterClick={(chapter) => {
-              // Open the chapter file in the editor
-              void onOpenByPath(chapter.filePath)
-            }}
-            onChapterUpdate={() => {
-              // Optionally refresh the file tree or perform other updates
-              if (workRoot) {
-                void refreshTree()
-              }
-            }}
-          />
-        ) : null}
+        {/* 章节管理面板已由 WorkspaceLayout 左区 ChapterList 承载（4.3） */}
 
         {activeSidebarTab === 'characters' ? (
           <CharacterManager
@@ -4146,8 +4117,15 @@ function App() {
         />
       ) : null}
 
-      {/* Main Content */}
+      {/* Main Content: 四区工作区（左章节列表在 WorkspaceLayout 内） */}
       <div className="main-content">
+      <WorkspaceLayout
+        workspaceRoot={workRoot}
+        activePath={activePath}
+        onOpenChapter={(filePath) => void onOpenByPath(filePath)}
+        onCreateChapter={() => void onNewChapter()}
+        tabsSlot={
+          <>
         <TabBar
           tabs={openFiles.map((f) => ({
             id: f.path,
@@ -4182,6 +4160,7 @@ function App() {
           }}
         />
         {activeFile ? (
+          <>
           <div className="editor-tabs-actions">
             <button className="icon-button" disabled={!workRoot} onClick={() => void onNewChapter()} title={t('app.action.newChapter')}>
               <AppIcon name="add" size={14} />
@@ -4206,7 +4185,11 @@ function App() {
               <AppIcon name="preview" size={15} />
             </button>
           </div>
+          </>
         ) : null}
+          </>
+        }
+        editorSlot={
         <div className="editor-content">
           {activeFile ? (
             <>
@@ -4281,20 +4264,17 @@ function App() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Right Activity Bar & Panel */}
-      <div className="right-panel-container">
-        {!isMobileLayout && activeRightTab ? (
-          <div
-            className="layout-resize-handle layout-resize-handle-right"
-            onMouseDown={startRightPanelResize}
-            title={t('app.action.dragResizeRight')}
-          />
+        }
+        aiPanelSlot={
+          <div className="workspace-ai-stack">
+        {!activeRightTab ? (
+          <div className="workspace-ai-placeholder">
+            <button type="button" onClick={() => toggleRightTab('chat')}>
+              {t('layout.showAiPanel')}
+            </button>
+          </div>
         ) : null}
-        {activeRightTab ? (
-          <aside className="right-panel-content">
-            {activeRightTab === 'chat' ? (
+        {activeRightTab === 'chat' ? (
               <AIChatPanel
                 writerMode={writerMode}
                 plannerLastRunError={plannerLastRunError}
@@ -4404,9 +4384,21 @@ function App() {
             ) : null}
 
             {activeRightTab === 'agent-cli' ? <AgentCliPanel workspaceRoot={workRoot} /> : null}
-          </aside>
-        ) : null}
+          </div>
+        }
+        sidebarCollapsed={sidebarCollapsed}
+        sidebarWidth={sidebarWidth}
+        rightPanelWidth={rightPanelWidth}
+        onSidebarCollapsedChange={setSidebarCollapsed}
+        onSidebarWidthChange={setSidebarWidth}
+        onRightPanelWidthChange={setRightPanelWidth}
+        immersive={immersiveMode}
+        onImmersiveChange={setImmersiveMode}
+      />
+      </div>
 
+      {/* Right Activity Bar（面板切换；面板本体在 WorkspaceLayout 右区） */}
+      <div className={`right-panel-container ${immersiveMode ? 'immersive-hidden' : ''}`}>
         <div className="right-activity-bar">
           <div
             className={`right-activity-item ${activeRightTab === 'chat' ? 'active' : ''}`}

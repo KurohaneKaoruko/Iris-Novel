@@ -25,6 +25,7 @@ type Props = {
   workspaceRoot: string | null
   activePath: string | null
   onOpenChapter: (filePath: string) => void
+  onCreateChapter?: () => void
   /** 渲染槽：由 App 提供既有组件（TabBar/编辑器/AI 栏），容器只负责布局 */
   tabsSlot: ReactNode
   editorSlot: ReactNode
@@ -51,6 +52,7 @@ export function WorkspaceLayout(props: Props) {
     workspaceRoot,
     activePath,
     onOpenChapter,
+    onCreateChapter,
     tabsSlot,
     editorSlot,
     aiPanelSlot,
@@ -156,6 +158,7 @@ export function WorkspaceLayout(props: Props) {
               workspaceRoot={workspaceRoot}
               activePath={activePath}
               onOpenChapter={onOpenChapter}
+              onCreateChapter={onCreateChapter}
             />
             <button
               type="button"

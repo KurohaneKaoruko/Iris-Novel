@@ -6170,3 +6170,45 @@ textarea:focus-visible {
   }
 }
 
+
+/* 沉浸模式：隐藏外围壳，仅 WorkspaceLayout 全屏 AI 区 */
+.app-container.immersive-active .workbench-body {
+  flex-direction: column;
+}
+
+.app-container.immersive-active .sidebar,
+.app-container.immersive-active .activity-bar,
+.app-container.immersive-active .right-panel-container,
+.immersive-hidden {
+  display: none !important;
+}
+
+.app-container.immersive-active .main-content {
+  flex: 1;
+  min-height: 0;
+}
+
+.workspace-ai-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.workspace-ai-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-ai-placeholder button {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2, var(--bg-primary));
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
