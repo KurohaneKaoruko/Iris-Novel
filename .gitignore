@@ -38,3 +38,4 @@ __tests__/
 *.test.tsx
 !src-react/__tests__/
 !src-react/__tests__/*.test.ts
+!src-react/__tests__/*.test.tsx
