@@ -1,0 +1,191 @@
+.workspace-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.workspace-layout.resizing,
+body.workspace-layout-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.workspace-left {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-1, var(--bg-secondary));
+}
+
+.workspace-resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.12s;
+  z-index: 2;
+}
+
+.workspace-resize-handle:hover,
+.workspace-resize-handle:active {
+  background: var(--accent-primary);
+}
+
+.workspace-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-main-tabs {
+  flex-shrink: 0;
+}
+
+.workspace-main-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.workspace-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-1, var(--bg-secondary));
+}
+
+.workspace-collapse-btn,
+.workspace-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.workspace-collapse-btn {
+  position: absolute;
+  right: 2px;
+  top: 8px;
+  width: 18px;
+  height: 22px;
+  z-index: 3;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.workspace-left:hover .workspace-collapse-btn {
+  opacity: 1;
+}
+
+.workspace-collapse-btn:hover,
+.workspace-expand-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-2, var(--bg-active));
+}
+
+.workspace-expand-btn {
+  width: 16px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-1, var(--bg-secondary));
+}
+
+.workspace-collapse-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.workspace-right-toggle {
+  position: absolute;
+  right: 0;
+  top: 8px;
+  width: 22px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: var(--surface-2, var(--bg-primary));
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 3;
+}
+
+.workspace-right-toggle:hover {
+  color: var(--text-primary);
+}
+
+.workspace-right-toggle.visible {
+  right: 0;
+}
+
+.workspace-immersive-enter {
+  position: absolute;
+  right: 30px;
+  top: 8px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2, var(--bg-primary));
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 3;
+}
+
+.workspace-immersive-enter:hover {
+  color: var(--text-accent);
+  border-color: var(--accent-primary);
+}
+
+/* 沉浸模式：全屏 AI 对话 */
+.workspace-layout.immersive {
+  flex-direction: column;
+}
+
+.workspace-immersive-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.workspace-immersive-exit {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2, var(--bg-primary));
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.workspace-immersive-exit:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
