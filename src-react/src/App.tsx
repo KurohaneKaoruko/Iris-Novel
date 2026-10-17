@@ -68,6 +68,7 @@ import { useProjectWritingSettings } from './hooks/useProjectWritingSettings'
 import { useAutoStoryNavigation } from './hooks/useAutoStoryNavigation'
 import { useWorkspaceTabs } from './hooks/useWorkspaceTabs'
 import { WorkspaceLayout } from './components/WorkspaceLayout'
+import { MaterialGraphPanel } from './components/MaterialGraphPanel'
 import { useTaskQualityValidator } from './hooks/useTaskQualityValidator'
 import { useChatSessionWorkbench } from './hooks/useChatSessionWorkbench'
 import { APP_LOCALES, type AppLocale, useI18n } from './i18n'
@@ -4359,6 +4360,13 @@ function App() {
             ) : null}
 
             {activeRightTab === 'graph' ? (
+              <MaterialGraphPanel
+                onOpenSourceFile={(path) => void onOpenByPath(path)}
+              />
+            ) : null}
+
+            {/* 旧 canvas 环形图谱保留在代码中，需要时可将 'legacy-graph' 加入 RightTab 联合类型恢复
+            {activeRightTab === 'legacy-graph' ? (
               <div className="graph-panel">
                 <div className="ai-header graph-header">
                   <button className="icon-button" onClick={() => void loadGraph()}>
@@ -4373,6 +4381,7 @@ function App() {
                 </div>
               </div>
             ) : null}
+            */}
 
             {activeRightTab === 'writing-goal' ? (
               <WritingGoalPanel

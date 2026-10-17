@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useI18n } from '../i18n'
 import './Export.css'
 
@@ -30,10 +30,6 @@ export function ExportPanel({ isOpen, onClose, onExport, busy = false, workspace
   const [includeCharacters, setIncludeCharacters] = useState(false)
   const [includeMetadata, setIncludeMetadata] = useState(true)
   const [title, setTitle] = useState(workspaceName)
-
-  useEffect(() => {
-    if (isOpen) setTitle((prev) => (prev ? prev : workspaceName))
-  }, [isOpen, workspaceName])
 
   if (!isOpen) return null
 
