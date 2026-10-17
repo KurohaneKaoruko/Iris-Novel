@@ -4,19 +4,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
-use tauri::AppHandle;
 
 #[derive(Default, Serialize, Deserialize)]
 struct SecretsFile {
   providers: BTreeMap<String, String>,
 }
 
-fn secrets_path(app: &AppHandle) -> Result<PathBuf, String> {
-  app_data::secrets_file_path(app, "secrets.json")
+fn secrets_path() -> Result<PathBuf, String> {
+  app_data::secrets_file_path("secrets.json")
 }
 
-fn read_secrets_file(app: &AppHandle) -> Result<SecretsFile, String> {
-  let path = secrets_path(app)?;
+fn read_secrets_file() -> Result<SecretsFile, String> {
+  let path = secrets_path()?;
   if !path.exists() {
     return Ok(SecretsFile::default());
   }
@@ -24,8 +23,8 @@ fn read_secrets_file(app: &AppHandle) -> Result<SecretsFile, String> {
   serde_json::from_str(&raw).map_err(|e| format!("parse secrets failed: {e}"))
 }
 
-fn write_secrets_file(app: &AppHandle, s: &SecretsFile) -> Result<(), String> {
-  let path = secrets_path(app)?;
+fn write_secrets_file(s: &SecretsFile) -> Result<(), String> {
+  let path = secrets_path()?;
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent).map_err(|e| format!("create secrets dir failed: {e}"))?;
   }
@@ -122,16 +121,16 @@ fn unprotect_bytes(ciphertext: &[u8]) -> Result<Vec<u8>, String> {
   Ok(ciphertext.to_vec())
 }
 
-fn store_fallback(app: &AppHandle, provider: &str, api_key: &str) -> Result<(), String> {
-  let mut s = read_secrets_file(app)?;
+fn store_fallback(provider: &str, api_key: &str) -> Result<(), String> {
+  let mut s = read_secrets_file()?;
   let encrypted = protect_bytes(api_key.as_bytes())?;
   let encoded = general_purpose::STANDARD.encode(encrypted);
   s.providers.insert(provider.to_string(), encoded);
-  write_secrets_file(app, &s)
+  write_secrets_file(&s)
 }
 
-fn load_fallback(app: &AppHandle, provider: &str) -> Result<Option<String>, String> {
-  let s = read_secrets_file(app)?;
+fn load_fallback(provider: &str) -> Result<Option<String>, String> {
+  let s = read_secrets_file()?;
   let encoded = match s.providers.get(provider) {
     Some(v) => v,
     None => return Ok(None),
@@ -144,7 +143,7 @@ fn load_fallback(app: &AppHandle, provider: &str) -> Result<Option<String>, Stri
   Ok(Some(v))
 }
 
-pub fn set_api_key(app: &AppHandle, provider: &str, api_key: &str) -> Result<(), String> {
+pub fn set_api_key(provider: &str, api_key: &str) -> Result<(), String> {
   let provider = provider.trim();
   if provider.is_empty() {
     return Err("provider empty".to_string());
@@ -153,16 +152,16 @@ pub fn set_api_key(app: &AppHandle, provider: &str, api_key: &str) -> Result<(),
   if api_key.is_empty() {
     return Err("api key empty".to_string());
   }
-  store_fallback(app, provider, api_key)
+  store_fallback(provider, api_key)
 }
 
-pub fn get_api_key(app: &AppHandle, provider: &str) -> Result<Option<String>, String> {
+pub fn get_api_key(provider: &str) -> Result<Option<String>, String> {
   let provider = provider.trim();
   if provider.is_empty() {
     return Ok(None);
   }
 
-  match load_fallback(app, provider)? {
+  match load_fallback(provider)? {
     Some(v) if !v.trim().is_empty() => Ok(Some(v)),
     _ => Ok(None),
   }

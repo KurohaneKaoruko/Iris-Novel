@@ -213,8 +213,8 @@ fn ensure_sane(mut s: AppSettings) -> AppSettings {
   s
 }
 
-pub fn load(app: &tauri::AppHandle) -> Result<AppSettings, String> {
-  let path = settings_path(app)?;
+pub fn load() -> Result<AppSettings, String> {
+  let path = settings_path()?;
   if !path.exists() {
     return Ok(ensure_sane(AppSettings::default()));
   }
@@ -273,11 +273,11 @@ pub fn load(app: &tauri::AppHandle) -> Result<AppSettings, String> {
 
         for p in &mut migrated.providers {
           if !p.api_key.trim().is_empty() {
-            secrets::set_api_key(app, &p.id, p.api_key.trim())?;
+            secrets::set_api_key(&p.id, p.api_key.trim())?;
             p.api_key.clear();
           }
         }
-        let _ = save(app, &migrated);
+        let _ = save(&migrated);
         Ok(migrated)
       }
       Err(_) => Err(format!("parse settings failed: {new_err}")),
@@ -285,8 +285,8 @@ pub fn load(app: &tauri::AppHandle) -> Result<AppSettings, String> {
   }
 }
 
-pub fn save(app: &tauri::AppHandle, settings: &AppSettings) -> Result<(), String> {
-  let path = settings_path(app)?;
+pub fn save(settings: &AppSettings) -> Result<(), String> {
+  let path = settings_path()?;
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent).map_err(|e| format!("create settings dir failed: {e}"))?;
   }
@@ -295,6 +295,6 @@ pub fn save(app: &tauri::AppHandle, settings: &AppSettings) -> Result<(), String
   fs::write(path, raw).map_err(|e| format!("write settings failed: {e}"))
 }
 
-fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  app_data::config_file_path(app, "settings.json")
+fn settings_path() -> Result<PathBuf, String> {
+  app_data::config_file_path("settings.json")
 }

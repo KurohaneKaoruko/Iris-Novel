@@ -140,12 +140,12 @@ fn normalize_active_agent_id(app: &AppHandle, settings: &mut app_settings::AppSe
 }
 
 pub fn get_app_settings(app: &AppHandle) -> Result<app_settings::AppSettings, String> {
-  let mut s = app_settings::load(app)?;
+  let mut s = app_settings::load()?;
   let prev_agent_id = s.active_agent_id.clone();
   let prev_active_writing_assistant_id = s.active_writing_assistant_id.clone();
   normalize_active_agent_id(app, &mut s);
   if s.active_agent_id != prev_agent_id || s.active_writing_assistant_id != prev_active_writing_assistant_id {
-    let _ = app_settings::save(app, &s);
+    let _ = app_settings::save(&s);
   }
   // Clear keys for display security
   for p in &mut s.providers {
@@ -168,12 +168,12 @@ pub fn set_app_settings(app: &AppHandle, settings: app_settings::AppSettings) ->
   // Save API keys to secrets if present
   for p in &mut s.providers {
     if !p.api_key.trim().is_empty() {
-      secrets::set_api_key(app, &p.id, p.api_key.trim())?;
+      secrets::set_api_key(&p.id, p.api_key.trim())?;
       p.api_key.clear();
     }
   }
   
-  app_settings::save(app, &s)
+  app_settings::save(&s)
 }
 
 #[allow(non_snake_case)]
@@ -181,7 +181,7 @@ pub fn get_api_key_status(app: &AppHandle, providerId: Option<String>, provider_
   let pid = providerId
     .or(provider_id)
     .unwrap_or_default();
-  match secrets::get_api_key(app, pid.trim()) {
+  match secrets::get_api_key(pid.trim()) {
     Ok(Some(v)) => Ok(!v.trim().is_empty()),
     Ok(None) => Ok(false),
     Err(e) => Err(e),
@@ -206,7 +206,7 @@ pub fn set_api_key(
   if key.is_empty() {
     return Err("api_key is required".to_string());
   }
-  secrets::set_api_key(app, pid, key)
+  secrets::set_api_key(pid, key)
 }
 
 // ---- 由 commands.rs 等价搬移（提供商解析与连通性）----
@@ -226,7 +226,7 @@ pub(crate) fn provider_has_configured_api_key(
     return true;
   }
   matches!(
-    secrets::get_api_key(app, provider.id.trim()),
+    secrets::get_api_key(provider.id.trim()),
     Ok(Some(v)) if !v.trim().is_empty()
   )
 }
@@ -328,7 +328,7 @@ pub(crate) fn resolve_provider_api_key(
       return Ok(trimmed);
     }
   }
-  match secrets::get_api_key(app, provider.id.trim()) {
+  match secrets::get_api_key(provider.id.trim()) {
     Ok(Some(v)) if !v.trim().is_empty() => Ok(v),
     Ok(_) => {
       let fallback = provider.api_key.trim().to_string();

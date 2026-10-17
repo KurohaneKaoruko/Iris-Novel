@@ -52,7 +52,7 @@ pub fn save(app: &tauri::AppHandle, agents: &[Agent]) -> Result<(), String> {
 }
 
 pub fn load_custom(app: &tauri::AppHandle) -> Result<Vec<Agent>, String> {
-  let path = agents_path(app)?;
+  let path = agents_path()?;
   if !path.exists() {
     return Ok(Vec::new());
   }
@@ -66,8 +66,8 @@ pub fn load_custom(app: &tauri::AppHandle) -> Result<Vec<Agent>, String> {
   Ok(customs)
 }
 
-pub fn save_custom(app: &tauri::AppHandle, agents: &[Agent]) -> Result<(), String> {
-  let path = agents_path(app)?;
+pub fn save_custom(_app: &tauri::AppHandle, agents: &[Agent]) -> Result<(), String> {
+  let path = agents_path()?;
   if agents.is_empty() {
     if path.exists() {
       fs::remove_file(&path).map_err(|e| format!("remove agents failed: {e}"))?;
@@ -498,6 +498,6 @@ pub fn default_agents() -> Vec<Agent> {
   agents
 }
 
-fn agents_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-  app_data::data_file_path(app, "agents.json")
+fn agents_path() -> Result<PathBuf, String> {
+  app_data::data_file_path("agents.json")
 }

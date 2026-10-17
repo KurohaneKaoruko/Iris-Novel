@@ -44,8 +44,8 @@ pub(crate) struct ExternalProjectRecord {
   pub(crate) added_at: i64,
 }
 
-pub fn get_last_workspace(app: &AppHandle) -> Result<Option<String>, String> {
-  let path = last_workspace_path(app)?;
+pub fn get_last_workspace(_app: &AppHandle) -> Result<Option<String>, String> {
+  let path = last_workspace_path()?;
   if !path.exists() {
     return Ok(None);
   }
@@ -65,12 +65,12 @@ pub fn get_last_workspace(app: &AppHandle) -> Result<Option<String>, String> {
   Ok(Some(p))
 }
 
-fn last_workspace_path(app: &AppHandle) -> Result<PathBuf, String> {
-  app_data::state_file_path(app, "last_workspace.json")
+fn last_workspace_path() -> Result<PathBuf, String> {
+  app_data::state_file_path("last_workspace.json")
 }
 
-pub(crate) fn save_last_workspace(app: &AppHandle, root: &Path) -> Result<(), String> {
-  let path = last_workspace_path(app)?;
+pub(crate) fn save_last_workspace(_app: &AppHandle, root: &Path) -> Result<(), String> {
+  let path = last_workspace_path()?;
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent).map_err(|e| format!("create last workspace dir failed: {e}"))?;
   }
@@ -78,12 +78,12 @@ pub(crate) fn save_last_workspace(app: &AppHandle, root: &Path) -> Result<(), St
   fs::write(path, payload).map_err(|e| format!("write last workspace failed: {e}"))
 }
 
-fn external_projects_path(app: &AppHandle) -> Result<PathBuf, String> {
-  app_data::state_file_path(app, "external_projects.json")
+fn external_projects_path() -> Result<PathBuf, String> {
+  app_data::state_file_path("external_projects.json")
 }
 
-fn load_external_projects(app: &AppHandle) -> Result<Vec<ExternalProjectRecord>, String> {
-  let path = external_projects_path(app)?;
+fn load_external_projects(_app: &AppHandle) -> Result<Vec<ExternalProjectRecord>, String> {
+  let path = external_projects_path()?;
   if !path.exists() {
     return Ok(Vec::new());
   }
@@ -93,8 +93,8 @@ fn load_external_projects(app: &AppHandle) -> Result<Vec<ExternalProjectRecord>,
   Ok(parsed.projects)
 }
 
-fn save_external_projects(app: &AppHandle, records: &[ExternalProjectRecord]) -> Result<(), String> {
-  let path = external_projects_path(app)?;
+fn save_external_projects(_app: &AppHandle, records: &[ExternalProjectRecord]) -> Result<(), String> {
+  let path = external_projects_path()?;
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent).map_err(|e| format!("create external projects dir failed: {e}"))?;
   }
@@ -288,7 +288,7 @@ fn parse_launch_mode(mode: &str) -> Result<app_settings::LaunchMode, String> {
 pub fn get_project_picker_state(app: &AppHandle) -> Result<ProjectPickerState, String> {
   let default_root = default_projects_root()?;
   let default_projects = list_default_projects(&default_root)?;
-  let settings = app_settings::load(app)?;
+  let settings = app_settings::load()?;
   let last_workspace = get_last_workspace(app)?;
 
   let mut seen_paths: HashSet<String> = HashSet::new();
@@ -399,9 +399,9 @@ pub fn forget_external_project(app: &AppHandle, path: &str) -> Result<(), String
 }
 
 pub fn set_launch_mode(app: &AppHandle, mode: &str) -> Result<(), String> {
-  let mut settings = app_settings::load(app)?;
+  let mut settings = app_settings::load()?;
   settings.launch_mode = parse_launch_mode(mode)?;
-  app_settings::save(app, &settings)
+  app_settings::save(&settings)
 }
 
 pub fn update_work_description(path: &str, description: Option<String>) -> Result<(), String> {
