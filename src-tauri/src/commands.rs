@@ -576,7 +576,7 @@ pub fn chat_generate_stream(
     let _ = window_for_task.emit("ai_stream_start", payload_start);
     emit_stream_status(&window_for_task, &stream_id_for_task, "initializing");
 
-    let settings = match app_settings::load(&app) {
+    let settings = match app_settings::load() {
       Ok(v) => v,
       Err(e) => {
         let _ = window_for_task.emit(
@@ -943,7 +943,7 @@ async fn call_openai_unbounded(
   temperature_override: Option<f32>,
   live_stream: Option<&LiveStreamSession>,
 ) -> Result<String, String> {
-  let api_key = match secrets::get_api_key(app, &cfg.id) {
+  let api_key = match secrets::get_api_key(&cfg.id) {
     Ok(Some(v)) => v,
     Ok(None) => cfg.api_key.trim().to_string(),
     Err(e) => return Err(format!("keyring read failed: {e}")),
@@ -1165,7 +1165,7 @@ async fn call_anthropic_unbounded(
   system_prompt: &str,
   live_stream: Option<&LiveStreamSession>,
 ) -> Result<String, String> {
-  let api_key = match secrets::get_api_key(app, &cfg.id) {
+  let api_key = match secrets::get_api_key(&cfg.id) {
     Ok(Some(v)) => v,
     Ok(None) => cfg.api_key.trim().to_string(),
     Err(e) => return Err(format!("keyring read failed: {e}")),
@@ -1357,7 +1357,7 @@ pub async fn ai_assistance_generate(
   _state: State<'_, AppState>,
   prompt: String,
 ) -> Result<String, String> {
-  let settings = app_settings::load(&app)?;
+  let settings = app_settings::load()?;
   let client = crate::services::build_http_client()?;
 
   let current_provider = resolve_current_provider(&app, &settings)?;
@@ -1647,7 +1647,7 @@ pub async fn risk_scan_content(
     return Err("content is empty".to_string());
   }
 
-  let settings = app_settings::load(&app)?;
+  let settings = app_settings::load()?;
   let current_provider = resolve_current_provider(&app, &settings)?;
   let client = crate::services::build_http_client()?;
   let scanned_chars = content.chars().count();
