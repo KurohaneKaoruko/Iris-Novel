@@ -51,6 +51,11 @@ import { cleanupStreamRefs, type StreamMapRefs } from './services/streamRefs'
 import { parseComposerInput } from './services/chatComposer'
 import { appendStreamTextWithOverlap, formatElapsedLabel } from './services/chatStreamText'
 import { resolveInlineReferencesInput } from './services/inlineReferences'
+import {
+  analyzeInjectionPlan,
+  composeInjectedContext,
+  type InjectionPlan,
+} from './services/ContextInjectionService'
 import { useMemoryWorkbench } from './hooks/useMemoryWorkbench'
 import DiffView from './components/DiffView'
 import EditorContextMenu from './components/EditorContextMenu'
@@ -639,6 +644,8 @@ function App() {
   const [showExportPanel, setShowExportPanel] = useState(false)
   const [exportBusy, setExportBusy] = useState(false)
   const [immersiveMode, setImmersiveMode] = useState(false)
+  const [injectionPlan, setInjectionPlan] = useState<InjectionPlan | null>(null)
+  const [injectionRemovedKeys, setInjectionRemovedKeys] = useState<Set<string>>(new Set())
 
   // New state for model modal
   const [showModelModal, setShowModelModal] = useState(false)
@@ -2068,6 +2075,35 @@ function App() {
 
       const requestedMode: WriterMode | null = parsedDirective.requestedMode
       const content = requestedMode ? parsedDirective.content : rawInput
+
+      // 6.1 生成前资料分析：产出涉及资料清单（显式 #引用 + 人物名匹配 + 当前章节）
+      let injectionPlanLocal: InjectionPlan | null = null
+      let injectionContextBlock = ''
+      try {
+        const explicitRefs = Array.from(content.matchAll(/#([A-Za-z0-9_./\\\u4e00-\u9fa5-]+\.[A-Za-z0-9]{1,16})/g)).map((m) => m[1])
+        injectionPlanLocal = await analyzeInjectionPlan({
+          requestText: content,
+          currentChapterPath: activeFile?.path?.startsWith('stories/') ? activeFile.path : null,
+          explicitRefs,
+        })
+        // 应用用户在上下文卡上的移除调整（6.2），再按优先级裁剪（6.3，预算 ~24k 字符）
+        const effectivePlan: InjectionPlan = injectionPlanLocal
+          ? {
+              ...injectionPlanLocal,
+              items: injectionPlanLocal.items.filter((i) => !injectionRemovedKeys.has(i.key)),
+            }
+          : injectionPlanLocal
+        const composed = composeInjectedContext(effectivePlan, 24_000)
+        injectionContextBlock = composed.contextBlock
+        if (composed.trimmed.length > 0) {
+          setError(t('app.injection.trimmed', { names: composed.trimmed.map((i) => i.title).join('、') }))
+        }
+      } catch {
+        // 分析失败降级为现有组装（不注入），不中断发送
+        injectionPlanLocal = null
+        injectionContextBlock = ''
+      }
+      setInjectionPlan(injectionPlanLocal)
       const applyRequestedMode = async (mode: WriterMode) => {
         if (mode === writerModeRef.current) return
         if (!workRoot || !isTauriApp()) {
@@ -2125,6 +2161,10 @@ function App() {
           const msg = e instanceof Error ? e.message : String(e)
           setError(msg)
         }
+      }
+      // 6.1/6.3 注入块拼接在模式包装之后（项目侧确定性注入，优先级最高）
+      if (injectionContextBlock) {
+        sendPayload = `${injectionContextBlock}\n\n${sendPayload}`
       }
 
       const selectedProviderId = options?.overrideProviderId?.trim() || effectiveProviderId
@@ -2299,6 +2339,7 @@ function App() {
       buildPromptByMode,
       chatInput,
       effectiveProviderId,
+      injectionRemovedKeys,
       ensurePlanningArtifacts,
       getSelectionText,
       newId,
@@ -4282,6 +4323,16 @@ function App() {
                 plannerTasks={plannerTasks}
                 plannerBusy={plannerBusy}
                 plannerQueueRunning={plannerQueueRunning}
+                injectionPlan={injectionPlan}
+                injectionRemovedKeys={injectionRemovedKeys}
+                onInjectionToggle={(key) =>
+                  setInjectionRemovedKeys((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(key)) next.delete(key)
+                    else next.add(key)
+                    return next
+                  })
+                }
                 onRunNextPlannerTask={onRunNextPlannerTask}
                 onRetryPlannerTask={(taskId) => void onRetryPlannerTask(taskId)}
                 onMarkPlannerTaskDone={(taskId) => void onMarkPlannerTaskDone(taskId)}
