@@ -1,27 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod commands;
-mod services;
-mod event_sink;
-mod ai_types;
-mod agent_system;
-mod app_data;
-mod app_settings;
-mod agents;
-mod chat_history;
-mod secrets;
-mod state;
-mod modification_types;
-mod ai_response_parser;
-mod prompt_config;
-mod skills;
-mod mcp;
-mod book_split;
+use iris_novel::commands;
 
 fn main() {
+  let late_sink = std::sync::Arc::new(iris_novel::event_sink::LateTauriEventSink::default());
+  iris_novel::event_sink::global::init(late_sink.clone());
+  let late_for_setup = late_sink.clone();
   tauri::Builder::default()
+    .setup(move |app| {
+      late_for_setup.bind(app.handle().clone());
+      Ok(())
+    })
     .plugin(tauri_plugin_dialog::init())
-    .manage(state::AppState::default())
+    .manage(iris_novel::state::AppState::default())
     .invoke_handler(tauri::generate_handler![
       commands::ping,
       commands::set_workspace,

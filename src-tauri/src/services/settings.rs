@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::AppHandle;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ProjectWritingSettings {
@@ -139,7 +138,7 @@ fn normalize_active_agent_id(settings: &mut app_settings::AppSettings) {
   settings.active_agent_id = fallback;
 }
 
-pub fn get_app_settings(_app: &AppHandle) -> Result<app_settings::AppSettings, String> {
+pub fn get_app_settings() -> Result<app_settings::AppSettings, String> {
   let mut s = app_settings::load()?;
   let prev_agent_id = s.active_agent_id.clone();
   let prev_active_writing_assistant_id = s.active_writing_assistant_id.clone();
@@ -154,7 +153,7 @@ pub fn get_app_settings(_app: &AppHandle) -> Result<app_settings::AppSettings, S
   Ok(s)
 }
 
-pub fn set_app_settings(_app: &AppHandle, settings: app_settings::AppSettings) -> Result<(), String> {
+pub fn set_app_settings(settings: app_settings::AppSettings) -> Result<(), String> {
   let mut s = settings.clone();
 
   if s.providers.is_empty() {
@@ -177,7 +176,7 @@ pub fn set_app_settings(_app: &AppHandle, settings: app_settings::AppSettings) -
 }
 
 #[allow(non_snake_case)]
-pub fn get_api_key_status(_app: &AppHandle, providerId: Option<String>, provider_id: Option<String>) -> Result<bool, String> {
+pub fn get_api_key_status(providerId: Option<String>, provider_id: Option<String>) -> Result<bool, String> {
   let pid = providerId
     .or(provider_id)
     .unwrap_or_default();
@@ -190,7 +189,6 @@ pub fn get_api_key_status(_app: &AppHandle, providerId: Option<String>, provider
 
 #[allow(non_snake_case)]
 pub fn set_api_key(
-  _app: &AppHandle,
   providerId: Option<String>,
   provider_id: Option<String>,
   apiKey: Option<String>,
@@ -426,7 +424,6 @@ async fn probe_provider_connectivity(
 
 #[allow(non_snake_case)]
 pub async fn test_provider_connectivity(
-  _app: &AppHandle,
   provider: app_settings::ModelProvider,
   apiKey: Option<String>,
   api_key: Option<String>,
@@ -447,20 +444,20 @@ pub async fn test_provider_connectivity(
 }
 
 // ---- 由 commands.rs 等价搬移（写作助手配置）----
-pub fn get_agents(_app: &AppHandle) -> Result<Vec<agents::Agent>, String> {
+pub fn get_agents() -> Result<Vec<agents::Agent>, String> {
   agents::load()
 }
 
-pub fn set_agents(_app: &AppHandle, agents_list: Vec<agents::Agent>) -> Result<(), String> {
+pub fn set_agents(agents_list: Vec<agents::Agent>) -> Result<(), String> {
   agents::save( &agents_list)
 }
 
-pub fn export_agents(_app: &AppHandle) -> Result<String, String> {
+pub fn export_agents() -> Result<String, String> {
   let list = agents::load_custom()?;
   serde_json::to_string_pretty(&list).map_err(|e| format!("export agents failed: {e}"))
 }
 
-pub fn import_agents(_app: &AppHandle, json: String) -> Result<(), String> {
+pub fn import_agents(json: String) -> Result<(), String> {
   let list: Vec<agents::Agent> = serde_json::from_str(&json).map_err(|e| format!("import agents failed: {e}"))?;
   agents::save_custom( &list)
 }

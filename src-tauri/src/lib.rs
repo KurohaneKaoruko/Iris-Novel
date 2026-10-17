@@ -1,0 +1,20 @@
+//! Iris-Novel 共享库：桌面（Tauri）与本地服务端（iris-novel-server）共用。
+
+pub mod commands;
+pub mod services;
+pub mod event_sink;
+pub mod ai_types;
+pub mod agent_system;
+pub mod app_data;
+pub mod app_settings;
+pub mod agents;
+pub mod chat_history;
+pub mod secrets;
+pub mod state;
+pub mod modification_types;
+pub mod ai_response_parser;
+pub mod prompt_config;
+pub mod skills;
+pub mod mcp;
+pub mod book_split;
+pub mod server;

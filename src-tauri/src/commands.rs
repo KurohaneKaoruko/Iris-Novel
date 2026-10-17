@@ -32,18 +32,18 @@ pub fn ping() -> &'static str {
 }
 
 #[tauri::command]
-pub fn set_workspace(app: AppHandle, state: State<'_, AppState>, path: String) -> Result<WorkspaceInfo, String> {
-  crate::services::workspace::set_workspace(&app, &state, &path)
+pub fn set_workspace(_app: AppHandle, state: State<'_, AppState>, path: String) -> Result<WorkspaceInfo, String> {
+  crate::services::workspace::set_workspace(&state, &path)
 }
 
 #[tauri::command]
-pub fn get_last_workspace(app: AppHandle) -> Result<Option<String>, String> {
-  crate::services::bookshelf::get_last_workspace(&app)
+pub fn get_last_workspace(_app: AppHandle) -> Result<Option<String>, String> {
+  crate::services::bookshelf::get_last_workspace()
 }
 
 #[tauri::command]
-pub fn get_project_picker_state(app: AppHandle) -> Result<ProjectPickerState, String> {
-  crate::services::bookshelf::get_project_picker_state(&app)
+pub fn get_project_picker_state(_app: AppHandle) -> Result<ProjectPickerState, String> {
+  crate::services::bookshelf::get_project_picker_state()
 }
 
 #[tauri::command]
@@ -52,28 +52,28 @@ pub fn create_novel_project(name: String, description: Option<String>) -> Result
 }
 
 #[tauri::command]
-pub fn remember_external_project(app: AppHandle, path: String) -> Result<(), String> {
-  crate::services::bookshelf::remember_external_project(&app, &path)
+pub fn remember_external_project(_app: AppHandle, path: String) -> Result<(), String> {
+  crate::services::bookshelf::remember_external_project(&path)
 }
 
 #[tauri::command]
-pub fn remember_imported_work(app: AppHandle, path: String) -> Result<(), String> {
-  crate::services::bookshelf::remember_external_project(&app, &path)
+pub fn remember_imported_work(_app: AppHandle, path: String) -> Result<(), String> {
+  crate::services::bookshelf::remember_external_project(&path)
 }
 
 #[tauri::command]
-pub fn forget_external_project(app: AppHandle, path: String) -> Result<(), String> {
-  crate::services::bookshelf::forget_external_project(&app, &path)
+pub fn forget_external_project(_app: AppHandle, path: String) -> Result<(), String> {
+  crate::services::bookshelf::forget_external_project(&path)
 }
 
 #[tauri::command]
-pub fn forget_imported_work(app: AppHandle, path: String) -> Result<(), String> {
-  crate::services::bookshelf::forget_external_project(&app, &path)
+pub fn forget_imported_work(_app: AppHandle, path: String) -> Result<(), String> {
+  crate::services::bookshelf::forget_external_project(&path)
 }
 
 #[tauri::command]
-pub fn set_launch_mode(app: AppHandle, mode: String) -> Result<(), String> {
-  crate::services::bookshelf::set_launch_mode(&app, &mode)
+pub fn set_launch_mode(_app: AppHandle, mode: String) -> Result<(), String> {
+  crate::services::bookshelf::set_launch_mode(&mode)
 }
 
 #[tauri::command]
@@ -145,8 +145,8 @@ pub fn update_work_description(path: String, description: Option<String>) -> Res
 }
 
 #[tauri::command]
-pub fn get_bookshelf_state(app: AppHandle) -> Result<ProjectPickerState, String> {
-  crate::services::bookshelf::get_project_picker_state(&app)
+pub fn get_bookshelf_state(_app: AppHandle) -> Result<ProjectPickerState, String> {
+  crate::services::bookshelf::get_project_picker_state()
 }
 
 #[tauri::command]
@@ -198,97 +198,97 @@ pub fn rename_entry(state: State<'_, AppState>, from_relative_path: String, to_r
 }
 
 #[tauri::command]
-pub fn get_app_settings(app: AppHandle) -> Result<app_settings::AppSettings, String> {
-  crate::services::settings::get_app_settings(&app)
+pub fn get_app_settings(_app: AppHandle) -> Result<app_settings::AppSettings, String> {
+  crate::services::settings::get_app_settings()
 }
 
 #[tauri::command]
-pub fn set_app_settings(app: AppHandle, settings: app_settings::AppSettings) -> Result<(), String> {
-  crate::services::settings::set_app_settings(&app, settings)
+pub fn set_app_settings(_app: AppHandle, settings: app_settings::AppSettings) -> Result<(), String> {
+  crate::services::settings::set_app_settings(settings)
 }
 
 #[allow(non_snake_case)]
 #[tauri::command]
-pub fn get_api_key_status(app: AppHandle, providerId: Option<String>, provider_id: Option<String>) -> Result<bool, String> {
-  crate::services::settings::get_api_key_status(&app, providerId, provider_id)
+pub fn get_api_key_status(_app: AppHandle, providerId: Option<String>, provider_id: Option<String>) -> Result<bool, String> {
+  crate::services::settings::get_api_key_status(providerId, provider_id)
 }
 
 #[allow(non_snake_case)]
 #[tauri::command]
 pub fn set_api_key(
-  app: AppHandle,
+  _app: AppHandle,
   providerId: Option<String>,
   provider_id: Option<String>,
   apiKey: Option<String>,
   api_key: Option<String>,
 ) -> Result<(), String> {
-  crate::services::settings::set_api_key(&app, providerId, provider_id, apiKey, api_key)
+  crate::services::settings::set_api_key(providerId, provider_id, apiKey, api_key)
 }
 
 #[allow(non_snake_case)]
 #[tauri::command]
 pub async fn test_provider_connectivity(
-  app: AppHandle,
+  _app: AppHandle,
   provider: app_settings::ModelProvider,
   apiKey: Option<String>,
   api_key: Option<String>,
 ) -> Result<ProviderConnectivityResult, String> {
-  crate::services::settings::test_provider_connectivity(&app, provider, apiKey, api_key).await
+  crate::services::settings::test_provider_connectivity(provider, apiKey, api_key).await
 }
 
 #[tauri::command]
-pub fn get_agents(app: AppHandle) -> Result<Vec<agents::Agent>, String> {
-  crate::services::settings::get_agents(&app)
+pub fn get_agents(_app: AppHandle) -> Result<Vec<agents::Agent>, String> {
+  crate::services::settings::get_agents()
 }
 
 #[tauri::command]
-pub fn get_writing_assistants(app: AppHandle) -> Result<Vec<agents::Agent>, String> {
-  crate::services::settings::get_agents(&app)
+pub fn get_writing_assistants(_app: AppHandle) -> Result<Vec<agents::Agent>, String> {
+  crate::services::settings::get_agents()
 }
 
 #[tauri::command]
-pub fn set_agents(app: AppHandle, agents_list: Vec<agents::Agent>) -> Result<(), String> {
-  crate::services::settings::set_agents(&app, agents_list)
+pub fn set_agents(_app: AppHandle, agents_list: Vec<agents::Agent>) -> Result<(), String> {
+  crate::services::settings::set_agents(agents_list)
 }
 
 #[tauri::command]
-pub fn set_writing_assistants(app: AppHandle, assistants: Vec<agents::Agent>) -> Result<(), String> {
-  crate::services::settings::set_agents(&app, assistants)
+pub fn set_writing_assistants(_app: AppHandle, assistants: Vec<agents::Agent>) -> Result<(), String> {
+  crate::services::settings::set_agents(assistants)
 }
 
 #[tauri::command]
-pub fn export_agents(app: AppHandle) -> Result<String, String> {
-  crate::services::settings::export_agents(&app)
+pub fn export_agents(_app: AppHandle) -> Result<String, String> {
+  crate::services::settings::export_agents()
 }
 
 #[tauri::command]
-pub fn export_writing_assistants(app: AppHandle) -> Result<String, String> {
-  crate::services::settings::export_agents(&app)
+pub fn export_writing_assistants(_app: AppHandle) -> Result<String, String> {
+  crate::services::settings::export_agents()
 }
 
 #[tauri::command]
-pub fn import_agents(app: AppHandle, json: String) -> Result<(), String> {
-  crate::services::settings::import_agents(&app, json)
+pub fn import_agents(_app: AppHandle, json: String) -> Result<(), String> {
+  crate::services::settings::import_agents(json)
 }
 
 #[tauri::command]
-pub fn import_writing_assistants(app: AppHandle, json: String) -> Result<(), String> {
-  crate::services::settings::import_agents(&app, json)
+pub fn import_writing_assistants(_app: AppHandle, json: String) -> Result<(), String> {
+  crate::services::settings::import_agents(json)
 }
 
 #[tauri::command]
-pub fn save_chat_session(app: AppHandle, session: chat_history::ChatSession) -> Result<(), String> {
-  crate::services::chat::save_chat_session(&app, session)
+pub fn save_chat_session(_app: AppHandle, session: chat_history::ChatSession) -> Result<(), String> {
+  crate::services::chat::save_chat_session(session)
 }
 
 #[tauri::command]
-pub fn list_chat_sessions(app: AppHandle, workspace_root: Option<String>) -> Result<Vec<chat_history::ChatSessionSummary>, String> {
-  crate::services::chat::list_chat_sessions(&app, workspace_root)
+pub fn list_chat_sessions(_app: AppHandle, workspace_root: Option<String>) -> Result<Vec<chat_history::ChatSessionSummary>, String> {
+  crate::services::chat::list_chat_sessions(workspace_root)
 }
 
 #[tauri::command]
-pub fn get_chat_session(app: AppHandle, id: String) -> Result<chat_history::ChatSession, String> {
-  crate::services::chat::get_chat_session(&app, &id)
+pub fn get_chat_session(_app: AppHandle, id: String) -> Result<chat_history::ChatSession, String> {
+  crate::services::chat::get_chat_session(&id)
 }
 
 #[allow(non_snake_case)]

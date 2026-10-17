@@ -49,7 +49,7 @@ pub struct ChatSessionSummary {
   pub message_count: usize,
 }
 
-pub fn load(_app: &tauri::AppHandle) -> Result<Vec<ChatSession>, String> {
+pub fn load() -> Result<Vec<ChatSession>, String> {
   let path = history_path()?;
   if !path.exists() {
     return Ok(Vec::new());
@@ -58,7 +58,7 @@ pub fn load(_app: &tauri::AppHandle) -> Result<Vec<ChatSession>, String> {
   serde_json::from_str(&raw).map_err(|e| format!("parse history failed: {e}"))
 }
 
-pub fn save(_app: &tauri::AppHandle, sessions: &[ChatSession]) -> Result<(), String> {
+pub fn save(sessions: &[ChatSession]) -> Result<(), String> {
   let path = history_path()?;
   if let Some(parent) = path.parent() {
     fs::create_dir_all(parent).map_err(|e| format!("create history dir failed: {e}"))?;

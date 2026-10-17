@@ -4,6 +4,19 @@ version = "0.0.2-test.1"
 description = "Iris-Novel"
 authors = ["you"]
 edition = "2021"
+default-run = "iris-novel"
+
+[lib]
+name = "iris_novel"
+path = "src/lib.rs"
+
+[[bin]]
+name = "iris-novel"
+path = "src/main.rs"
+
+[[bin]]
+name = "iris-novel-server"
+path = "src/bin/iris-novel-server.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -17,7 +30,7 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["io-util", "macros", "process", "rt-multi-thread", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 futures-util = "0.3"
 blake3 = "1"
@@ -28,6 +41,10 @@ regex = "1"
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
 epub-builder = "0.4.8"
+axum = { version = "0.8.9", features = ["ws", "http1"] }
+tower-http = { version = "0.7.1", features = ["fs", "cors"] }
+clap = { version = "4.6.7", features = ["derive"] }
+tower = "0.5.3"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory"] }

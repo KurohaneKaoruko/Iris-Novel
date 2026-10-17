@@ -80,6 +80,68 @@ pub fn shared(sink: impl EventSink + 'static) -> SharedEventSink {
   Arc::new(sink)
 }
 
+/// 进程级全局事件汇：fs_watcher 等无法穿透传 sink 的旧代码路径使用。
+/// 桌面端在 main 启动时初始化为 TauriEventSink；服务端初始化为 broadcast。
+/// 未初始化时事件仅丢弃（如纯库测试）。
+pub mod global {
+  use super::SharedEventSink;
+  use serde_json::Value;
+  use std::sync::{Mutex, OnceLock};
+
+  static GLOBAL_SINK: OnceLock<Mutex<Option<SharedEventSink>>> = OnceLock::new();
+
+  fn cell() -> &'static Mutex<Option<SharedEventSink>> {
+    GLOBAL_SINK.get_or_init(|| Mutex::new(None))
+  }
+
+  /// 设置全局 sink（可重复调用，后者覆盖前者）。
+  pub fn init(sink: SharedEventSink) {
+    if let Ok(mut slot) = cell().lock() {
+      *slot = Some(sink);
+    }
+  }
+
+  pub fn emit(event: &str, payload: Value) {
+    if let Ok(slot) = cell().lock() {
+      if let Some(sink) = slot.as_ref() {
+        sink.emit(event, payload);
+      }
+    }
+  }
+}
+
+/// 可延迟绑定 Tauri AppHandle 的 sink：main 先装上占位，setup 回调里再绑定真实 handle。
+pub struct LateTauriEventSink {
+  handle: std::sync::Mutex<Option<tauri::AppHandle>>,
+}
+
+impl Default for LateTauriEventSink {
+  fn default() -> Self {
+    Self {
+      handle: std::sync::Mutex::new(None),
+    }
+  }
+}
+
+impl LateTauriEventSink {
+  pub fn bind(&self, app: tauri::AppHandle) {
+    if let Ok(mut slot) = self.handle.lock() {
+      *slot = Some(app);
+    }
+  }
+}
+
+impl EventSink for LateTauriEventSink {
+  fn emit(&self, event: &str, payload: Value) {
+    use tauri::Emitter;
+    if let Ok(slot) = self.handle.lock() {
+      if let Some(app) = slot.as_ref() {
+        let _ = app.emit(event, payload);
+      }
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
