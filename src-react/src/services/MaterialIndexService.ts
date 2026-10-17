@@ -149,14 +149,12 @@ function parseCache(raw: string): MaterialIndex | null {
 }
 
 async function listMaterialFiles(dir: 'concept' | 'outline'): Promise<string[]> {
+  type TreeItem = { name: string; kind: string; path: string; children?: TreeItem[] }
   try {
-    const tree = await callCommand<{ name: string; kind: string; path: string; children?: unknown[] }>(
-      'list_workspace_tree',
-      { maxDepth: 2 },
-    )
+    const tree = await callCommand<TreeItem>('list_workspace_tree', { maxDepth: 2 })
     const target = tree.children?.find((c) => c.name === dir && c.kind === 'dir')
     if (!target?.children) return []
-    return (target.children as Array<{ name: string; kind: string; path: string }>)
+    return target.children
       .filter((c) => c.kind === 'file' && c.name.endsWith('.md'))
       .map((c) => c.path)
       .sort()
