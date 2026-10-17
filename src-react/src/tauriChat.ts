@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { callCommand } from './transport';
 import type { ChangeSet } from './services/ModificationService'
 
 export type ChatMessage = {
@@ -19,7 +19,7 @@ export async function chatGenerateStream(args: {
   providerId?: string | null
 }): Promise<void> {
   const assistantId = args.assistantId ?? args.agentId ?? null
-  return invoke<void>('chat_generate_stream', {
+  return callCommand<void>('chat_generate_stream', {
     streamId: args.streamId,
     stream_id: args.streamId,
     messages: args.messages,
@@ -33,7 +33,7 @@ export async function chatGenerateStream(args: {
 }
 
 export async function chatCancelStream(streamId: string): Promise<void> {
-  return invoke<void>('chat_cancel_stream', {
+  return callCommand<void>('chat_cancel_stream', {
     streamId,
     stream_id: streamId,
   })

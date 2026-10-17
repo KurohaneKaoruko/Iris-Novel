@@ -1,5 +1,5 @@
 import { diffService, type Modification } from './DiffService';
-import { invoke } from '@tauri-apps/api/core';
+import { callCommand } from '../transport';
 
 /**
  * Represents a modification to a single file
@@ -395,7 +395,7 @@ export class ModificationService {
    */
   private async readFile(filePath: string): Promise<string> {
     try {
-      const content = await invoke<string>('read_text', { relativePath: filePath });
+      const content = await callCommand<string>('read_text', { relativePath: filePath });
       return content;
     } catch (error) {
       throw new Error(`Failed to read file ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
@@ -409,7 +409,7 @@ export class ModificationService {
    */
   private async writeFile(filePath: string, content: string): Promise<void> {
     try {
-      await invoke('write_text', { relativePath: filePath, content });
+      await callCommand('write_text', { relativePath: filePath, content });
     } catch (error) {
       throw new Error(`Failed to write file ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }

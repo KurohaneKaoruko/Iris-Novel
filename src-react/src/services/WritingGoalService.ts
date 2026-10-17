@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { callCommand } from '../transport';
 
 /**
  * Writing goal configuration
@@ -266,7 +266,7 @@ export class WritingGoalService {
    */
   private async loadGoalMetadata(): Promise<WritingGoalMetadata> {
     try {
-      const content = await invoke<string>('read_text', { relativePath: this.GOAL_PATH });
+      const content = await callCommand<string>('read_text', { relativePath: this.GOAL_PATH });
       return JSON.parse(content) as WritingGoalMetadata;
     } catch (error) {
       // If file doesn't exist, return default metadata
@@ -285,7 +285,7 @@ export class WritingGoalService {
   private async saveGoalMetadata(metadata: WritingGoalMetadata): Promise<void> {
     try {
       const content = JSON.stringify(metadata, null, 2);
-      await invoke('write_text', { relativePath: this.GOAL_PATH, content });
+      await callCommand('write_text', { relativePath: this.GOAL_PATH, content });
     } catch (error) {
       throw new Error(`Failed to save goal metadata: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -297,7 +297,7 @@ export class WritingGoalService {
    */
   private async loadHistoryMetadata(): Promise<WritingHistoryMetadata> {
     try {
-      const content = await invoke<string>('read_text', { relativePath: this.HISTORY_PATH });
+      const content = await callCommand<string>('read_text', { relativePath: this.HISTORY_PATH });
       return JSON.parse(content) as WritingHistoryMetadata;
     } catch (error) {
       // If file doesn't exist, return empty history
@@ -312,7 +312,7 @@ export class WritingGoalService {
   private async saveHistoryMetadata(metadata: WritingHistoryMetadata): Promise<void> {
     try {
       const content = JSON.stringify(metadata, null, 2);
-      await invoke('write_text', { relativePath: this.HISTORY_PATH, content });
+      await callCommand('write_text', { relativePath: this.HISTORY_PATH, content });
     } catch (error) {
       throw new Error(`Failed to save history metadata: ${error instanceof Error ? error.message : String(error)}`);
     }

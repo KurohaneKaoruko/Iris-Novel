@@ -1,4 +1,4 @@
-import { message, confirm } from '@tauri-apps/plugin-dialog'
+import { dialogMessage, dialogConfirm } from '../transport'
 import { isTauriApp } from '../tauri'
 import { logError, logWarning } from './errorLogger'
 
@@ -55,13 +55,13 @@ export async function handleFileSaveError(options: SaveErrorOptions): Promise<'r
   
   // Show error dialog
   if (isTauriApp()) {
-    await message(`${errorMessage}\n\n${errorDetails}\n\n内容已自动备份到本地缓存。`, {
+    await dialogMessage(`${errorMessage}\n\n${errorDetails}\n\n内容已自动备份到本地缓存。`, {
       title: '保存错误',
       kind: 'error',
     })
     
     // Ask user what to do
-    const shouldRetry = await confirm('是否重试保存？', {
+    const shouldRetry = await dialogConfirm('是否重试保存？', {
       title: '保存失败',
       kind: 'warning',
       okLabel: '重试',
@@ -75,7 +75,7 @@ export async function handleFileSaveError(options: SaveErrorOptions): Promise<'r
           return 'retry'
         } catch (retryError) {
           // Retry failed, offer save as option
-          const shouldSaveAs = await confirm('重试失败，是否另存为？', {
+          const shouldSaveAs = await dialogConfirm('重试失败，是否另存为？', {
             title: '保存失败',
             kind: 'warning',
             okLabel: '另存为',
@@ -91,7 +91,7 @@ export async function handleFileSaveError(options: SaveErrorOptions): Promise<'r
       return 'retry'
     } else {
       // Offer save as option
-      const shouldSaveAs = await confirm('是否另存为到其他位置？', {
+      const shouldSaveAs = await dialogConfirm('是否另存为到其他位置？', {
         title: '保存失败',
         kind: 'info',
         okLabel: '另存为',

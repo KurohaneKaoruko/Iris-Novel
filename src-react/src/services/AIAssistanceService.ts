@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { callCommand } from '../transport';
 import type { ChangeSet } from './ModificationService';
 import { diffService } from './DiffService';
 
@@ -205,7 +205,7 @@ export class AIAssistanceService {
   private async callAI(prompt: string): Promise<string> {
     try {
       // Call the Tauri backend to generate AI response
-      const response = await invoke<string>('ai_assistance_generate', {
+      const response = await callCommand<string>('ai_assistance_generate', {
         prompt,
       });
       

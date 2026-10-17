@@ -1,7 +1,5 @@
-import { listen } from '@tauri-apps/api/event'
-import { getCurrentWindow } from '@tauri-apps/api/window'
+import { subscribeEvent } from './transport'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
-import { confirm, message } from '@tauri-apps/plugin-dialog'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import type { LexicalEditor as LexicalEditorType } from 'lexical'
@@ -1587,8 +1585,8 @@ function App() {
   }, [activeFile, refreshTree])
 
   const showConfirm = useCallback(async (text: string): Promise<boolean> => {
-    if (!isTauriApp()) return window.confirm(text)
-    return confirm(text, { title: t('common.confirm'), kind: 'warning' })
+    const { dialogConfirm } = await import('./transport')
+    return dialogConfirm(text, t('common.confirm'))
   }, [t])
 
   const onNewChapter = useCallback(async () => {
@@ -1899,11 +1897,8 @@ function App() {
   }, [])
 
   const showErrorDialog = useCallback(async (text: string) => {
-    if (!isTauriApp()) {
-      window.alert(text)
-      return
-    }
-    await message(text, { title: '\u63d0\u793a' })
+    const { dialogMessage } = await import('./transport')
+    await dialogMessage(text, '\u63d0\u793a')
   }, [])
 
   const persistAppSettings = useCallback(
@@ -3480,7 +3475,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!isTauriApp()) return
     const unlistenFns: Array<() => void> = []
     let disposed = false
     const normalizeStreamId = (v: unknown): string | null => {
@@ -3502,9 +3496,9 @@ function App() {
       return null
     }
     const subscribe = (eventName: string, handler: (payload: unknown) => void) => {
-      void listen(eventName, (event) => {
+      void subscribeEvent(eventName, (payload) => {
         if (disposed) return
-        handler(event.payload)
+        handler(payload)
       })
         .then((unlisten) => {
           if (disposed) {
@@ -3823,7 +3817,6 @@ function App() {
   }, [appSettings, diffContext, onOpenDiffView, refreshTree, t, upsertAssistantVersion])
 
   useEffect(() => {
-    if (!isTauriApp()) return
     if (!workRoot) return
     let timer: number | null = null
     const unlistenFns: Array<() => void> = []
@@ -3831,11 +3824,10 @@ function App() {
       if (timer) window.clearTimeout(timer)
       timer = window.setTimeout(() => void refreshTree(), 200)
     }
-    void listen('fs_changed', () => {
+    void subscribeEvent('fs_changed', () => {
       scheduleRefresh()
     }).then((u) => unlistenFns.push(u))
-    void listen('fs_watch_error', (event) => {
-      const payload: unknown = event.payload
+    void subscribeEvent('fs_watch_error', (payload: unknown) => {
       if (payload && typeof payload === 'object' && 'message' in payload && typeof (payload as { message?: unknown }).message === 'string') {
         setError((payload as { message: string }).message)
       }
@@ -3894,11 +3886,13 @@ function App() {
     const hasUnsaved = openFiles.some((f) => f.dirty) || settingsDirty
     if (!hasUnsaved) return
     let unlisten: null | (() => void) = null
-    void getCurrentWindow()
-      .onCloseRequested(async (event) => {
-        const ok = await showConfirm('You have unsaved changes. Close anyway?')
-        if (!ok) event.preventDefault()
-      })
+    void import('@tauri-apps/api/window')
+      .then(({ getCurrentWindow }) =>
+        getCurrentWindow().onCloseRequested(async (event) => {
+          const ok = await showConfirm('You have unsaved changes. Close anyway?')
+          if (!ok) event.preventDefault()
+        }),
+      )
       .then((u) => {
         unlisten = u
       })

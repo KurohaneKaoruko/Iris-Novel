@@ -1,5 +1,8 @@
-import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
+import {
+  callCommand,
+  isTauriApp as isTauriAppImpl,
+  dialogOpenDirectory,
+} from './transport'
 
 export type WorkspaceInfo = {
   root: string
@@ -96,11 +99,11 @@ export type NovelTaskQualityResult = {
 }
 
 export function isTauriApp(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+  return isTauriAppImpl()
 }
 
 export async function setWorkspace(path: string): Promise<WorkspaceInfo> {
-  return invoke<WorkspaceInfo>('set_workspace', { path })
+  return callCommand<WorkspaceInfo>('set_workspace', { path })
 }
 
 export async function setWorkRoot(path: string): Promise<WorkInfo> {
@@ -108,7 +111,7 @@ export async function setWorkRoot(path: string): Promise<WorkInfo> {
 }
 
 export async function getLastWorkspace(): Promise<string | null> {
-  return invoke<string | null>('get_last_workspace')
+  return callCommand<string | null>('get_last_workspace')
 }
 
 export async function getLastWork(): Promise<string | null> {
@@ -116,61 +119,55 @@ export async function getLastWork(): Promise<string | null> {
 }
 
 export async function getProjectPickerState(): Promise<ProjectPickerState> {
-  return invoke<ProjectPickerState>('get_project_picker_state')
+  return callCommand<ProjectPickerState>('get_project_picker_state')
 }
 
 export async function getBookshelfState(): Promise<BookshelfState> {
-  return invoke<BookshelfState>('get_bookshelf_state')
+  return callCommand<BookshelfState>('get_bookshelf_state')
 }
 
 export async function createNovelProject(name: string, description?: string): Promise<ProjectItem> {
-  return invoke<ProjectItem>('create_novel_project', { name, description: description ?? null })
+  return callCommand<ProjectItem>('create_novel_project', { name, description: description ?? null })
 }
 
 export async function createNovelWork(name: string, description?: string): Promise<WorkItem> {
-  return invoke<WorkItem>('create_novel_work', { name, description: description ?? null })
+  return callCommand<WorkItem>('create_novel_work', { name, description: description ?? null })
 }
 
 export async function updateWorkDescription(path: string, description: string): Promise<void> {
-  return invoke<void>('update_work_description', { path, description })
+  return callCommand<void>('update_work_description', { path, description })
 }
 
 export async function rememberExternalProject(path: string): Promise<void> {
-  return invoke<void>('remember_external_project', { path })
+  return callCommand<void>('remember_external_project', { path })
 }
 
 export async function rememberImportedWork(path: string): Promise<void> {
-  return invoke<void>('remember_imported_work', { path })
+  return callCommand<void>('remember_imported_work', { path })
 }
 
 export async function forgetExternalProject(path: string): Promise<void> {
-  return invoke<void>('forget_external_project', { path })
+  return callCommand<void>('forget_external_project', { path })
 }
 
 export async function forgetImportedWork(path: string): Promise<void> {
-  return invoke<void>('forget_imported_work', { path })
+  return callCommand<void>('forget_imported_work', { path })
 }
 
 export async function setLaunchMode(mode: LaunchMode): Promise<void> {
-  return invoke<void>('set_launch_mode', { mode })
+  return callCommand<void>('set_launch_mode', { mode })
 }
 
 export async function openFolderDialog(): Promise<string | null> {
-  const selected = await open({
-    directory: true,
-    multiple: false,
-  })
-  if (!selected) return null
-  if (Array.isArray(selected)) return selected[0] ?? null
-  return selected
+  return dialogOpenDirectory()
 }
 
 export async function initNovel(): Promise<void> {
-  return invoke<void>('init_novel')
+  return callCommand<void>('init_novel')
 }
 
 export async function listWorkspaceTree(maxDepth = 6): Promise<FsEntry> {
-  return invoke<FsEntry>('list_workspace_tree', { maxDepth })
+  return callCommand<FsEntry>('list_workspace_tree', { maxDepth })
 }
 
 export async function listWorkTree(maxDepth = 6): Promise<FsEntry> {
@@ -178,15 +175,15 @@ export async function listWorkTree(maxDepth = 6): Promise<FsEntry> {
 }
 
 export async function getProjectWritingSettings(): Promise<ProjectWritingSettings> {
-  return invoke<ProjectWritingSettings>('get_project_writing_settings')
+  return callCommand<ProjectWritingSettings>('get_project_writing_settings')
 }
 
 export async function setProjectWritingSettings(settings: ProjectWritingSettings): Promise<ProjectWritingSettings> {
-  return invoke<ProjectWritingSettings>('set_project_writing_settings', { settings })
+  return callCommand<ProjectWritingSettings>('set_project_writing_settings', { settings })
 }
 
 export async function parseComposerDirective(input: string): Promise<ComposerDirectiveParseResult> {
-  return invoke<ComposerDirectiveParseResult>('parse_composer_directive', { input })
+  return callCommand<ComposerDirectiveParseResult>('parse_composer_directive', { input })
 }
 
 export async function resolveInlineReferences(
@@ -195,7 +192,7 @@ export async function resolveInlineReferences(
   activeFilePath?: string | null,
   activeFileContent?: string | null,
 ): Promise<InlineReferencesResolveResult> {
-  return invoke<InlineReferencesResolveResult>('resolve_inline_references', {
+  return callCommand<InlineReferencesResolveResult>('resolve_inline_references', {
     payload: {
       input,
       selection_text: selectionText ?? null,
@@ -210,7 +207,7 @@ export async function validateNovelTaskQuality(
   assistantText: string,
   taskPool: NovelTaskQualityTask[],
 ): Promise<NovelTaskQualityResult> {
-  return invoke<NovelTaskQualityResult>('validate_novel_task_quality', {
+  return callCommand<NovelTaskQualityResult>('validate_novel_task_quality', {
     payload: {
       task,
       assistant_text: assistantText,
@@ -220,43 +217,43 @@ export async function validateNovelTaskQuality(
 }
 
 export async function readText(path: string): Promise<string> {
-  return invoke<string>('read_text', { relativePath: path })
+  return callCommand<string>('read_text', { relativePath: path })
 }
 
 export async function writeText(path: string, content: string): Promise<void> {
-  return invoke<void>('write_text', { relativePath: path, content })
+  return callCommand<void>('write_text', { relativePath: path, content })
 }
 
 export async function createFile(path: string): Promise<void> {
-  return invoke<void>('create_file', { relativePath: path })
+  return callCommand<void>('create_file', { relativePath: path })
 }
 
 export async function createDir(path: string): Promise<void> {
-  return invoke<void>('create_dir', { relativePath: path })
+  return callCommand<void>('create_dir', { relativePath: path })
 }
 
 export async function deleteEntry(path: string): Promise<void> {
-  return invoke<void>('delete_entry', { relativePath: path })
+  return callCommand<void>('delete_entry', { relativePath: path })
 }
 
 export async function renameEntry(fromPath: string, toPath: string): Promise<void> {
-  return invoke<void>('rename_entry', { fromRelativePath: fromPath, toRelativePath: toPath })
+  return callCommand<void>('rename_entry', { fromRelativePath: fromPath, toRelativePath: toPath })
 }
 
 export async function getAppSettings(): Promise<AppSettings> {
-  return invoke<AppSettings>('get_app_settings')
+  return callCommand<AppSettings>('get_app_settings')
 }
 
 export async function setAppSettings(settings: AppSettings): Promise<void> {
-  return invoke<void>('set_app_settings', { settings })
+  return callCommand<void>('set_app_settings', { settings })
 }
 
 export async function getApiKeyStatus(providerId: string): Promise<boolean> {
-  return invoke<boolean>('get_api_key_status', { providerId })
+  return callCommand<boolean>('get_api_key_status', { providerId })
 }
 
 export async function setApiKey(providerId: string, apiKey: string): Promise<void> {
-  return invoke<void>('set_api_key', { providerId, apiKey })
+  return callCommand<void>('set_api_key', { providerId, apiKey })
 }
 
 export type ProviderConnectivityResult = {
@@ -267,7 +264,7 @@ export type ProviderConnectivityResult = {
 }
 
 export async function testProviderConnectivity(provider: ModelProvider, apiKey?: string | null): Promise<ProviderConnectivityResult> {
-  return invoke<ProviderConnectivityResult>('test_provider_connectivity', {
+  return callCommand<ProviderConnectivityResult>('test_provider_connectivity', {
     provider,
     apiKey: apiKey ?? null,
   })
@@ -284,35 +281,35 @@ export type Agent = {
 export type WritingAssistant = Agent
 
 export async function getAgents(): Promise<Agent[]> {
-  return invoke<Agent[]>('get_agents')
+  return callCommand<Agent[]>('get_agents')
 }
 
 export async function getWritingAssistants(): Promise<WritingAssistant[]> {
-  return invoke<WritingAssistant[]>('get_writing_assistants')
+  return callCommand<WritingAssistant[]>('get_writing_assistants')
 }
 
 export async function setAgents(agents_list: Agent[]): Promise<void> {
-  return invoke<void>('set_agents', { agentsList: agents_list })
+  return callCommand<void>('set_agents', { agentsList: agents_list })
 }
 
 export async function setWritingAssistants(assistants: WritingAssistant[]): Promise<void> {
-  return invoke<void>('set_writing_assistants', { assistants })
+  return callCommand<void>('set_writing_assistants', { assistants })
 }
 
 export async function exportAgents(): Promise<string> {
-  return invoke<string>('export_agents')
+  return callCommand<string>('export_agents')
 }
 
 export async function exportWritingAssistants(): Promise<string> {
-  return invoke<string>('export_writing_assistants')
+  return callCommand<string>('export_writing_assistants')
 }
 
 export async function importAgents(json: string): Promise<void> {
-  return invoke<void>('import_agents', { json })
+  return callCommand<void>('import_agents', { json })
 }
 
 export async function importWritingAssistants(json: string): Promise<void> {
-  return invoke<void>('import_writing_assistants', { json })
+  return callCommand<void>('import_writing_assistants', { json })
 }
 
 export type HistoryEntry = {
@@ -326,22 +323,22 @@ export type HistoryEntry = {
 }
 
 export async function listHistoryEntries(max = 120): Promise<HistoryEntry[]> {
-  return invoke<HistoryEntry[]>('list_history_entries', { max })
+  return callCommand<HistoryEntry[]>('list_history_entries', { max })
 }
 
 export async function createHistorySnapshot(relativePath: string, reason?: string | null): Promise<HistoryEntry> {
-  return invoke<HistoryEntry>('create_history_snapshot', {
+  return callCommand<HistoryEntry>('create_history_snapshot', {
     relativePath,
     reason: reason ?? null,
   })
 }
 
 export async function readHistorySnapshot(id: string): Promise<string> {
-  return invoke<string>('read_history_snapshot', { id })
+  return callCommand<string>('read_history_snapshot', { id })
 }
 
 export async function restoreHistorySnapshot(id: string): Promise<string> {
-  return invoke<string>('restore_history_snapshot', { id })
+  return callCommand<string>('restore_history_snapshot', { id })
 }
 
 export type ChatHistoryMessage = {
@@ -382,19 +379,19 @@ export type RiskScanResult = {
 }
 
 export async function saveChatSession(session: ChatSession): Promise<void> {
-  return invoke<void>('save_chat_session', { session })
+  return callCommand<void>('save_chat_session', { session })
 }
 
 export async function listChatSessions(workspace_root?: string | null): Promise<ChatSessionSummary[]> {
-  return invoke<ChatSessionSummary[]>('list_chat_sessions', { workspaceRoot: workspace_root ?? null })
+  return callCommand<ChatSessionSummary[]>('list_chat_sessions', { workspaceRoot: workspace_root ?? null })
 }
 
 export async function getChatSession(id: string): Promise<ChatSession> {
-  return invoke<ChatSession>('get_chat_session', { id })
+  return callCommand<ChatSession>('get_chat_session', { id })
 }
 
 export async function riskScanContent(filePath: string | null, content: string): Promise<RiskScanResult> {
-  return invoke<RiskScanResult>('risk_scan_content', { filePath: filePath ?? null, content })
+  return callCommand<RiskScanResult>('risk_scan_content', { filePath: filePath ?? null, content })
 }
 
 // ============ Skills ============
@@ -409,19 +406,19 @@ export type Skill = {
 }
 
 export async function getSkills(): Promise<Skill[]> {
-  return invoke<Skill[]>('get_skills')
+  return callCommand<Skill[]>('get_skills')
 }
 
 export async function getSkillCategories(): Promise<string[]> {
-  return invoke<string[]>('get_skill_categories')
+  return callCommand<string[]>('get_skill_categories')
 }
 
 export async function getSkillsByCategory(category: string): Promise<Skill[]> {
-  return invoke<Skill[]>('get_skills_by_category', { category })
+  return callCommand<Skill[]>('get_skills_by_category', { category })
 }
 
 export async function applySkill(skillId: string, content: string): Promise<string> {
-  return invoke<string>('apply_skill', { skillId, content })
+  return callCommand<string>('apply_skill', { skillId, content })
 }
 
 // ============ MCP ============
@@ -525,15 +522,15 @@ export type BookSplitResult = {
 }
 
 export async function analyzeBook(content: string, title: string): Promise<BookAnalysis> {
-  return invoke<BookAnalysis>('analyze_book', { content, title })
+  return callCommand<BookAnalysis>('analyze_book', { content, title })
 }
 
 export async function splitBook(content: string, title: string, config: BookSplitConfig): Promise<BookSplitResult> {
-  return invoke<BookSplitResult>('split_book', { content, title, config })
+  return callCommand<BookSplitResult>('split_book', { content, title, config })
 }
 
 export async function extractChapters(content: string): Promise<ChapterInfo[]> {
-  return invoke<ChapterInfo[]>('extract_chapters', { content })
+  return callCommand<ChapterInfo[]>('extract_chapters', { content })
 }
 
 // ============ 拆书 Types ============
@@ -629,9 +626,9 @@ export type Book拆书Result = {
 }
 
 export async function 拆书Analyze(content: string, title: string): Promise<Book拆书Result> {
-  return invoke<Book拆书Result>('拆书_analyze', { content, title })
+  return callCommand<Book拆书Result>('拆书_analyze', { content, title })
 }
 
 export async function 拆书ExtractTechniques(content: string): Promise<WritingTechnique[]> {
-  return invoke<WritingTechnique[]>('拆书_extract__echniques', { content })
+  return callCommand<WritingTechnique[]>('拆书_extract__echniques', { content })
 }

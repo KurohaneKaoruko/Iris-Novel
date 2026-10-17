@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { callCommand } from '../transport';
 import { createDir, readText, writeText, type FsEntry } from '../tauri'
 import plannerPrompts from '../config/plannerPrompts.json'
 import { buildCharacterStateDigest, buildDocumentContextBlock, buildStoryCueDigest, buildStorySummaryIndex } from './documentSummary'
@@ -686,7 +686,7 @@ export class NovelPlannerService {
 
     let body = ''
     try {
-      const generated = await invoke<string>('ai_assistance_generate', { prompt })
+      const generated = await callCommand<string>('ai_assistance_generate', { prompt })
       body = normalizePlanBody(generated)
     } catch {
       body = ''
