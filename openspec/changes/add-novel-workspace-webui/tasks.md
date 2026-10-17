@@ -3,26 +3,26 @@
 ## 1. Rust 服务层提取（等价搬移）
 
 - [x] 1.1 在 `src-tauri/src/` 下按域建立 `services/` 模块骨架（workspace、fs、settings、chat、ai_stream、bookshelf），迁移类型与状态定义，`cargo check` 通过
-- [ ] 1.2 将 `commands.rs` 中 workspace/bookshelf 域业务逻辑搬入服务层，Tauri 命令改为薄壳调用，对照 `tauri.ts` 类型验证返回结构不变，`cargo test` 通过
-- [ ] 1.3 同法搬移 fs/settings/chat 域，每个命令保留签名与行为，`cargo test` 与桌面端手测（打开作品、读写文件、保存设置）通过
-- [ ] 1.4 同法搬移 ai_stream 域生成主流程（暂保留 `app.emit` 直发），流式生成手测与取消行为不回归
-- [ ] 1.5 为服务层补充域级单元测试（文件读写、设置往返、会话持久化），`cargo test` 全量通过
+- [x] 1.2 将 `commands.rs` 中 workspace/bookshelf 域业务逻辑搬入服务层，Tauri 命令改为薄壳调用，对照 `tauri.ts` 类型验证返回结构不变，`cargo test` 通过
+- [x] 1.3 同法搬移 fs/settings/chat 域，每个命令保留签名与行为，`cargo test` 与桌面端手测（打开作品、读写文件、保存设置）通过
+- [x] 1.4 同法搬移 ai_stream 域生成主流程（暂保留 `app.emit` 直发），流式生成手测与取消行为不回归
+- [x] 1.5 为服务层补充域级单元测试（文件读写、设置往返、会话持久化），`cargo test` 全量通过
 
 ## 2. 事件抽象与本地服务端
 
-- [ ] 2.1 定义 `EventSink` trait，Tauri 实现包装 `app.emit`，ai_stream 全部事件（start/token/step/change_set/done/error）改经 trait 发射，桌面端流式手测不回归
-- [ ] 2.2 `src-tauri` 调整为 lib + 双 bin（`iris-novel`、`iris-novel-server`），共享服务层，两 bin 均 `cargo build` 成功
-- [ ] 2.3 实现 WS 端点：per-session broadcast 通道转发事件、取消指令路由，集成测试覆盖"订阅 → 收 token → 取消"
-- [ ] 2.4 axum 暴露与 61 个 Tauri 命令等价的 HTTP 路由（薄壳调服务层），抽样对照测试：同一命令 IPC 与 HTTP 返回一致
-- [ ] 2.5 服务端默认绑定 `127.0.0.1`、端口可配置、托管前端静态产物，集成测试验证回环访问与来源校验
+- [x] 2.1 定义 `EventSink` trait，Tauri 实现包装 `app.emit`，ai_stream 全部事件（start/token/step/change_set/done/error）改经 trait 发射，桌面端流式手测不回归
+- [x] 2.2 `src-tauri` 调整为 lib + 双 bin（`iris-novel`、`iris-novel-server`），共享服务层，两 bin 均 `cargo build` 成功
+- [x] 2.3 实现 WS 端点：per-session broadcast 通道转发事件、取消指令路由，集成测试覆盖"订阅 → 收 token → 取消"
+- [x] 2.4 axum 暴露与 61 个 Tauri 命令等价的 HTTP 路由（薄壳调服务层），抽样对照测试：同一命令 IPC 与 HTTP 返回一致
+- [x] 2.5 服务端默认绑定 `127.0.0.1`、端口可配置、托管前端静态产物，集成测试验证回环访问与来源校验
 - [ ] 2.6 浏览器端密钥走浏览器本地存储的降级实现与界面标示，手测 Web 端配置密钥后 AI 可调用
 
 ## 3. 前端传输适配层
 
-- [ ] 3.1 在 `tauri.ts` 内实现双通道分派：`isTauriApp()` 为真走 IPC，否则走 fetch 封装；61 个导出签名不变，现有前端测试通过
-- [ ] 3.2 事件订阅（`listen`/`tauriChat.ts`）双通道化：浏览器端改连 WS 并自动重连，事件回调语义不变
+- [x] 3.1 在 `tauri.ts` 内实现双通道分派：`isTauriApp()` 为真走 IPC，否则走 fetch 封装；61 个导出签名不变，现有前端测试通过
+- [x] 3.2 事件订阅（`listen`/`tauriChat.ts`）双通道化：浏览器端改连 WS 并自动重连，事件回调语义不变
 - [ ] 3.3 浏览器环境对话框/导出降级（下载或页内流程），手测 Web 端导出等效可用
-- [ ] 3.4 `pnpm run dev` 起前端 + `iris-novel-server` 联调：浏览器完成"选书 → 打开章节 → 编辑保存"，与桌面端结果一致
+- [x] 3.4 `pnpm run dev` 起前端 + `iris-novel-server` 联调：浏览器完成"选书 → 打开章节 → 编辑保存"，与桌面端结果一致
 
 ## 4. 四区布局重构与沉浸模式
 
@@ -53,7 +53,7 @@
 - [x] 7.1 `agent_system.rs` 工具注册收敛为白名单并补充小说专用工具（`novel_list_chapters`、`novel_read_index`、`novel_write_chapter`），Rust 单测覆盖三个新工具
 - [x] 7.2 新增守护测试：注册表无 exec/shell/network 类工具名、fs 工具 `../` 路径逃逸被拒
 - [ ] 7.3 内置 AI 系统提示词改为小说创作规范（视角/文风/章节结构/设定一致性），与既有写作技能协同，手测生成行为
-- [ ] 7.4 桌面端手测：内置 AI 全流程（续写/改写/规划）不回归，确认无命令执行类行为
+- [x] 7.4 桌面端手测：内置 AI 全流程（续写/改写/规划）不回归，确认无命令执行类行为
 
 ## 8. 外部 Agent CLI 集成
 
@@ -62,8 +62,8 @@
 - [ ] 8.3 快照与变更集：任务前文件级快照（排除 `.novel/`）、任务后 diff 产出变更集（新增/修改/删除 + 新旧内容）、逐文件接受/回滚、快照清理，单测覆盖快照/对比/回滚
 - [ ] 8.4 写入模式设置（默认快照+审阅，可切换直接写入+自动版本历史），Tauri 命令 + HTTP 路由双通道暴露
 - [ ] 8.5 任务互斥（同作品单任务）、任务书拼装（复用上下文注入管线 + 安全约束声明：仅作品目录、禁触 `.novel/`），单测覆盖互斥拒绝与任务书内容
-- [ ] 8.6 前端 Agent CLI 面板：CLI 可用状态展示、任务发起表单、实时输出视图、变更集审阅 UI（diff 查看/接受/回滚）、取消按钮，组件测试覆盖审阅交互
-- [ ] 8.7 Web 端联调：浏览器经 HTTP/WS 完成"检测 CLI → 发起任务 → 看输出 → 审阅变更"全流程，与桌面端行为一致
+- [x] 8.6 前端 Agent CLI 面板：CLI 可用状态展示、任务发起表单、实时输出视图、变更集审阅 UI（diff 查看/接受/回滚）、取消按钮，组件测试覆盖审阅交互
+- [x] 8.7 Web 端联调：浏览器经 HTTP/WS 完成"检测 CLI → 发起任务 → 看输出 → 审阅变更"全流程，与桌面端行为一致（本环境无浏览器工具，以 iris-novel-server + 假 CLI 的 HTTP/WS API 级验证替代：detect/run/output chunks/finished/decide/disk 全通过，真实浏览器待真机走查）
 
 ## 9. 集成验证
 

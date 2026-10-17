@@ -632,3 +632,75 @@ export async function 拆书Analyze(content: string, title: string): Promise<Boo
 export async function 拆书ExtractTechniques(content: string): Promise<WritingTechnique[]> {
   return callCommand<WritingTechnique[]>('拆书_extract__echniques', { content })
 }
+
+// ============ External Agent CLI ============
+
+export type AgentCliInfo = {
+  id: string
+  name: string
+  available: boolean
+  version: string | null
+  error: string | null
+}
+
+export type AgentCliChangeEntry = {
+  path: string
+  change_type: 'added' | 'modified' | 'deleted'
+  old_text: string | null
+  new_text: string | null
+  unified_diff: string | null
+  decision: 'pending' | 'accepted' | 'reverted'
+}
+
+export type AgentCliChangeSet = {
+  task_id: string
+  workspace_root: string
+  entries: AgentCliChangeEntry[]
+  created_at: number
+}
+
+export type AgentCliTaskStatus = {
+  task_id: string
+  cli_id: string
+  workspace_root: string
+  state: 'running' | 'finished' | 'cancelled' | 'failed'
+  started_at: number
+  finished_at: number | null
+  exit_code: number | null
+  output_tail: string
+  change_set: AgentCliChangeSet | null
+  error: string | null
+}
+
+export async function agentCliDetect(): Promise<AgentCliInfo[]> {
+  return callCommand<AgentCliInfo[]>('agent_cli_detect')
+}
+
+export async function agentCliRunTask(params: {
+  cliId: string
+  workspaceRoot: string
+  prompt: string
+  writeMode?: 'review' | 'direct'
+}): Promise<string> {
+  return callCommand<string>('agent_cli_run_task', params)
+}
+
+export async function agentCliListTasks(): Promise<AgentCliTaskStatus[]> {
+  return callCommand<AgentCliTaskStatus[]>('agent_cli_list_tasks')
+}
+
+export async function agentCliGetTask(taskId: string): Promise<AgentCliTaskStatus> {
+  return callCommand<AgentCliTaskStatus>('agent_cli_get_task', { taskId })
+}
+
+export async function agentCliCancelTask(taskId: string): Promise<void> {
+  return callCommand<void>('agent_cli_cancel_task', { taskId })
+}
+
+export async function agentCliDecideChange(params: {
+  taskId: string
+  path: string
+  accept: boolean
+}): Promise<AgentCliChangeEntry> {
+  return callCommand<AgentCliChangeEntry>('agent_cli_decide_change', params)
+}
