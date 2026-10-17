@@ -94,12 +94,79 @@ describe('WorkspaceLayout', () => {
     const h = setupLayout()
     await screen.findByText('Ch1')
 
-    // 折叠
+    // 折叠（受控：父级把 sidebarCollapsed 置 true）
     fireEvent.click(screen.getByTitle('Collapse chapter list'))
     expect(h.onSidebarCollapsedChange).toHaveBeenCalledWith(true)
+  })
 
-    // 恢复（受控属性切换由父级负责，这里直接验证折叠态下编辑区内容仍在）
+  it('collapsed -> restored shows chapters and editor content again (4.4)', async () => {
+    // 初始正常态
+    const { rerender } = render(
+      <I18nProvider>
+        <WorkspaceLayout
+          workspaceRoot="/tmp/work"
+          activePath="stories/ch1.md"
+          onOpenChapter={vi.fn()}
+          tabsSlot={<div data-testid="tabs" />}
+          editorSlot={<div data-testid="editor">editor-content-marker</div>}
+          aiPanelSlot={<div data-testid="ai" />}
+          sidebarCollapsed={false}
+          sidebarWidth={240}
+          rightPanelWidth={340}
+          onSidebarCollapsedChange={vi.fn()}
+          onSidebarWidthChange={vi.fn()}
+          onRightPanelWidthChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    await screen.findByText('Ch1')
     expect(screen.getByTestId('editor').textContent).toContain('editor-content-marker')
+
+    // 折叠态：章节列表隐藏，编辑器内容保留
+    rerender(
+      <I18nProvider>
+        <WorkspaceLayout
+          workspaceRoot="/tmp/work"
+          activePath="stories/ch1.md"
+          onOpenChapter={vi.fn()}
+          tabsSlot={<div data-testid="tabs" />}
+          editorSlot={<div data-testid="editor">editor-content-marker</div>}
+          aiPanelSlot={<div data-testid="ai" />}
+          sidebarCollapsed
+          sidebarWidth={240}
+          rightPanelWidth={340}
+          onSidebarCollapsedChange={vi.fn()}
+          onSidebarWidthChange={vi.fn()}
+          onRightPanelWidthChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(screen.queryByText('Ch1')).toBeNull()
+    expect(screen.getByTestId('editor').textContent).toContain('editor-content-marker')
+    expect(screen.getByTitle('Expand chapter list')).toBeTruthy()
+
+    // 恢复：章节列表回来，内容不丢
+    rerender(
+      <I18nProvider>
+        <WorkspaceLayout
+          workspaceRoot="/tmp/work"
+          activePath="stories/ch1.md"
+          onOpenChapter={vi.fn()}
+          tabsSlot={<div data-testid="tabs" />}
+          editorSlot={<div data-testid="editor">editor-content-marker</div>}
+          aiPanelSlot={<div data-testid="ai" />}
+          sidebarCollapsed={false}
+          sidebarWidth={240}
+          rightPanelWidth={340}
+          onSidebarCollapsedChange={vi.fn()}
+          onSidebarWidthChange={vi.fn()}
+          onRightPanelWidthChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    await screen.findByText('Ch1')
+    expect(screen.getByTestId('editor').textContent).toContain('editor-content-marker')
+    expect(screen.getByTitle('Collapse chapter list')).toBeTruthy()
   })
 
   it('immersive mode shows only AI panel and exit restores snapshot', async () => {
