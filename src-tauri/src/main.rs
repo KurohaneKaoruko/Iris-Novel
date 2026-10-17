@@ -2,6 +2,7 @@
 
 mod commands;
 mod services;
+mod event_sink;
 mod ai_types;
 mod agent_system;
 mod app_data;

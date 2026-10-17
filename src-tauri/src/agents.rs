@@ -32,9 +32,9 @@ impl Default for Agent {
   }
 }
 
-pub fn load(app: &tauri::AppHandle) -> Result<Vec<Agent>, String> {
+pub fn load() -> Result<Vec<Agent>, String> {
   let builtins = default_agents();
-  let customs = load_custom(app)?;
+  let customs = load_custom()?;
   let mut out = builtins.clone();
   let mut seen: HashSet<String> = out.iter().map(|a| a.id.clone()).collect();
   for agent in customs {
@@ -45,13 +45,13 @@ pub fn load(app: &tauri::AppHandle) -> Result<Vec<Agent>, String> {
   Ok(out)
 }
 
-pub fn save(app: &tauri::AppHandle, agents: &[Agent]) -> Result<(), String> {
+pub fn save(agents: &[Agent]) -> Result<(), String> {
   let builtins = default_agents();
   let customs = custom_agents_from_input(agents, &builtins);
-  save_custom(app, &customs)
+  save_custom(&customs)
 }
 
-pub fn load_custom(app: &tauri::AppHandle) -> Result<Vec<Agent>, String> {
+pub fn load_custom() -> Result<Vec<Agent>, String> {
   let path = agents_path()?;
   if !path.exists() {
     return Ok(Vec::new());
@@ -61,12 +61,12 @@ pub fn load_custom(app: &tauri::AppHandle) -> Result<Vec<Agent>, String> {
   let builtins = default_agents();
   let customs = custom_agents_from_input(&parsed, &builtins);
   if customs != parsed {
-    save_custom(app, &customs)?;
+    save_custom(&customs)?;
   }
   Ok(customs)
 }
 
-pub fn save_custom(_app: &tauri::AppHandle, agents: &[Agent]) -> Result<(), String> {
+pub fn save_custom(agents: &[Agent]) -> Result<(), String> {
   let path = agents_path()?;
   if agents.is_empty() {
     if path.exists() {

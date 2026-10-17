@@ -111,8 +111,8 @@ pub fn set_project_writing_settings(
 }
 
 // ---- 由 commands.rs 等价搬移（活动助手归一化与应用设置）----
-fn normalize_active_agent_id(app: &AppHandle, settings: &mut app_settings::AppSettings) {
-  let agents_list = agents::load(app).unwrap_or_else(|_| agents::default_agents());
+fn normalize_active_agent_id(settings: &mut app_settings::AppSettings) {
+  let agents_list = agents::load().unwrap_or_else(|_| agents::default_agents());
   if agents_list.is_empty() {
     settings.active_writing_assistant_id.clear();
     settings.active_agent_id.clear();
@@ -139,11 +139,11 @@ fn normalize_active_agent_id(app: &AppHandle, settings: &mut app_settings::AppSe
   settings.active_agent_id = fallback;
 }
 
-pub fn get_app_settings(app: &AppHandle) -> Result<app_settings::AppSettings, String> {
+pub fn get_app_settings(_app: &AppHandle) -> Result<app_settings::AppSettings, String> {
   let mut s = app_settings::load()?;
   let prev_agent_id = s.active_agent_id.clone();
   let prev_active_writing_assistant_id = s.active_writing_assistant_id.clone();
-  normalize_active_agent_id(app, &mut s);
+  normalize_active_agent_id(&mut s);
   if s.active_agent_id != prev_agent_id || s.active_writing_assistant_id != prev_active_writing_assistant_id {
     let _ = app_settings::save(&s);
   }
@@ -154,7 +154,7 @@ pub fn get_app_settings(app: &AppHandle) -> Result<app_settings::AppSettings, St
   Ok(s)
 }
 
-pub fn set_app_settings(app: &AppHandle, settings: app_settings::AppSettings) -> Result<(), String> {
+pub fn set_app_settings(_app: &AppHandle, settings: app_settings::AppSettings) -> Result<(), String> {
   let mut s = settings.clone();
 
   if s.providers.is_empty() {
@@ -163,7 +163,7 @@ pub fn set_app_settings(app: &AppHandle, settings: app_settings::AppSettings) ->
   if s.active_provider_id.trim().is_empty() || !s.providers.iter().any(|p| p.id == s.active_provider_id) {
     s.active_provider_id = s.providers[0].id.clone();
   }
-  normalize_active_agent_id(app, &mut s);
+  normalize_active_agent_id(&mut s);
 
   // Save API keys to secrets if present
   for p in &mut s.providers {
@@ -177,7 +177,7 @@ pub fn set_app_settings(app: &AppHandle, settings: app_settings::AppSettings) ->
 }
 
 #[allow(non_snake_case)]
-pub fn get_api_key_status(app: &AppHandle, providerId: Option<String>, provider_id: Option<String>) -> Result<bool, String> {
+pub fn get_api_key_status(_app: &AppHandle, providerId: Option<String>, provider_id: Option<String>) -> Result<bool, String> {
   let pid = providerId
     .or(provider_id)
     .unwrap_or_default();
@@ -190,7 +190,7 @@ pub fn get_api_key_status(app: &AppHandle, providerId: Option<String>, provider_
 
 #[allow(non_snake_case)]
 pub fn set_api_key(
-  app: &AppHandle,
+  _app: &AppHandle,
   providerId: Option<String>,
   provider_id: Option<String>,
   apiKey: Option<String>,
@@ -218,10 +218,7 @@ pub struct ProviderConnectivityResult {
   pub message: String,
 }
 
-pub(crate) fn provider_has_configured_api_key(
-  app: &AppHandle,
-  provider: &app_settings::ModelProvider,
-) -> bool {
+pub(crate) fn provider_has_configured_api_key(provider: &app_settings::ModelProvider) -> bool {
   if !provider.api_key.trim().is_empty() {
     return true;
   }
@@ -232,7 +229,6 @@ pub(crate) fn provider_has_configured_api_key(
 }
 
 pub(crate) fn resolve_current_provider(
-  app: &AppHandle,
   settings: &app_settings::AppSettings,
 ) -> Result<app_settings::ModelProvider, String> {
   if settings.providers.is_empty() {
@@ -245,7 +241,7 @@ pub(crate) fn resolve_current_provider(
     .find(|p| p.id == settings.active_provider_id);
 
   if let Some(provider) = active {
-    if provider_has_configured_api_key(app, provider) {
+    if provider_has_configured_api_key(provider) {
       return Ok(provider.clone());
     }
   }
@@ -253,7 +249,7 @@ pub(crate) fn resolve_current_provider(
   if let Some(provider) = settings
     .providers
     .iter()
-    .find(|p| provider_has_configured_api_key(app, p))
+    .find(|p| provider_has_configured_api_key(p))
   {
     return Ok(provider.clone());
   }
@@ -265,7 +261,6 @@ pub(crate) fn resolve_current_provider(
 }
 
 pub(crate) fn ensure_provider_ready(
-  app: &AppHandle,
   provider: &app_settings::ModelProvider,
 ) -> Result<(), String> {
   if provider.base_url.trim().is_empty() {
@@ -280,7 +275,7 @@ pub(crate) fn ensure_provider_ready(
       provider.id
     ));
   }
-  if !provider_has_configured_api_key(app, provider) {
+  if !provider_has_configured_api_key(provider) {
     return Err(format!(
       "no API key configured for provider={}. Set it in Settings > Models.",
       provider.id
@@ -290,7 +285,6 @@ pub(crate) fn ensure_provider_ready(
 }
 
 pub(crate) fn resolve_chat_provider(
-  app: &AppHandle,
   settings: &app_settings::AppSettings,
   requested_provider_id: Option<&str>,
 ) -> Result<app_settings::ModelProvider, String> {
@@ -307,18 +301,17 @@ pub(crate) fn resolve_chat_provider(
         .find(|p| p.id == provider_id)
         .cloned()
         .ok_or_else(|| format!("provider not found: {}", provider_id))?;
-      ensure_provider_ready(app, &provider)?;
+      ensure_provider_ready(&provider)?;
       return Ok(provider);
     }
   }
 
-  let provider = resolve_current_provider(app, settings)?;
-  ensure_provider_ready(app, &provider)?;
+  let provider = resolve_current_provider(settings)?;
+  ensure_provider_ready(&provider)?;
   Ok(provider)
 }
 
 pub(crate) fn resolve_provider_api_key(
-  app: &AppHandle,
   provider: &app_settings::ModelProvider,
   override_key: Option<String>,
 ) -> Result<String, String> {
@@ -433,7 +426,7 @@ async fn probe_provider_connectivity(
 
 #[allow(non_snake_case)]
 pub async fn test_provider_connectivity(
-  app: &AppHandle,
+  _app: &AppHandle,
   provider: app_settings::ModelProvider,
   apiKey: Option<String>,
   api_key: Option<String>,
@@ -448,27 +441,27 @@ pub async fn test_provider_connectivity(
     return Err("model_name is empty".to_string());
   }
   let merged_key = apiKey.or(api_key);
-  let key = resolve_provider_api_key(app, &provider, merged_key)?;
+  let key = resolve_provider_api_key(&provider, merged_key)?;
   let client = crate::services::build_http_client()?;
   probe_provider_connectivity(&client, &provider, key.as_str()).await
 }
 
 // ---- 由 commands.rs 等价搬移（写作助手配置）----
-pub fn get_agents(app: &AppHandle) -> Result<Vec<agents::Agent>, String> {
-  agents::load(app)
+pub fn get_agents(_app: &AppHandle) -> Result<Vec<agents::Agent>, String> {
+  agents::load()
 }
 
-pub fn set_agents(app: &AppHandle, agents_list: Vec<agents::Agent>) -> Result<(), String> {
-  agents::save(app, &agents_list)
+pub fn set_agents(_app: &AppHandle, agents_list: Vec<agents::Agent>) -> Result<(), String> {
+  agents::save( &agents_list)
 }
 
-pub fn export_agents(app: &AppHandle) -> Result<String, String> {
-  let list = agents::load_custom(app)?;
+pub fn export_agents(_app: &AppHandle) -> Result<String, String> {
+  let list = agents::load_custom()?;
   serde_json::to_string_pretty(&list).map_err(|e| format!("export agents failed: {e}"))
 }
 
-pub fn import_agents(app: &AppHandle, json: String) -> Result<(), String> {
+pub fn import_agents(_app: &AppHandle, json: String) -> Result<(), String> {
   let list: Vec<agents::Agent> = serde_json::from_str(&json).map_err(|e| format!("import agents failed: {e}"))?;
-  agents::save_custom(app, &list)
+  agents::save_custom( &list)
 }
 
