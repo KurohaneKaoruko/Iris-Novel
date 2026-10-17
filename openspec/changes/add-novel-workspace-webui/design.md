@@ -76,6 +76,40 @@
 
 - 备选：让 AI 通过 agent 工具自取资料 —— 否决：这正是当前"AI 不记得看"的痛点，注入必须由项目确定性完成。
 
+### D9. 外部 Agent CLI 适配器：进程外执行 + 快照/diff 审阅，写入模式可切换
+
+新增 `src-tauri/src/agent_cli.rs`（或 services/agent_cli），定义 `CliAdapter` 内部约定，预置三个适配器，均以 headless 模式运行：
+
+| CLI | 命令形态 | 输出 |
+|---|---|---|
+| Claude Code | `claude -p "<task>" --output-format json`（cwd=作品目录） | stdout JSON（含 result 文本） |
+| Codex CLI | `codex exec "<task>"`（cwd=作品目录） | stdout |
+| DeepSeek Harness | `dsh --profile headless "<task>"`（cwd=作品目录） | stdout |
+
+- **任务上下文拼装**：复用 `chatComposer` 同源的小说上下文（设定/大纲/前情/当前章节），生成一段完整任务书（含写作规范、目录结构说明、MUST NOT 触碰 `.novel/` 的约束），作为 prompt 传入 CLI。CLI 的任务书拼装与内置 AI 上下文注入共享同一管线（D8）。
+- **写入管控（两种模式可切换，默认快照+审阅）**：
+  - *快照+审阅（默认）*：任务启动前对作品目录（不含 `.novel/`）做文件级快照（路径→内容 hash+内容副本存 `.novel/snapshots/<task-id>/`）；CLI 结束后对比快照产出变更集（新增/修改/删除、新旧全文与统一 diff）；用户在 UI 逐文件接受/回滚；全部处理完毕后清理快照。
+  - *直接写入*：跳过快照与审阅，CLI 结束后自动刷新文件树并记录一条版本历史快照（复用 `create_history_snapshot`）。
+- **进度与取消**：CLI 的 stdout/stderr 增量经 `EventSink`（D2）推送（`agent_cli_output` 事件），UI 实时显示；取消 = kill 进程组（`kill_on_drop(true)` + 进程组），取消后进入变更集审阅（如有改动）。
+- **并发**：同一作品同时只允许一个外部 CLI 任务（互斥锁 per-workspace），不同作品互不影响。
+- **检测**：`agent_cli_detect` 命令返回各 CLI 是否可用（`which`/PATH 查找 + `--version` 探测，带超时）。
+- Web 端通过 HTTP/WS 使用同一能力（CLI 在服务端主机执行）。
+
+备选与否决：
+- 备选：MCP 方式集成 —— 否决：三个 CLI 均非 MCP server；项目内 `mcp/mod.rs` 仅是占位类型，首版不扩展。
+- 备选：强制每次都走快照审阅 —— 否决：用户明确要求两种模式可切换；默认审阅保守安全。
+- 备选：强制直接写入 —— 否决：外部 CLI 无逐条拦截能力，快照+diff 是唯一可靠的审阅手段。
+
+### D10. 内置 AI 小说特化：工具白名单 + 小说专用工具
+
+`agent_system.rs` 的 `ToolRegistry` 收敛为白名单注册制，内置 AI MUST NOT 注册命令执行/网络访问类工具（现状即无此类工具，固化为规范与测试）：
+
+- **保留**：`fs_read_text`、`fs_list_dir`、`fs_exists`、`fs_create_dir`、`fs_create_file`、`fs_delete_entry`、`fs_rename_entry`、`fs_write_text`（全部路径约束在工作区内）+ `memory_upsert`、`memory_search`。
+- **新增小说专用工具**：`novel_list_chapters`（章节列表+字数）、`novel_read_index`（人物状态/伏笔索引）、`novel_write_chapter`（`stories/` 下整章写入，带字数统计）。
+- **提示词**：系统提示词强调小说创作规范（视角、文风、章节结构、设定一致性），替代通用 agent 自由探索提示词。
+- **守护**：新增 Rust 单元测试断言工具注册表不含 `exec/shell/bash/network/http` 类工具名，且 fs 工具路径逃逸测试（`../` 拒绝）保持通过。
+- 外部 CLI 与内置 AI 的能力边界：外部 CLI 是用户机器上的独立程序，能力不受 Iris-Novel 限制（因此需要快照审阅）；内置 AI 是项目自身 agent，能力白名单化。
+
 ## Risks / Trade-offs
 
 - [App.tsx 拆分引入行为回归] → 拆分以"先移动后修改"两步提交；布局容器先行、行为逻辑不动；`pnpm run test` 全量守护。
@@ -84,10 +118,14 @@
 - [注入管线增加生成前延迟（多一次 LLM 分析）] → 分析与本地检索并行；清单按章节缓存复用；分析模型可用低成本配置。
 - [Markdown 解析出的图谱/角色卡不准] → 索引支持手动修订与锁定（沿用既有 `source/locked` 语义），一键重建兜底。
 - [Web 端密钥存于浏览器本地，安全性弱于密钥环] → 界面明确标示存储差异；服务端默认仅回环绑定，来源校验。
+- [外部 CLI 写坏作品文件] → 默认快照+审阅模式兜底；直接写入模式也自动记录版本历史；`.novel/` 目录对 CLI 任务书声明为禁止触碰。
+- [CLI 长时间运行/挂死] → 启动超时与空闲输出超时（stdout 超过 N 分钟无输出判定挂死）可配置；取消走进程组 kill。
+- [CLI 未安装或未登录] → `agent_cli_detect` 预检 + 任务启动前二次校验，UI 明确报错而非静默失败。
+- [内置 AI 能力被误扩展回通用 agent] → Rust 单元测试固化工具白名单（无 exec/shell/network 类工具名 + fs 路径逃逸防护测试）。
 
 ## Migration Plan
 
-按可独立验证的六个阶段推进（详见 tasks.md）：
+按可独立验证的八个阶段推进（详见 tasks.md）：
 
 1. 服务层提取（纯等价搬移，桌面端行为不变）
 2. `EventSink` + WS 通道 + `iris-novel-server` 骨架（桌面端仍为主要使用路径）
@@ -95,6 +133,8 @@
 4. 布局拆分与四区重构 + 沉浸模式（双端共用）
 5. 资料管理三视图
 6. 上下文注入管线
+7. 内置 AI 小说特化（工具白名单收敛 + 小说专用工具）
+8. 外部 Agent CLI 集成（适配器、快照审阅、UI）
 
 每阶段结束时应用可构建、测试可过；回滚以阶段为单位 revert。
 
