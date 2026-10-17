@@ -398,7 +398,7 @@ pub fn forget_external_project(app: &AppHandle, path: &str) -> Result<(), String
   save_external_projects(app, &records)
 }
 
-pub fn set_launch_mode(app: &AppHandle, mode: &str) -> Result<(), String> {
+pub fn set_launch_mode(_app: &AppHandle, mode: &str) -> Result<(), String> {
   let mut settings = app_settings::load()?;
   settings.launch_mode = parse_launch_mode(mode)?;
   app_settings::save(&settings)

@@ -95,7 +95,7 @@ fn parse_modifications(edit_content: &str) -> Result<Vec<Modification>, String> 
 
     // Parse <replace> tags
     let replace_regex = Regex::new(
-        r#"<replace\s+lines="(\d+)-(\d+)">(.*?)</replace>"#
+        r#"(?s)<replace\s+lines="(\d+)-(\d+)">(.*?)</replace>"#
     ).map_err(|e| format!("Failed to compile replace regex: {}", e))?;
 
     for cap in replace_regex.captures_iter(edit_content) {
@@ -132,7 +132,7 @@ fn parse_modifications(edit_content: &str) -> Result<Vec<Modification>, String> 
 
     // Parse <insert> tags
     let insert_regex = Regex::new(
-        r#"<insert\s+at="(\d+)">(.*?)</insert>"#
+        r#"(?s)<insert\s+at="(\d+)">(.*?)</insert>"#
     ).map_err(|e| format!("Failed to compile insert regex: {}", e))?;
 
     for cap in insert_regex.captures_iter(edit_content) {
