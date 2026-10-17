@@ -27,7 +27,7 @@
 ## 4. 四区布局重构与沉浸模式
 
 - [x] 4.1 从 `App.tsx` 抽出文件打开/标签/侧栏状态 hooks（行为不变纯搬移），现有测试与手测通过（useWorkspaceTabs：openFiles/activePath/activeFile/onOpenByPath/closeActiveTab/focusNeighborTab，App.tsx 删除对应本地实现改为 hook 消费，构建通过，新增 5 例单测）
-- [ ] 4.2 新建 `WorkspaceLayout` 四区容器与 `ChapterList` 组件（数据源 `ChapterService`），先在现有壳内并行挂载验证
+- [x] 4.2 新建 `WorkspaceLayout` 四区容器与 `ChapterList` 组件（数据源 `ChapterService`），先在现有壳内并行挂载验证（组件 + 5 例测试完成；主布局替换在 4.3）
 - [ ] 4.3 替换主布局为四区结构（左章节列表 / 上标签 / 中编辑器 / 右 AI 栏），移除目录树主导航，布局状态并入 `UISettingsManager` 持久化
 - [ ] 4.4 折叠/拖宽行为与状态保留，组件测试覆盖"折叠 → 恢复后打开内容不丢失"
 - [ ] 4.5 实现沉浸模式：进入仅显 AI 对话区、生成不中断、退出恢复进入前布局，组件测试覆盖进入/生成/退出三场景
