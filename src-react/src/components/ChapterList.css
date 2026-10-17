@@ -1,0 +1,121 @@
+.chapter-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface-1, var(--bg-secondary));
+  overflow: hidden;
+}
+
+.chapter-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-2, var(--bg-tertiary));
+}
+
+.chapter-list-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chapter-list-reload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.chapter-list-reload:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.chapter-list-reload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chapter-list-body {
+  flex: 1;
+  overflow: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chapter-list-empty,
+.chapter-list-error {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 8px 6px;
+}
+
+.chapter-list-error {
+  color: var(--danger, #d1242f);
+}
+
+.chapter-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chapter-list-item:hover {
+  background: var(--surface-2, var(--bg-active));
+  color: var(--text-primary);
+}
+
+.chapter-list-item.active {
+  background: var(--bg-active);
+  color: var(--text-accent);
+}
+
+.chapter-list-index {
+  flex-shrink: 0;
+  width: 20px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.chapter-list-item.active .chapter-list-index {
+  color: var(--text-accent);
+}
+
+.chapter-list-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-list-words {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
