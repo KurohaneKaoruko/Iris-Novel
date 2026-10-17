@@ -66,6 +66,7 @@ import { handleFileSaveError, clearBackupContent } from './utils/fileSaveErrorHa
 import { useAutoSave, clearAutoSavedContent } from './hooks/useAutoSave'
 import { useProjectWritingSettings } from './hooks/useProjectWritingSettings'
 import { useAutoStoryNavigation } from './hooks/useAutoStoryNavigation'
+import { useWorkspaceTabs } from './hooks/useWorkspaceTabs'
 import { useTaskQualityValidator } from './hooks/useTaskQualityValidator'
 import { useChatSessionWorkbench } from './hooks/useChatSessionWorkbench'
 import { APP_LOCALES, type AppLocale, useI18n } from './i18n'
@@ -87,17 +88,6 @@ import {
   providerKindLabel,
   type CustomProviderApiFormat,
 } from './config/providerPresets'
-
-type OpenFile = {
-  path: string
-  name: string
-  content: string
-  dirty: boolean
-}
-
-type OpenByPathOptions = {
-  forceReload?: boolean
-}
 
 type ChatItem = {
   id: string
@@ -625,8 +615,21 @@ function App() {
   const [launchMode, setLaunchModeState] = useState<LaunchMode>('picker')
   const [lastWorkPath, setLastWorkPath] = useState<string | null>(null)
   const [tree, setTree] = useState<FsEntry | null>(null)
-  const [openFiles, setOpenFiles] = useState<OpenFile[]>([])
-  const [activePath, setActivePath] = useState<string | null>(null)
+  const onErrorForTabs = useCallback((message: string | null) => { setError(message) }, [])
+  const onBusyForTabs = useCallback((b: boolean) => { setBusy(b) }, [])
+  const {
+    openFiles,
+    setOpenFiles,
+    activePath,
+    setActivePath,
+    activeFile,
+    onOpenByPath,
+    closeActiveTab,
+    focusNeighborTab,
+  } = useWorkspaceTabs({
+    onError: onErrorForTabs,
+    onBusyChange: onBusyForTabs,
+  })
   const [showPreview, setShowPreview] = useState(false)
   const [previewHtml, setPreviewHtml] = useState('')
   const [busy, setBusy] = useState(false)
@@ -756,7 +759,7 @@ function App() {
   const [graphEdges, setGraphEdges] = useState<Array<{ from: string; to: string; type?: string }>>([])
   const { validateTaskQuality } = useTaskQualityValidator()
 
-  const activeFile = useMemo(() => openFiles.find((f) => f.path === activePath) ?? null, [openFiles, activePath])
+  // activeFile comes from useWorkspaceTabs
   const openFileContentMap = useMemo(() => {
     const map = new Map<string, string>()
     for (const file of openFiles) {
@@ -1423,39 +1426,6 @@ function App() {
     [refreshBookshelfState],
   )
 
-  const onOpenByPath = useCallback(
-    async (relPath: string, options?: OpenByPathOptions) => {
-      if (!relPath) return
-      const forceReload = options?.forceReload === true
-      setError(null)
-      setBusy(true)
-      try {
-        const existing = openFiles.find((f) => f.path === relPath)
-        if (existing && !forceReload) {
-          setActivePath(existing.path)
-          return
-        }
-        const parts = relPath.replaceAll('\\', '/').split('/')
-        const name = parts[parts.length - 1] || relPath
-        const content = await readText(relPath)
-        if (existing) {
-          setOpenFiles((prev) =>
-            prev.map((f) => (f.path === relPath ? { ...f, name, content, dirty: false } : f)),
-          )
-        } else {
-          const next: OpenFile = { path: relPath, name, content, dirty: false }
-          setOpenFiles((prev) => [...prev, next])
-        }
-        setActivePath(relPath)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
-      } finally {
-        setBusy(false)
-      }
-    },
-    [openFiles],
-  )
-
   const onSearchInFiles = useCallback(
     async (query: string, options: SearchPanelOptions): Promise<SearchResult[]> => {
       const normalizedQuery = query.trim()
@@ -1511,27 +1481,6 @@ function App() {
       void onOpenByPath(result.path)
     },
     [onOpenByPath],
-  )
-
-  const closeActiveTab = useCallback(() => {
-    if (!activePath) return
-    setOpenFiles((prev) => {
-      const next = prev.filter((f) => f.path !== activePath)
-      setActivePath(next[next.length - 1]?.path ?? null)
-      return next
-    })
-  }, [activePath])
-
-  const focusNeighborTab = useCallback(
-    (direction: 'next' | 'prev') => {
-      if (!activePath || openFiles.length <= 1) return
-      const currentIndex = openFiles.findIndex((f) => f.path === activePath)
-      if (currentIndex < 0) return
-      const offset = direction === 'next' ? 1 : -1
-      const nextIndex = (currentIndex + offset + openFiles.length) % openFiles.length
-      setActivePath(openFiles[nextIndex]?.path ?? activePath)
-    },
-    [activePath, openFiles],
   )
 
   const { ensureAutoNextChapter, ensureAutoStoryFile } = useAutoStoryNavigation({
