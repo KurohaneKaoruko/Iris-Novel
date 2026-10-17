@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Clean Build Script for Iris Creation
+# Clean Build Script for Iris-Creation
 # This script cleans all build artifacts and caches to fix path reference issues.
 
-echo "Cleaning Iris Creation build artifacts..."
+echo "Cleaning Iris-Creation build artifacts..."
 echo
 
 echo "Cleaning Rust build cache (src-tauri/target)..."

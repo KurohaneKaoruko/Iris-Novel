@@ -10,8 +10,6 @@
   },
   "editor": {
     "namespace": "IrisCreationEditor",
-    "configStorageKey": "iris-creation-editor-config",
-    "legacyConfigStorageKey": "iris-creation-editor-config"
-  },
-  "legacyDataDirName": "Iris Creation"
+    "configStorageKey": "iris-creation-editor-config"
+  }
 }

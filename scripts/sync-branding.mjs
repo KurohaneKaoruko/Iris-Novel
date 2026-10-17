@@ -73,7 +73,6 @@ function escapeRustString(value) {
 function generateRustBrandingSource(branding) {
   const displayName = branding.displayName ?? "";
   const dataDirName = branding.dataDirName ?? displayName;
-  const legacyDataDirName = branding.legacyDataDirName ?? "";
   const gitName = branding?.gitSignature?.name ?? displayName;
   const gitEmail = branding?.gitSignature?.email ?? "";
 
@@ -82,8 +81,6 @@ function generateRustBrandingSource(branding) {
     `pub const DISPLAY_NAME: &str = "${escapeRustString(displayName)}";\n` +
     `#[allow(dead_code)]\n` +
     `pub const DATA_DIR_NAME: &str = "${escapeRustString(dataDirName)}";\n` +
-    `#[allow(dead_code)]\n` +
-    `pub const LEGACY_DATA_DIR_NAME: &str = "${escapeRustString(legacyDataDirName)}";\n` +
     `pub const GIT_SIGNATURE_NAME: &str = "${escapeRustString(gitName)}";\n` +
     `pub const GIT_SIGNATURE_EMAIL: &str = "${escapeRustString(gitEmail)}";\n`
   );
@@ -97,13 +94,11 @@ function generateFrontendBrandingSource(branding) {
   const displayName = branding.displayName ?? "";
   const editorNamespace = branding?.editor?.namespace ?? "";
   const editorConfigStorageKey = branding?.editor?.configStorageKey ?? "";
-  const legacyEditorConfigStorageKey = branding?.editor?.legacyConfigStorageKey ?? "";
 
   return (
     `export const DISPLAY_NAME = ${tsStringLiteral(displayName)} as const\n` +
     `export const EDITOR_NAMESPACE = ${tsStringLiteral(editorNamespace)} as const\n` +
-    `export const EDITOR_CONFIG_STORAGE_KEY = ${tsStringLiteral(editorConfigStorageKey)} as const\n` +
-    `export const LEGACY_EDITOR_CONFIG_STORAGE_KEY = ${tsStringLiteral(legacyEditorConfigStorageKey)} as const\n`
+    `export const EDITOR_CONFIG_STORAGE_KEY = ${tsStringLiteral(editorConfigStorageKey)} as const\n`
   );
 }
 
