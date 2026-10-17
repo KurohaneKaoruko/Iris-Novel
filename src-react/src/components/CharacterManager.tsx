@@ -178,6 +178,21 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           </div>
 
           <button
+            className="view-mode-button"
+            onClick={() => {
+              void (async () => {
+                const { rebuildMaterialIndex } = await import('../services/MaterialIndexService')
+                await rebuildMaterialIndex()
+                await loadCharacters()
+              })()
+            }}
+            disabled={isLoading}
+            title={t('character.manager.rebuildIndex')}
+          >
+            {t('character.manager.rebuildIndex')}
+          </button>
+
+          <button
             className="create-button"
             onClick={() => setShowCreateForm(true)}
             disabled={isLoading}
