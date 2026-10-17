@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { callCommand } from '../transport';
 
 /**
  * Plot line status types
@@ -171,7 +171,7 @@ export class PlotLineService {
    */
   private async loadPlotLinesFile(): Promise<string> {
     try {
-      return await invoke<string>('read_text', { relativePath: this.PLOTLINES_FILE });
+      return await callCommand<string>('read_text', { relativePath: this.PLOTLINES_FILE });
     } catch (error) {
       // Return empty content if file doesn't exist
       return '';
@@ -312,7 +312,7 @@ export class PlotLineService {
         content += '\n';
       }
       
-      await invoke('write_text', { relativePath: this.PLOTLINES_FILE, content });
+      await callCommand('write_text', { relativePath: this.PLOTLINES_FILE, content });
     } catch (error) {
       throw new Error(`Failed to save plot lines: ${error instanceof Error ? error.message : String(error)}`);
     }

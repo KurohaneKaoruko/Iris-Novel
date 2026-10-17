@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { callCommand } from '../transport';
 
 /**
  * Character data fields
@@ -174,7 +174,7 @@ export class CharacterService {
    */
   private async loadCharactersFile(): Promise<string> {
     try {
-      return await invoke<string>('read_text', { relativePath: this.CHARACTERS_FILE });
+      return await callCommand<string>('read_text', { relativePath: this.CHARACTERS_FILE });
     } catch (error) {
       // Return empty content if file doesn't exist
       return '';
@@ -318,7 +318,7 @@ export class CharacterService {
         content += '\n';
       }
       
-      await invoke('write_text', { relativePath: this.CHARACTERS_FILE, content });
+      await callCommand('write_text', { relativePath: this.CHARACTERS_FILE, content });
     } catch (error) {
       throw new Error(`Failed to save characters: ${error instanceof Error ? error.message : String(error)}`);
     }

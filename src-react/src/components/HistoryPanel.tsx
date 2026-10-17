@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { confirm } from '@tauri-apps/plugin-dialog'
+import { dialogConfirm } from '../transport'
 import {
   createHistorySnapshot,
   isTauriApp,
@@ -117,7 +117,7 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
   const handleRestore = useCallback(
     async (entry: HistoryEntry) => {
       if (!workRoot || !isTauriApp()) return
-      const ok = await confirm(
+      const ok = await dialogConfirm(
         t('history.restoreConfirm', {
           path: entry.file_path,
           time: formatTime(entry.created_at, locale),

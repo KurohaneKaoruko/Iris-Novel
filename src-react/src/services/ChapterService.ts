@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { callCommand } from '../transport';
 
 /**
  * Chapter status types
@@ -127,10 +127,10 @@ export class ChapterService {
       const filePath = `${this.STORIES_DIR}/${fileName}.md`;
       
       // Create the file
-      await invoke('create_file', { relativePath: filePath });
+      await callCommand('create_file', { relativePath: filePath });
       
       // Write initial content
-      await invoke('write_text', { 
+      await callCommand('write_text', { 
         relativePath: filePath, 
         content: `# ${title}\n\n` 
       });
@@ -223,7 +223,7 @@ export class ChapterService {
    */
   async getChapterStats(filePath: string): Promise<ChapterStats> {
     try {
-      const content = await invoke<string>('read_text', { relativePath: filePath });
+      const content = await callCommand<string>('read_text', { relativePath: filePath });
       
       // Word count follows the web app's convention: number of
       // non-whitespace characters, which is meaningful for CJK text
@@ -256,7 +256,7 @@ export class ChapterService {
    */
   private async loadMetadata(): Promise<ChapterMetadata> {
     try {
-      const content = await invoke<string>('read_text', { relativePath: this.METADATA_PATH });
+      const content = await callCommand<string>('read_text', { relativePath: this.METADATA_PATH });
       return JSON.parse(content) as ChapterMetadata;
     } catch (error) {
       // If file doesn't exist, return empty metadata
@@ -271,7 +271,7 @@ export class ChapterService {
   private async saveMetadata(metadata: ChapterMetadata): Promise<void> {
     try {
       const content = JSON.stringify(metadata, null, 2);
-      await invoke('write_text', { relativePath: this.METADATA_PATH, content });
+      await callCommand('write_text', { relativePath: this.METADATA_PATH, content });
     } catch (error) {
       throw new Error(`Failed to save metadata: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -284,7 +284,7 @@ export class ChapterService {
   private async getStoryFiles(): Promise<string[]> {
     try {
       // List workspace tree with max depth to get stories directory
-      const tree = await invoke<any>('list_workspace_tree', { maxDepth: 2 });
+      const tree = await callCommand<any>('list_workspace_tree', { maxDepth: 2 });
       
       // Find stories directory
       const storiesDir = tree.children?.find((child: any) => 

@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(),
+vi.mock('../src/transport', () => ({
+  callCommand: vi.fn(),
+  isTauriApp: () => true,
 }))
 
-import { invoke } from '@tauri-apps/api/core'
+import { callCommand } from '../src/transport'
 
 import { ModificationService, type ChangeSet } from '../src/services/ModificationService'
 
-const invokeMock = vi.mocked(invoke)
+const invokeMock = vi.mocked(callCommand)
 
 function makeChangeSet(): ChangeSet {
   return {
@@ -77,7 +78,7 @@ describe('ModificationService', () => {
 
   it('rejects applying suggestions when the file changed externally', async () => {
     const originalContent = 'one\ntwo'
-    let currentContent = 'one\nchanged by user'
+    const currentContent = 'one\nchanged by user'
 
     invokeMock.mockImplementation(async (command) => {
       if (command === 'read_text') {
