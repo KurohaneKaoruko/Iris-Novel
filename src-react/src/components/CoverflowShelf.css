@@ -1,0 +1,280 @@
+/* ========================================
+   Coverflow 封面流
+   ======================================== */
+
+.coverflow {
+  flex: 1;
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  perspective: 1400px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  cursor: grab;
+  outline: none;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8%, #000 92%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 8%, #000 92%, transparent 100%);
+}
+
+.coverflow::-webkit-scrollbar {
+  display: none;
+}
+
+.coverflow:active {
+  cursor: grabbing;
+}
+
+.coverflow-track {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 44px;
+  /* 左右留白让首尾条目也能居中 */
+  padding: 0 max(48px, calc(50vw - 340px));
+  width: max-content;
+  transform-style: preserve-3d;
+}
+
+.coverflow-item {
+  flex: none;
+  height: 344px;
+  transform-origin: center center;
+  will-change: transform, opacity;
+  transition: box-shadow var(--dur-med) var(--ease-out);
+  backface-visibility: hidden;
+}
+
+.coverflow-item:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 6px;
+  border-radius: var(--radius-lg);
+}
+
+/* 降级：静态网格 */
+.coverflow-grid {
+  flex: 1;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  padding: 24px 32px 120px;
+  align-content: start;
+}
+
+.coverflow-grid-cell {
+  min-width: 0;
+}
+
+/* ========================================
+   作品卡与封面
+   ======================================== */
+
+.shelf-card {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.shelf-card * {
+  user-select: none;
+}
+
+.shelf-cover {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: var(--shadow-lg);
+  transform: translateZ(0);
+  transition: transform var(--dur-med) var(--ease-out), box-shadow var(--dur-med) var(--ease-out);
+}
+
+[data-theme='light'] .shelf-cover {
+  border-color: rgba(20, 30, 60, 0.12);
+}
+
+.shelf-card:hover .shelf-cover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-float);
+}
+
+/* 封面光斑层 */
+.shelf-cover::before,
+.shelf-cover::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.shelf-cover::before {
+  width: 130%;
+  height: 90%;
+  left: -30%;
+  top: -35%;
+  background: radial-gradient(closest-side, var(--cover-glow-a, rgba(255, 255, 255, 0.3)), transparent 70%);
+}
+
+.shelf-cover::after {
+  width: 120%;
+  height: 80%;
+  right: -35%;
+  bottom: -30%;
+  background: radial-gradient(closest-side, var(--cover-glow-b, rgba(255, 255, 255, 0.2)), transparent 72%);
+}
+
+/* 封面噪点与内描边 */
+.shelf-cover-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, transparent 18%, transparent 78%, rgba(0, 0, 0, 0.24) 100%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.028) 0 2px, transparent 2px 5px);
+  pointer-events: none;
+}
+
+.shelf-cover-initials {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 58px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.shelf-cover-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 9px;
+  font-size: 10px;
+  line-height: 1.4;
+  border-radius: var(--radius-pill);
+  background: rgba(10, 12, 18, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.shelf-cover-badge.warn {
+  background: rgba(120, 70, 20, 0.6);
+  border-color: rgba(240, 178, 122, 0.5);
+}
+
+/* 封面右下圆形动作钮（参考图的 + 按钮） */
+.shelf-cover-action {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(12, 14, 20, 0.5);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+
+.shelf-cover-action:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: scale(1.08);
+}
+
+.shelf-card-info {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 2px;
+}
+
+.shelf-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shelf-card-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shelf-card-meta {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 动作卡（新建/导入） */
+.shelf-action-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: var(--radius-lg);
+  border: 1.5px dashed var(--glass-border);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--dur-med) var(--ease-out), color var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
+}
+
+.shelf-action-card:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  transform: translateY(-4px);
+}
+
+.shelf-action-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--bg-hover);
+  font-size: 24px;
+  line-height: 1;
+}

@@ -5,67 +5,75 @@
 
 /* CSS Variables for Theme */
 :root {
-  /* Base Colors */
-  --bg-primary: #111111;
-  --bg-secondary: #161616;
-  --bg-tertiary: #1c1c1c;
-  --bg-hover: #252525;
-  --bg-active: #2e2e2e;
-  --bg-selected: #2a2a2a;
-  --surface-1: #141414;
-  --surface-2: #1a1a1a;
-  --surface-3: #202020;
-  --surface-glass: #151515;
-  
+  /* Base Colors — 深蓝灰基调 */
+  --bg-primary: #14161f;
+  --bg-secondary: #181b26;
+  --bg-tertiary: #1d202c;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.1);
+  --bg-selected: rgba(255, 255, 255, 0.08);
+  --surface-1: #171a24;
+  --surface-2: #1c2030;
+  --surface-3: #232838;
+  --surface-glass: rgba(23, 26, 36, 0.72);
+
+  /* Glass — 液态玻璃配方 */
+  --glass-bg: rgba(23, 26, 36, 0.66);
+  --glass-bg-strong: rgba(20, 23, 33, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-highlight: rgba(255, 255, 255, 0.07);
+  --glass-blur: 22px;
+
   /* Text Colors */
-  --text-primary: #f2f2f2;
-  --text-secondary: #c5c5c5;
-  --text-muted: #8d8d8d;
-  --text-tertiary: #737373;
+  --text-primary: #eef0f6;
+  --text-secondary: #b6bccb;
+  --text-muted: #7e8496;
+  --text-tertiary: #646a7c;
   --text-accent: #ffffff;
-  
+
   /* Accent Colors */
-  --accent-primary: #f4f4f4;
+  --accent-primary: #e8ebf4;
   --accent-hover: #ffffff;
-  --accent-active: #dfdfdf;
-  --accent-glow: #8c8c8c66;
-  --accent-contrast: #111111;
-  --accent-light: #262626;
-  --accent-secondary: #e3e3e3;
-  --accent-tertiary: #c9c9c9;
+  --accent-active: #d4d9e8;
+  --accent-glow: rgba(196, 206, 236, 0.4);
+  --accent-contrast: #14161f;
+  --accent-light: #262b3a;
+  --accent-secondary: #d9dde9;
+  --accent-tertiary: #c2c7d6;
   --accent-color: var(--accent-primary);
   --accent-color-hover: var(--accent-hover);
   --accent-dark: var(--accent-active);
   --primary-color: var(--accent-primary);
   --primary-hover: var(--accent-hover);
-  
+
   /* Status Colors */
-  --status-blue: #d0d0d0;
-  --status-green: #c8c8c8;
-  --status-yellow: #c2c2c2;
-  --status-orange: #b8b8b8;
-  --status-red: #aaaaaa;
-  --status-purple: #cecece;
-  
+  --status-blue: #8fb4ff;
+  --status-green: #7ed3a2;
+  --status-yellow: #e8d48b;
+  --status-orange: #f0b27a;
+  --status-red: #f08a8a;
+  --status-purple: #b8a6f0;
+
   /* Delta Colors */
-  --delta-added: #cfcfcf;
-  --delta-modified: #bfbfbf;
-  --delta-deleted: #a8a8a8;
-  --delta-new: #d5d5d5;
-  
-  /* Borders */
-  --border-subtle: #333333;
-  --border-color: #333333;
-  --border-hover: #535353;
-  --border-focus: #ffffff;
-  --border-strong: #4a4a4a;
-  
-  /* Shadows */
-  --shadow-sm: 0 2px 8px #00000044;
-  --shadow-md: 0 6px 18px #00000055;
-  --shadow-lg: 0 12px 28px #00000066;
-  --shadow-modal: 0 14px 36px #00000077;
-  --ring: 0 0 0 1px var(--accent-glow), 0 0 0 3px #ffffff22;
+  --delta-added: #7ed3a2;
+  --delta-modified: #e8d48b;
+  --delta-deleted: #f08a8a;
+  --delta-new: #8fb4ff;
+
+  /* Borders — 发丝线 */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-color: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --border-focus: #dfe4f2;
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  /* Shadows — 多层柔和投影 */
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 28px 70px rgba(0, 0, 0, 0.6);
+  --shadow-float: 0 18px 50px rgba(0, 0, 0, 0.55);
+  --ring: 0 0 0 1px var(--accent-glow), 0 0 0 3px rgba(255, 255, 255, 0.09);
   --panel-backdrop: none;
   --content-max-width: 1200px;
   --status-bar-bg: var(--surface-2);
@@ -76,20 +84,21 @@
   --active-bg: var(--bg-active);
 
   /* Semantic */
-  --error-bg: #332121;
-  --error-border: #7e5555;
-  --error-text: #f1c7c7;
-  --error-hover: #422a2a;
-  --success-bg: #203126;
-  --success-border: #4b6a54;
-  --success-text: #bed8c5;
-  --success-hover: #294231;
-  --warning-bg: #342c1c;
-  --warning-border: #7d6a42;
-  --warning-text: #ebd7a8;
-  --scrollbar-thumb: #4b4b4b;
-  --scrollbar-thumb-hover: #5a5a5a;
-  
+  --error-bg: rgba(120, 45, 45, 0.24);
+  --error-border: rgba(240, 138, 138, 0.4);
+  --error-text: #f5b8b8;
+  --error-hover: rgba(120, 45, 45, 0.36);
+  --success-bg: rgba(45, 110, 75, 0.22);
+  --success-border: rgba(126, 211, 162, 0.35);
+  --success-text: #b9e8cd;
+  --success-hover: rgba(45, 110, 75, 0.34);
+  --warning-bg: rgba(120, 95, 45, 0.22);
+  --warning-border: rgba(232, 212, 139, 0.35);
+  --warning-text: #eee0b4;
+  --warning-hover: rgba(120, 95, 45, 0.34);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.14);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.22);
+
   /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
@@ -106,93 +115,110 @@
   --right-activity-item-size: 36px;
   --right-panel-width: 348px;
   --status-bar-height: 21px;
-  
-  /* Border Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  
-  /* Transitions */
-  --transition-fast: 0.15s ease;
-  --transition-normal: 0.2s ease;
-  --transition-slow: 0.3s ease;
-  
+  --titlebar-height: 40px;
+
+  /* Border Radius — 大圆角阶梯 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* Transitions — 统一缓动 */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.3, 0.44, 1);
+  --dur-fast: 140ms;
+  --dur-med: 240ms;
+  --dur-slow: 420ms;
+  --transition-fast: var(--dur-fast) var(--ease-out);
+  --transition-normal: var(--dur-med) var(--ease-out);
+  --transition-slow: var(--dur-slow) var(--ease-out);
+
   /* Fonts */
   --font-sans: 'Space Grotesk', 'Segoe UI Variable', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
+
 /* Light Theme */
 [data-theme="light"] {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f7f7f7;
-  --bg-tertiary: #efefef;
-  --bg-hover: #e7e7e7;
-  --bg-active: #dddddd;
-  --bg-selected: #e2e2e2;
+  --bg-primary: #f2f4f9;
+  --bg-secondary: #f7f8fc;
+  --bg-tertiary: #eceef4;
+  --bg-hover: rgba(20, 30, 60, 0.06);
+  --bg-active: rgba(20, 30, 60, 0.1);
+  --bg-selected: rgba(20, 30, 60, 0.08);
   --surface-1: #ffffff;
-  --surface-2: #f9f9f9;
-  --surface-3: #f2f2f2;
-  --surface-glass: #ffffff;
-  
-  --text-primary: #141414;
-  --text-secondary: #3a3a3a;
-  --text-muted: #6f6f6f;
-  --text-tertiary: #8a8a8a;
+  --surface-2: #f7f8fb;
+  --surface-3: #eef0f6;
+  --surface-glass: rgba(255, 255, 255, 0.72);
+
+  --glass-bg: rgba(255, 255, 255, 0.68);
+  --glass-bg-strong: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(20, 30, 60, 0.09);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  --glass-blur: 22px;
+
+  --text-primary: #1a1d28;
+  --text-secondary: #4a5060;
+  --text-muted: #77809a;
+  --text-tertiary: #8b93a8;
   --text-accent: #000000;
-  
-  --accent-primary: #111111;
+
+  --accent-primary: #1a1d28;
   --accent-hover: #000000;
-  --accent-active: #202020;
-  --accent-glow: #9a9a9a66;
+  --accent-active: #2c3040;
+  --accent-glow: rgba(43, 48, 64, 0.25);
   --accent-contrast: #ffffff;
-  --accent-light: #efefef;
-  --accent-secondary: #2a2a2a;
-  --accent-tertiary: #4f4f4f;
+  --accent-light: #e8eaf2;
+  --accent-secondary: #2a2e3c;
+  --accent-tertiary: #4f5466;
   --accent-color: var(--accent-primary);
   --accent-color-hover: var(--accent-hover);
   --accent-dark: var(--accent-active);
   --primary-color: var(--accent-primary);
   --primary-hover: var(--accent-hover);
-  --status-blue: #2f2f2f;
-  --status-green: #3a3a3a;
-  --status-yellow: #555555;
-  --status-orange: #5e5e5e;
-  --status-red: #4a4a4a;
-  --status-purple: #505050;
-  --delta-added: #2d2d2d;
-  --delta-modified: #3d3d3d;
-  --delta-deleted: #535353;
-  --delta-new: #252525;
-  --border-subtle: #d8d8d8;
-  --border-color: #d8d8d8;
-  --border-hover: #b8b8b8;
-  --border-focus: #111111;
-  --border-strong: #bdbdbd;
+  --status-blue: #3b6fd4;
+  --status-green: #2f8a56;
+  --status-yellow: #a8842c;
+  --status-orange: #c07030;
+  --status-red: #c04a4a;
+  --status-purple: #7058c0;
+  --delta-added: #2f8a56;
+  --delta-modified: #a8842c;
+  --delta-deleted: #c04a4a;
+  --delta-new: #3b6fd4;
+  --border-subtle: rgba(20, 30, 60, 0.1);
+  --border-color: rgba(20, 30, 60, 0.1);
+  --border-hover: rgba(20, 30, 60, 0.2);
+  --border-focus: #1a1d28;
+  --border-strong: rgba(20, 30, 60, 0.18);
   --status-bar-bg: var(--surface-2);
   --panel-bg: var(--surface-1);
   --tab-header-bg: var(--surface-2);
   --input-bg: var(--surface-1);
   --hover-bg: var(--bg-hover);
   --active-bg: var(--bg-active);
-  --error-bg: #fff1f1;
-  --error-border: #d3a2a2;
+  --error-bg: rgba(200, 70, 70, 0.1);
+  --error-border: rgba(200, 70, 70, 0.34);
   --error-text: #8f2d2d;
-  --error-hover: #ffe6e6;
-  --success-bg: #eef8f0;
-  --success-border: #9fc1a6;
+  --error-hover: rgba(200, 70, 70, 0.18);
+  --success-bg: rgba(47, 138, 86, 0.1);
+  --success-border: rgba(47, 138, 86, 0.32);
   --success-text: #2f6b3f;
-  --success-hover: #e0f1e4;
-  --warning-bg: #fff7e8;
-  --warning-border: #d2bc8f;
+  --success-hover: rgba(47, 138, 86, 0.18);
+  --warning-bg: rgba(168, 132, 44, 0.12);
+  --warning-border: rgba(168, 132, 44, 0.34);
   --warning-text: #8a6420;
-  --scrollbar-thumb: #b7b7b7;
-  --scrollbar-thumb-hover: #9f9f9f;
-  
-  --shadow-sm: 0 4px 12px #0000001a;
-  --shadow-md: 0 10px 22px #00000024;
-  --shadow-lg: 0 14px 30px #0000002e;
-  --shadow-modal: 0 22px 52px #00000033;
+  --warning-hover: rgba(168, 132, 44, 0.2);
+  --scrollbar-thumb: rgba(20, 30, 60, 0.18);
+  --scrollbar-thumb-hover: rgba(20, 30, 60, 0.3);
+
+  --shadow-sm: 0 2px 10px rgba(30, 40, 70, 0.1);
+  --shadow-md: 0 10px 26px rgba(30, 40, 70, 0.14);
+  --shadow-lg: 0 18px 40px rgba(30, 40, 70, 0.18);
+  --shadow-modal: 0 28px 70px rgba(30, 40, 70, 0.24);
+  --shadow-float: 0 18px 46px rgba(30, 40, 70, 0.22);
 }
 
 [data-density="compact"] {

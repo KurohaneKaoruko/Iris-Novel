@@ -18,7 +18,7 @@ body.workspace-layout-resizing {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  flex-shrink: 0;
+  flex-shrink: 1;
   border-right: 1px solid var(--border-subtle);
   background: var(--surface-1, var(--bg-secondary));
 }
@@ -38,8 +38,9 @@ body.workspace-layout-resizing {
 }
 
 .workspace-main {
-  flex: 1;
-  min-width: 0;
+  background: transparent;
+  /* 编辑区保底宽度：窄视口下两侧允许压缩（覆盖 min-width:0 的塌缩） */
+  min-width: 280px;
   display: flex;
   flex-direction: column;
 }
@@ -58,7 +59,7 @@ body.workspace-layout-resizing {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  flex-shrink: 0;
+  flex-shrink: 1;
   border-left: 1px solid var(--border-subtle);
   background: var(--surface-1, var(--bg-secondary));
 }

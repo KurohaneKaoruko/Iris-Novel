@@ -1,0 +1,352 @@
+/* ========================================
+   液态玻璃 · 壳层覆盖
+   依赖 App.css 的令牌（--glass-* / --radius-* / --ease-* / --dur-*）。
+   只做视觉覆盖，不改布局尺寸（除注明处）。
+   ======================================== */
+
+/* ---------- 玻璃基元 ---------- */
+
+.glass-panel {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--glass-highlight);
+}
+
+.glass-float {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-float), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* ---------- 应用底色：深空氛围 ---------- */
+
+.app-container {
+  background:
+    radial-gradient(58% 42% at 18% 0%, rgba(90, 110, 190, 0.09) 0%, transparent 62%),
+    radial-gradient(52% 40% at 86% 100%, rgba(140, 100, 200, 0.07) 0%, transparent 64%),
+    var(--bg-primary);
+}
+
+[data-theme='light'] .app-container {
+  background:
+    radial-gradient(58% 42% at 18% 0%, rgba(110, 140, 230, 0.08) 0%, transparent 62%),
+    radial-gradient(52% 40% at 86% 100%, rgba(160, 120, 230, 0.06) 0%, transparent 64%),
+    var(--bg-primary);
+}
+
+/* ---------- 活动栏 ---------- */
+
+.activity-bar {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.activity-bar-item {
+  border-radius: var(--radius-md);
+  margin: 2px 6px;
+  width: auto;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.activity-bar-item:hover {
+  transform: translateY(-1px);
+}
+
+.activity-bar-item.active {
+  background: var(--bg-active);
+  box-shadow: inset 0 0 0 1px var(--glass-border);
+}
+
+/* ---------- 侧栏 / 右栏 ---------- */
+
+.sidebar {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.right-panel-container {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.sidebar-header,
+.panel-header {
+  background: transparent;
+}
+
+/* ---------- 标签栏 ---------- */
+
+.editor-tabs {
+  background: transparent;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.editor-tab,
+[class*='tab-item'] {
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+/* ---------- 编辑区：居中书写栏 ---------- */
+
+.editor-content {
+  background: transparent;
+}
+
+.editor-pane {
+  justify-content: center;
+}
+
+.novel-editor,
+.lexical-editor-wrapper {
+  max-width: 780px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* 底部为悬浮状态条预留空间 */
+.editor-content {
+  padding-bottom: 64px;
+}
+
+/* ---------- 悬浮状态胶囊 ---------- */
+
+.status-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 40;
+  height: auto;
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  box-shadow: var(--shadow-float);
+  font-size: 11.5px;
+  max-width: min(92vw, 860px);
+  white-space: nowrap;
+}
+
+.status-item {
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+}
+
+/* 沉浸模式下保持悬浮胶囊 */
+.app-container.immersive-active .status-bar {
+  background: var(--glass-bg-strong);
+}
+
+/* ---------- WorkspaceLayout 四区 ---------- */
+
+.workspace-layout {
+  background: transparent;
+}
+
+.workspace-left {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  /* 窄视口下允许压缩，避免中间编辑区塌缩 */
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.workspace-main {
+  background: transparent;
+}
+
+.workspace-right {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border-left: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  /* 窄视口下允许压缩，编辑区保底宽度 */
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.workspace-main {
+  background: transparent;
+  /* 窄视口保底（WorkspaceLayout.css 已设 280px，此处仅 glass 语义） */
+  min-width: 280px;
+}
+
+.workspace-resize-handle {
+  background: transparent;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.workspace-resize-handle:hover {
+  background: var(--accent-glow);
+}
+
+/* ---------- FAB 悬浮快速操作 ---------- */
+
+.fab-stack {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  z-index: 45;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 10px;
+}
+
+.fab-main {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--accent-primary);
+  color: var(--accent-contrast);
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: var(--shadow-float);
+  transition: transform var(--dur-fast) var(--ease-spring), background var(--dur-fast) var(--ease-out);
+}
+
+.fab-main:hover {
+  transform: scale(1.06);
+}
+
+.fab-main.open {
+  transform: rotate(45deg);
+}
+
+.fab-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.fab-menu.open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.fab-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.fab-menu-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ---------- 弹窗统一玻璃壳 ---------- */
+
+.modal-overlay,
+[class*='overlay'],
+[class*='modal-backdrop'] {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.modal-panel,
+[class*='modal-panel'],
+[class*='dialog'] {
+  border-radius: var(--radius-xl);
+}
+
+/* 导出/设置等既有面板容器（保守选择器） */
+.export-panel,
+.settings-panel,
+.model-modal,
+[role='dialog'] {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-modal);
+}
+
+/* ---------- 书架↔工作台转场 ---------- */
+
+.app-container,
+.shelf-page {
+  animation: viewTransition var(--dur-slow) var(--ease-out);
+}
+
+@keyframes viewTransition {
+  from {
+    opacity: 0;
+    transform: scale(0.988);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---------- 卡片悬浮提升（通用） ---------- */
+
+.project-card,
+.structure-item,
+.chapter-list-item,
+.memory-card {
+  transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* ---------- 减弱动效 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .app-container,
+  .shelf-page {
+    animation: none;
+  }
+
+  .activity-bar-item:hover,
+  .fab-main:hover,
+  .shelf-card:hover .shelf-cover {
+    transform: none;
+  }
+}
+
+[data-motion='reduced'] .app-container,
+[data-motion='reduced'] .shelf-page {
+  animation: none;
+}
+
+[data-motion='reduced'] .fab-menu,
+[data-motion='reduced'] .fab-main {
+  transition: none;
+}
