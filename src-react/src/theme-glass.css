@@ -4,6 +4,30 @@
    只做视觉覆盖，不改布局尺寸（除注明处）。
    ======================================== */
 
+/* ---------- 应用根容器（标题栏 + 内容） ---------- */
+
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(58% 42% at 18% 0%, rgba(90, 110, 190, 0.09) 0%, transparent 62%),
+    radial-gradient(52% 40% at 86% 100%, rgba(140, 100, 200, 0.07) 0%, transparent 64%),
+    var(--bg-primary);
+}
+
+.app-root > .shelf-page {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.app-root,
+.shelf-page {
+  animation: viewTransition var(--dur-slow) var(--ease-out);
+}
+
 /* ---------- 玻璃基元 ---------- */
 
 .glass-panel {

@@ -1,0 +1,96 @@
+/* ========================================
+   自绘标题栏
+   ======================================== */
+
+.title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--titlebar-height, 40px);
+  flex-shrink: 0;
+  padding-left: 10px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border-bottom: 1px solid var(--border-subtle);
+  user-select: none;
+  z-index: 50;
+}
+
+.title-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+}
+
+.title-bar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.title-bar-brand:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.title-bar-context {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40vw;
+}
+
+/* 拖拽热区：左侧剩余整片区域（桌面端） */
+.title-bar-tauri .title-bar-left {
+  -webkit-app-region: drag;
+}
+
+.title-bar-brand {
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-controls {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.title-bar-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.title-bar-close:hover {
+  background: #e5484d;
+  color: #ffffff;
+}
