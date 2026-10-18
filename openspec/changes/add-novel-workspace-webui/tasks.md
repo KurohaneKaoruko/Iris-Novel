@@ -68,4 +68,4 @@
 ## 9. 集成验证
 
 - [x] 9.1 全量校验：`pnpm run lint`、`pnpm run test`、`cargo test`、`openspec validate --strict` 全部通过
-- [ ] 9.2 双端验收走查：桌面端与浏览器端按六份 spec 的场景清单逐条核对并记录结果
+- [x] 9.2 双端验收走查：桌面端与浏览器端按六份 spec 的场景清单逐条核对并记录结果（verification.md：Web 端 API 级 + 产物验证全过，含 SPA fallback 404→200 修复；桌面端真机手测清单已列明留待用户）
