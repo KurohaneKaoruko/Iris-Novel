@@ -75,6 +75,7 @@ import { useAutoStoryNavigation } from './hooks/useAutoStoryNavigation'
 import { useWorkspaceTabs } from './hooks/useWorkspaceTabs'
 import { WorkspaceLayout } from './components/WorkspaceLayout'
 import { FabQuickActions } from './components/FabQuickActions'
+import { TitleBar } from './components/TitleBar'
 import { MaterialGraphPanel } from './components/MaterialGraphPanel'
 import { useTaskQualityValidator } from './hooks/useTaskQualityValidator'
 import { useChatSessionWorkbench } from './hooks/useChatSessionWorkbench'
@@ -4023,6 +4024,8 @@ function App() {
 
   if (appView === 'bookshelf') {
     return (
+      <div className="app-root">
+      <TitleBar title={null} />
       <BookshelfPage
         busy={busy}
         error={error}
@@ -4043,11 +4046,19 @@ function App() {
           void onOpenProjectFromPicker(path, 'external')
         }}
       />
+      </div>
     )
   }
 
   return (
     <div className={`app-container ${immersiveMode ? 'immersive-active' : ''}`} data-theme={theme} data-density={uiDensity} data-motion={uiMotion} style={layoutCssVars}>
+      <TitleBar
+        title={workRoot ? workRoot.split('/').pop() || workRoot : null}
+        onOpenBookshelf={() => {
+          setAppView('bookshelf')
+          void refreshBookshelfState()
+        }}
+      />
       <div className="workbench-body">
         {/* Activity Bar (Left) */}
         <div className={`activity-bar ${immersiveMode ? 'immersive-hidden' : ''}`}>

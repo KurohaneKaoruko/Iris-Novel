@@ -6,10 +6,10 @@
 - [x] 1.3 浅色令牌同构更新，对照检查无深色残留
 
 ## 2. 自定义窗口边框
-- [ ] 2.1 tauri.conf.json `decorations: false`
-- [ ] 2.2 TitleBar 组件：品牌区/上下文标题/窗口控制按钮（Tauri API）
-- [ ] 2.3 拖拽（属性 + startDragging 兜底）与双击最大化
-- [ ] 2.4 浏览器端降级（隐藏控制按钮）与布局高度适配；组件测试
+- [x] 2.1 tauri.conf.json `decorations: false`
+- [x] 2.2 TitleBar 组件：品牌区/上下文标题/窗口控制按钮（Tauri API）
+- [x] 2.3 拖拽（属性 + startDragging 兜底）与双击最大化
+- [x] 2.4 浏览器端降级（隐藏控制按钮）与布局高度适配；组件测试
 
 ## 3. 书架封面流
 - [x] 3.1 coverArt 程序化封面（哈希→渐变/光斑/首字）+ 单测（确定性）
