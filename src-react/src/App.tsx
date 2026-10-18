@@ -4,6 +4,7 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import type { LexicalEditor as LexicalEditorType } from 'lexical'
 import './App.css'
+import './theme-glass.css'
 import { LexicalEditor } from './components/LexicalEditor'
 import type { EditorConfig } from './types/editor'
 import { EDITOR_NAMESPACE } from './branding'
@@ -73,6 +74,7 @@ import { useProjectWritingSettings } from './hooks/useProjectWritingSettings'
 import { useAutoStoryNavigation } from './hooks/useAutoStoryNavigation'
 import { useWorkspaceTabs } from './hooks/useWorkspaceTabs'
 import { WorkspaceLayout } from './components/WorkspaceLayout'
+import { FabQuickActions } from './components/FabQuickActions'
 import { MaterialGraphPanel } from './components/MaterialGraphPanel'
 import { useTaskQualityValidator } from './hooks/useTaskQualityValidator'
 import { useChatSessionWorkbench } from './hooks/useChatSessionWorkbench'
@@ -1302,7 +1304,6 @@ function App() {
   )
 
   const refreshBookshelfState = useCallback(async () => {
-    if (!isTauriApp()) return
     try {
       const state = await getBookshelfState()
       setBookshelfRoot(state.default_root)
@@ -3415,10 +3416,6 @@ function App() {
     if (autoOpenedRef.current) return
     autoOpenedRef.current = true
     void (async () => {
-      if (!isTauriApp()) {
-        setAppView('bookshelf')
-        return
-      }
       try {
         const pickerState = await getBookshelfState()
         setBookshelfRoot(pickerState.default_root)
@@ -3427,7 +3424,7 @@ function App() {
         setLastWorkPath(pickerState.last_workspace)
         setLaunchModeState(pickerState.launch_mode)
 
-        if (pickerState.launch_mode === 'auto_last' && pickerState.last_workspace) {
+        if (isTauriApp() && pickerState.launch_mode === 'auto_last' && pickerState.last_workspace) {
           const opened = await openWorkPath(pickerState.last_workspace)
           if (opened) {
             setAppView('studio')
@@ -5399,6 +5396,23 @@ function App() {
         onThemeToggle={toggleTheme}
         onHistoryClick={() => {
           openSidebarTab('history')
+        }}
+      />
+
+      {/* 右下 FAB 快速操作（仅工作台、非沉浸） */}
+      <FabQuickActions
+        immersive={immersiveMode}
+        canSave={!!activeFile?.dirty}
+        canExport={!!workRoot}
+        onNewChapter={() => void onNewChapter()}
+        onSave={() => void onSaveActive()}
+        onExport={() => setShowExportPanel(true)}
+        onImmersive={() => setImmersiveMode((v) => !v)}
+        labels={{
+          newChapter: t('app.action.newChapter'),
+          save: t('app.action.save'),
+          export: t('app.action.export'),
+          immersive: t('layout.enterImmersive'),
         }}
       />
 
