@@ -4509,12 +4509,18 @@ button.ai-session-row-main {
   left: 0;
   right: 0;
   bottom: 0;
-  background: #00000099;
+  background: rgba(8, 10, 16, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
   animation: modalOverlayIn 0.2s ease;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+[data-theme='light'] .modal-overlay {
+  background: rgba(230, 234, 244, 0.55);
 }
 
 @keyframes modalOverlayIn {
@@ -4523,16 +4529,18 @@ button.ai-session-row-main {
 }
 
 .modal-content {
-  background: var(--surface-1);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
   width: 680px;
   max-width: 90%;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-modal);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal), inset 0 1px 0 var(--glass-highlight);
   display: flex;
   flex-direction: column;
   max-height: 85vh;
-  border: 1px solid var(--border-subtle);
-  animation: modalContentIn 0.3s ease;
+  border: 1px solid var(--glass-border);
+  animation: modalContentIn var(--dur-med) var(--ease-spring);
 }
 
 @keyframes modalContentIn {
