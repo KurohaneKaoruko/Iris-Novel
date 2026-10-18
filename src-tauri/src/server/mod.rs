@@ -73,7 +73,9 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
 
   let index_file = dist_dir.join("index.html");
   let serve_frontend = tower_http::services::ServeDir::new(&dist_dir)
-    .not_found_service(tower::service_fn(move |req: axum::http::Request<axum::body::Body>| {
+    // 用 fallback（而非 not_found_service）：后者会把响应状态强制覆盖为 404，
+    // SPA 路由需要 200 + index.html。
+    .fallback(tower::service_fn(move |req: axum::http::Request<axum::body::Body>| {
       // SPA fallback：非 API/WS 路径全部回退到 index.html
       let index = index_file.clone();
       let is_api = req.uri().path().starts_with("/api/") || req.uri().path() == "/ws";
