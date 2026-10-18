@@ -214,6 +214,8 @@ export async function buildMaterialIndex(): Promise<MaterialIndex> {
   }
 
   try {
+    // .novel/index 可能不存在（首次构建），create_dir_all 幂等
+    await callCommand('create_dir', { relativePath: '.novel/index' }).catch(() => undefined)
     await writeText(CACHE_PATH, JSON.stringify(index, null, 2))
   } catch {
     // 缓存写失败不影响返回（视图仍可用）

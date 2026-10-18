@@ -1570,6 +1570,36 @@ function App() {
     }
   }, [workRoot, refreshTree, showConfirm])
 
+  // 打开作品后自动加载第一个章节（无已打开文件时），减少一次手动点击
+  const autoOpenedWorkRef = useRef<string | null>(null)
+  const openFilesLenRef = useRef(0)
+  openFilesLenRef.current = openFiles.length
+  useEffect(() => {
+    if (!workRoot) {
+      autoOpenedWorkRef.current = null
+      return
+    }
+    if (autoOpenedWorkRef.current === workRoot) return
+    autoOpenedWorkRef.current = workRoot
+    if (openFilesLenRef.current > 0) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const { chapterService } = await import('./services/ChapterService')
+        const chapters = await chapterService.listChapters()
+        if (cancelled || openFilesLenRef.current > 0) return
+        if (chapters.length === 0) return
+        const first = [...chapters].sort((a, b) => a.order - b.order)[0]
+        await onOpenByPath(first.filePath)
+      } catch {
+        // 章节列表失败不打扰用户（ChapterList 区会显示错误）
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [workRoot, onOpenByPath])
+
   const onCreateDraftInDir = useCallback(
     async (dir: string, prefix: string, ext: 'md' | 'txt' = 'md') => {
       if (!workRoot) return
@@ -4290,6 +4320,24 @@ function App() {
                 </div>
               ) : null}
             </>
+          ) : workRoot ? (
+            <div className="welcome-screen">
+              <h1>{t('app.welcome.studioTitle')}</h1>
+              <p className="welcome-hint">{t('app.welcome.studioHint')}</p>
+              <div className="welcome-actions">
+                <button className="welcome-btn" onClick={() => void onNewChapter()}>
+                  {t('chapterList.newChapter')}
+                </button>
+                <button
+                  className="welcome-btn welcome-btn-secondary"
+                  onClick={() => {
+                    setSidebarCollapsed(false)
+                  }}
+                >
+                  {t('app.welcome.openMaterials')}
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="welcome-screen">
               <h1>Iris-Novel</h1>

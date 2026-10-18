@@ -21,6 +21,8 @@ export function ChapterList({ workspaceRoot, activePath, onOpenChapter, onCreate
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const totalWords = chapters.reduce((sum, ch) => sum + ch.wordCount, 0)
+  const doneCount = chapters.filter((ch) => ch.status === 'completed').length
 
   const reload = useCallback(async () => {
     if (!workspaceRoot) {
@@ -89,6 +91,9 @@ export function ChapterList({ workspaceRoot, activePath, onOpenChapter, onCreate
             >
               <span className="chapter-list-index">{index + 1}</span>
               <span className="chapter-list-name">{ch.title}</span>
+              <span className={`chapter-list-status status-${ch.status}`}>
+                {t(`chapterList.status.${ch.status}`)}
+              </span>
               <span className="chapter-list-words">
                 {ch.wordCount > 0 ? t('chapterList.words', { count: ch.wordCount }) : ''}
               </span>
@@ -96,6 +101,14 @@ export function ChapterList({ workspaceRoot, activePath, onOpenChapter, onCreate
           )
         })}
       </div>
+      {chapters.length > 0 ? (
+        <div className="chapter-list-footer">
+          <span>{t('chapterList.summary', { count: chapters.length, words: totalWords })}</span>
+          <span className="chapter-list-done">
+            {t('chapterList.doneCount', { count: doneCount })}
+          </span>
+        </div>
+      ) : null}
     </div>
   )
 }
