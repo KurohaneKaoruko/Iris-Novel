@@ -271,6 +271,8 @@ export class ChapterService {
   private async saveMetadata(metadata: ChapterMetadata): Promise<void> {
     try {
       const content = JSON.stringify(metadata, null, 2);
+      // .novel/.settings 可能不存在（新作品首次保存），create_dir_all 幂等
+      await callCommand('create_dir', { relativePath: '.novel/.settings' }).catch(() => undefined);
       await callCommand('write_text', { relativePath: this.METADATA_PATH, content });
     } catch (error) {
       throw new Error(`Failed to save metadata: ${error instanceof Error ? error.message : String(error)}`);
