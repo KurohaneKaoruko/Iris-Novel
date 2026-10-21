@@ -49,6 +49,7 @@ Iris-Novel 是一个专注于长篇小说创作的本地桌面写作工作台，
 - 自动保存与预览
 - 新建章节 / 设定 / 大纲文件
 - AI 续写、改写、润色、规划与一致性检查
+- 写作技能库（[Novelist-Skills](https://github.com/KurohaneKaoruko/Novelist-Skills) 子模块）：场景三拍、正文铁律、黄金三章、连续性维护与六种风格规范，聊天面板 `/skill <id>` 一键注入
 - 修订建议审阅与逐条应用
 - 人物关系图与作品结构导航
 - 版本记录与恢复
@@ -65,6 +66,10 @@ Iris-Novel 是一个专注于长篇小说创作的本地桌面写作工作台，
 ### 本地开发
 
 ```powershell
+git clone --recurse-submodules <repo-url>
+# 已克隆的仓库补拉子模块：
+git submodule update --init --recursive
+
 pnpm install --frozen-lockfile
 pnpm run tauri:dev
 ```

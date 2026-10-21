@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 /// Skill 定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10,6 +12,57 @@ pub struct Skill {
     pub prompt: String,
     pub category: String,
     pub enabled: bool,
+}
+
+/// 从 SKILL.md 的 YAML frontmatter 解析 name/description。
+/// frontmatter 形如：
+/// ```yaml
+/// ---
+/// name: novel-craft
+/// description: ……（单行）
+/// ---
+/// ```
+fn parse_frontmatter(text: &str) -> (Option<String>, Option<String>) {
+    let trimmed = text.trim_start();
+    if !trimmed.starts_with("---") {
+        return (None, None);
+    }
+    let after_open = &trimmed[3..];
+    let end = match after_open.find("\n---") {
+        Some(idx) => idx,
+        None => return (None, None),
+    };
+    let body = &after_open[..end];
+    let mut name = None;
+    let mut description = None;
+    for line in body.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("name:") {
+            let value = rest.trim().trim_matches('"').trim_matches('\'').to_string();
+            if !value.is_empty() && name.is_none() {
+                name = Some(value);
+            }
+        } else if let Some(rest) = line.strip_prefix("description:") {
+            let value = rest.trim().trim_matches('"').trim_matches('\'').to_string();
+            if !value.is_empty() && description.is_none() {
+                description = Some(value);
+            }
+        }
+    }
+    (name, description)
+}
+
+/// SKILL.md 正文（frontmatter 之后的内容），作为 skill 的 prompt。
+fn frontmatter_body(text: &str) -> &str {
+    let trimmed = text.trim_start();
+    if !trimmed.starts_with("---") {
+        return text;
+    }
+    let after_open = &trimmed[3..];
+    match after_open.find("\n---") {
+        Some(idx) => after_open[idx + 4..].trim_start_matches('\n'),
+        None => text,
+    }
 }
 
 impl Skill {
@@ -246,6 +299,112 @@ pub struct SkillManager {
     skills: HashMap<String, Skill>,
 }
 
+/// 已解析的 skills 子模块目录（进程级缓存；目录缺失时为空表）。
+static SKILLS_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+/// 解析技能库目录，优先级：
+/// 1. `IRIS_NOVEL_SKILLS_DIR` 环境变量（server / 开发覆盖）
+/// 2. 可执行文件旁的 `skills/`（随包分发的子模块）
+/// 3. 开发目录回退（target/../skills，即仓库根的 skills 子模块）
+fn resolve_skills_dir() -> Option<PathBuf> {
+    SKILLS_DIR
+        .get_or_init(|| {
+            if let Ok(from_env) = std::env::var("IRIS_NOVEL_SKILLS_DIR") {
+                let trimmed = from_env.trim().to_string();
+                if !trimmed.is_empty() {
+                    let path = PathBuf::from(trimmed);
+                    if path.is_dir() {
+                        return Some(path);
+                    }
+                }
+            }
+            if let Ok(exe) = std::env::current_exe() {
+                if let Some(exe_dir) = exe.parent() {
+                    // 桌面安装布局：<install>/iris-novel + <install>/skills/
+                    let beside = exe_dir.join("skills");
+                    if beside.join("novel-craft").is_dir() {
+                        return Some(beside);
+                    }
+                    // 开发布局：<repo>/src-tauri/target/{profile}/iris-novel + <repo>/skills/
+                    for ancestor in exe_dir.ancestors().skip(1) {
+                        if ancestor.file_name().map(|n| n == "target").unwrap_or(false) {
+                            continue;
+                        }
+                        // ancestor 形如 target/debug 或 target；仓库根是其 parent
+                        if let Some(repo_root) = ancestor.parent() {
+                            let candidate = repo_root.join("skills");
+                            if candidate.join("novel-craft").is_dir() {
+                                return Some(candidate);
+                            }
+                        }
+                    }
+                }
+            }
+            None
+        })
+        .clone()
+}
+
+// build.rs 从 skills/ 子模块（Novelist-Skills）内嵌的技能原文
+include!(concat!(env!("OUT_DIR"), "/skills_data.rs"));
+
+/// 内嵌技能的懒解析结果（id -> Skill）。
+static EMBEDDED_PARSED: OnceLock<Vec<Skill>> = OnceLock::new();
+
+fn embedded_skills() -> &'static [Skill] {
+    EMBEDDED_PARSED.get_or_init(|| {
+        EMBEDDED_SKILLS
+            .iter()
+            .filter_map(|(id, text)| {
+                let (fm_name, fm_desc) = parse_frontmatter(text);
+                let prompt = frontmatter_body(text).trim().to_string();
+                if prompt.is_empty() {
+                    return None;
+                }
+                Some(Skill::new(
+                    id,
+                    &fm_name.unwrap_or_else(|| id.to_string()),
+                    &fm_desc.unwrap_or_default(),
+                    "Novelist-Skills",
+                    &prompt,
+                ))
+            })
+            .collect()
+    })
+}
+
+/// 从目录扫描加载 SKILL.md 技能（Novelist-Skills 子模块格式）。
+/// 目录名即技能 id；frontmatter 提供 name/description，正文即 prompt。
+pub fn load_skills_from_dir(dir: &Path) -> Vec<Skill> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path().join("SKILL.md");
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let dir_name = entry.file_name().to_string_lossy().to_string();
+        let (fm_name, fm_desc) = parse_frontmatter(&text);
+        let name = fm_name.unwrap_or_else(|| dir_name.clone());
+        let description = fm_desc.unwrap_or_default();
+        let prompt = frontmatter_body(&text).trim().to_string();
+        if prompt.is_empty() {
+            continue;
+        }
+        out.push(Skill::new(
+            &dir_name,
+            &name,
+            &description,
+            "Novelist-Skills",
+            &prompt,
+        ));
+    }
+    out.sort_by(|a, b| a.id.cmp(&b.id));
+    out
+}
+
 impl SkillManager {
     pub fn new() -> Self {
         let mut manager = Self {
@@ -254,6 +413,15 @@ impl SkillManager {
         // 加载内置 skills
         for skill in builtin_skills() {
             manager.skills.insert(skill.id.clone(), skill);
+        }
+        // 叠加 Novelist-Skills 子模块：内嵌兜底 + 运行时目录覆盖（id 冲突时后者优先）
+        for skill in embedded_skills() {
+            manager.skills.insert(skill.id.clone(), skill.clone());
+        }
+        if let Some(dir) = resolve_skills_dir() {
+            for skill in load_skills_from_dir(&dir) {
+                manager.skills.insert(skill.id.clone(), skill);
+            }
         }
         manager
     }
@@ -306,5 +474,65 @@ impl SkillManager {
 impl Default for SkillManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_frontmatter_name_and_description() {
+        let text = "---\nname: novel-craft\ndescription: 写场景与对话\n---\n\n# 场景与对话写作技法\n\n正文内容";
+        let (name, desc) = parse_frontmatter(text);
+        assert_eq!(name.as_deref(), Some("novel-craft"));
+        assert_eq!(desc.as_deref(), Some("写场景与对话"));
+        assert_eq!(frontmatter_body(text), "# 场景与对话写作技法\n\n正文内容");
+    }
+
+    #[test]
+    fn frontmatter_without_fences_falls_back_to_full_text() {
+        let text = "# 无 frontmatter 的技能\n\n正文";
+        assert_eq!(parse_frontmatter(text), (None, None));
+        assert_eq!(frontmatter_body(text), text);
+    }
+
+    #[test]
+    fn loads_skills_from_directory() {
+        let dir = std::env::temp_dir().join(format!("iris-skill-test-{}", std::process::id()));
+        let sub = dir.join("novel-test-skill");
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(
+            sub.join("SKILL.md"),
+            "---\nname: novel-test-skill\ndescription: 测试技能\n---\n\n测试正文",
+        )
+        .unwrap();
+
+        let skills = load_skills_from_dir(&dir);
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].id, "novel-test-skill");
+        assert_eq!(skills[0].prompt, "测试正文");
+        assert_eq!(skills[0].category, "Novelist-Skills");
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn builtin_and_submodule_skills_merge() {
+        let manager = SkillManager::new();
+        // 内置技能仍在
+        assert!(manager.get("style_wuwei").is_some());
+        // 子模块技能：内嵌兜底（编译期打包）或运行时目录，二者必有其一
+        assert!(
+            manager.get("novel-craft").is_some(),
+            "novel-craft should load from embedded data or the skills/ dir"
+        );
+        assert!(
+            manager
+                .categories()
+                .iter()
+                .any(|c| c == "Novelist-Skills"),
+            "submodule category should be present"
+        );
     }
 }

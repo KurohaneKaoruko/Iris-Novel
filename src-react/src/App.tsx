@@ -17,6 +17,7 @@ import {
   getAppSettings,
   forgetImportedWork,
   getBookshelfState,
+  getSkills,
   initNovel,
   isTauriApp,
   listWorkTree,
@@ -2108,7 +2109,8 @@ function App() {
       }
 
       const requestedMode: WriterMode | null = parsedDirective.requestedMode
-      const content = requestedMode ? parsedDirective.content : rawInput
+      const hasComposerDirective = parsedDirective.matched
+      const content = hasComposerDirective ? parsedDirective.content : rawInput
 
       // 6.1 生成前资料分析：产出涉及资料清单（显式 #引用 + 人物名匹配 + 当前章节）
       let injectionPlanLocal: InjectionPlan | null = null
@@ -2196,9 +2198,27 @@ function App() {
           setError(msg)
         }
       }
+      // /skill <id>：把技能写作规范作为最高优先级指令注入本次请求
+      let skillPromptBlock = ''
+      if (parsedDirective.skillId) {
+        try {
+          const skills = isTauriApp() ? await getSkills() : []
+          const skill = skills.find((s) => s.id.toLowerCase() === parsedDirective.skillId)
+          if (!skill) {
+            setError(t('chat.skillNotFound', { id: parsedDirective.skillId }))
+          } else {
+            skillPromptBlock = `<skill:${skill.id} 写作规范>\n${skill.prompt}\n</skill:${skill.id}>`
+          }
+        } catch {
+          // 技能加载失败降级为不注入
+        }
+      }
       // 6.1/6.3 注入块拼接在模式包装之后（项目侧确定性注入，优先级最高）
       if (injectionContextBlock) {
         sendPayload = `${injectionContextBlock}\n\n${sendPayload}`
+      }
+      if (skillPromptBlock) {
+        sendPayload = `${skillPromptBlock}\n\n${sendPayload}`
       }
 
       const selectedProviderId = options?.overrideProviderId?.trim() || effectiveProviderId

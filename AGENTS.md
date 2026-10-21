@@ -57,7 +57,7 @@ pnpm run tauri:ios:dev
 - **`main.rs`** - Tauri 应用入口点，注册所有命令
 - **`commands.rs`** - Tauri 命令实现：文件 I/O、工作区管理、设置、聊天历史
 - **`agent_system.rs`** - AI 代理运行时，包含工具注册表和记忆存储
-- **`skills/mod.rs`** - 内置写作技能（风格：无为/馆zolh/简洁， 剧情技巧， 人物工具）
+- **`skills/mod.rs`** - 写作技能：内置技能（风格：无为/馆zolh/简洁，剧情技巧，人物工具）+ Novelist-Skills 子模块（`skills/` 目录，编译期内嵌 + 运行时目录覆盖）
 - **`app_settings.rs`** - 应用设置和提供商配置
 - **`secrets.rs`** - API 密钥存储（平台特定：Windows DPAPI，macOS/Linux keyring）
 - **`chat_history.rs`** - 聊天会话持久化
@@ -104,7 +104,15 @@ pnpm run tauri:ios:dev
 Rust 后端包含 AI 代理运行时：
 - 工具注册表用于文件操作（`fs_read_text`、`fs_write_text`、`fs_list_dir` 等)
 - 记忆存储用于长期上下文
-- 内置写作技能通过 `/skills` 命访问
+- 写作技能通过聊天面板 `/skill <id>` 指令或控制项里的技能下拉选用，发送时注入技能写作规范
+
+### 技能库（Novelist-Skills 子模块）
+
+`skills/` 是 git submodule（https://github.com/KurohaneKaoruko/Novelist-Skills.git ），提供场景写作、正文铁律、剧情规划、连续性维护、风格库（热血/轻小说/悬疑/言情/科幻/仙侠）等 SKILL.md 技能：
+
+- 加载优先级：`IRIS_NOVEL_SKILLS_DIR` 环境变量 > 可执行文件旁 `skills/` > 编译期内嵌（build.rs 生成 `skills_data.rs`）
+- 克隆后需 `git submodule update --init --recursive`
+- 每个技能是 `<skills>/<id>/SKILL.md`，YAML frontmatter（name/description）+ 正文（prompt）
 
 ### 前后端通信
 

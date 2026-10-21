@@ -1,6 +1,41 @@
 fn main() {
+  embed_skills();
   ensure_windows_icon();
   tauri_build::build()
+}
+
+/// 把 skills/ 子模块（Novelist-Skills）的 SKILL.md 内嵌进二进制，
+/// 发布包即使不随包分发 skills/ 目录也能加载技能；
+/// 运行时目录（IRIS_NOVEL_SKILLS_DIR / exe 旁）仍可覆盖内嵌版本。
+fn embed_skills() {
+  let manifest_dir =
+    std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo");
+  let skills_dir = std::path::Path::new(&manifest_dir).join("..").join("skills");
+  let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR is set by cargo");
+  let dest = std::path::Path::new(&out_dir).join("skills_data.rs");
+
+  let mut code = String::from("/// build.rs 从 skills/ 子模块生成的内嵌技能表 (id, SKILL.md 全文)\npub static EMBEDDED_SKILLS: &[(&str, &str)] = &[\n");
+  let mut paths: Vec<std::path::PathBuf> = Vec::new();
+  if let Ok(entries) = std::fs::read_dir(&skills_dir) {
+    paths = entries
+      .flatten()
+      .map(|e| e.path())
+      .filter(|p| p.is_dir() && p.join("SKILL.md").is_file())
+      .collect();
+    paths.sort();
+  }
+  for path in paths {
+    let Some(id) = path.file_name().and_then(|n| n.to_str()) else {
+      continue;
+    };
+    let skill_md = path.join("SKILL.md");
+    code.push_str(&format!("  ({:?}, include_str!({:?})),\n", id, skill_md));
+  }
+  code.push_str("];\n");
+  if let Err(e) = std::fs::write(&dest, code) {
+    panic!("failed to write skills_data.rs: {e}");
+  }
+  println!("cargo:rerun-if-changed={}", skills_dir.display());
 }
 
 fn ensure_windows_icon() {

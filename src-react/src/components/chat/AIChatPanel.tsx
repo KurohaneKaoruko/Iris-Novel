@@ -101,7 +101,7 @@ type AIChatPanelProps = {
   showStopAction: boolean
   canStop: boolean
   onStopChat: () => void | Promise<unknown>
-  onSendChat: () => void | Promise<unknown>
+  onSendChat: (overrideContent?: string) => void | Promise<unknown>
   canRollbackLastTurn: boolean
   onRollbackLastTurn: () => void | Promise<unknown>
   busy: boolean
@@ -710,6 +710,30 @@ export function AIChatPanel(props: AIChatPanelProps) {
   } = props
 
   const [expandedAssistantIds, setExpandedAssistantIds] = useState<Record<string, boolean>>({})
+  const [availableSkills, setAvailableSkills] = useState<Array<{ id: string; name: string; description: string; category: string }>>([])
+  const [selectedComposerSkillId, setSelectedComposerSkillId] = useState('')
+
+  // 技能库（Novelist-Skills 子模块 + 内置）懒加载：首次打开面板时取一次
+  useEffect(() => {
+    let cancelled = false
+    import('../../tauri')
+      .then(({ getSkills, isTauriApp }) => {
+        if (!isTauriApp()) return
+        return getSkills().then((skills) => {
+          if (!cancelled) {
+            setAvailableSkills(
+              skills.map((s) => ({ id: s.id, name: s.name, description: s.description, category: s.category })),
+            )
+          }
+        })
+      })
+      .catch(() => {
+        // 非 Tauri 环境或加载失败：保持空技能表，/skill 指令不可用
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [collapsedToolPanels, setCollapsedToolPanels] = useState<Record<string, boolean>>({})
   const [collapsedToolStages, setCollapsedToolStages] = useState<Record<string, boolean>>({})
   const [toolFilterByMessage, setToolFilterByMessage] = useState<Record<string, ToolFilterMode>>({})
@@ -1095,14 +1119,33 @@ export function AIChatPanel(props: AIChatPanelProps) {
     [applySlashPrompt, onSmartComplete, t],
   )
 
-  const slashQuery = chatInput.trimStart().startsWith('/') ? chatInput.trimStart().slice(1).toLowerCase() : ''
-  const visibleSlashCommands = useMemo(
+  // 技能指令（/skill <id>）：来自 Novelist-Skills 子模块 + 内置技能
+  const skillSlashCommands = useMemo<AISlashCommand[]>(
     () =>
-      !chatInput.trimStart().startsWith('/')
-        ? []
-        : slashCommands.filter((command) => command.label.slice(1).includes(slashQuery)).slice(0, 6),
-    [chatInput, slashCommands, slashQuery],
+      availableSkills.map((skill) => ({
+        id: `slash-skill-${skill.id}`,
+        label: `/skill ${skill.id}`,
+        hint: skill.description || skill.name,
+        run: () => {
+          onChatInputChange('/skill ' + skill.id + ' ')
+          window.setTimeout(() => chatInputRef.current?.focus(), 0)
+        },
+      })),
+    // chatInputRef 是稳定 ref；onChatInputChange 由父组件 memo 化
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [availableSkills, onChatInputChange],
   )
+
+  const slashQuery = chatInput.trimStart().startsWith('/') ? chatInput.trimStart().slice(1).toLowerCase() : ''
+  const visibleSlashCommands = useMemo(() => {
+    if (!chatInput.trimStart().startsWith('/')) return []
+    const pool =
+      slashQuery.startsWith('skill') || slashQuery.startsWith('技能')
+        ? [...slashCommands, ...skillSlashCommands]
+        : slashCommands
+    const filtered = pool.filter((command) => command.label.slice(1).toLowerCase().includes(slashQuery))
+    return filtered.slice(0, 8)
+  }, [chatInput, slashCommands, skillSlashCommands, slashQuery])
   const workbenchLinks = useMemo(
     () => [
       {
@@ -1365,6 +1408,22 @@ export function AIChatPanel(props: AIChatPanelProps) {
     setActiveChatDrawer((prev) => (prev === drawer ? null : drawer))
   }, [])
 
+  // 发送前若在下拉中选中了技能且输入未显式使用 /skill，则自动前置指令
+  const sendWithComposerSkill = useCallback(() => {
+    const trimmed = (chatInputRef.current?.value ?? chatInput).trim()
+    if (
+      selectedComposerSkillId &&
+      trimmed.trim() &&
+      !trimmed.trimStart().startsWith('/skill')
+    ) {
+      // 直接以 overrideContent 传完整指令，避免 setState 异步导致旧闭包读到旧输入
+      onChatInputChange('')
+      void onSendChat(`/skill ${selectedComposerSkillId} ${trimmed}`)
+      return
+    }
+    void onSendChat()
+  }, [chatInput, onChatInputChange, onSendChat, selectedComposerSkillId])
+
   const handleComposerKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !chatInput.trim()) {
       if (!canRollbackLastTurn) return
@@ -1382,7 +1441,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
       if (showStopAction) {
         void onStopChat()
       } else {
-        void onSendChat()
+        sendWithComposerSkill()
       }
       return
     }
@@ -1395,7 +1454,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
       if (showStopAction) {
         void onStopChat()
       } else {
-        void onSendChat()
+        sendWithComposerSkill()
       }
     }
   }
@@ -2971,6 +3030,22 @@ export function AIChatPanel(props: AIChatPanelProps) {
                     </option>
                   ))}
                 </select>
+                {availableSkills.length > 0 ? (
+                  <select
+                    className="ai-select ai-select-compact ai-skill-select"
+                    value={selectedComposerSkillId}
+                    onChange={(event) => setSelectedComposerSkillId(event.target.value)}
+                    title={t('chat.skillsTitle')}
+                    aria-label={t('chat.skillsTitle')}
+                  >
+                    <option value="">{t('chat.skillNone')}</option>
+                    {availableSkills.map((skill) => (
+                      <option key={skill.id} value={skill.id}>
+                        {t('chat.skillBadge')} · {skill.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
               </div>
               <div className="ai-composer-controls">
                 <label className={`ai-auto-switch ${autoLongWriteEnabled ? 'active' : ''}`} title={t('chat.autoWrite')}>
@@ -3054,7 +3129,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
                   <AppIcon name="stop" size={13} />
                 </button>
               ) : (
-                <button className="primary-button" disabled={busy || !chatInput.trim() || autoLongWriteRunning} onClick={() => void onSendChat()}>
+                <button className="primary-button" disabled={busy || !chatInput.trim() || autoLongWriteRunning} onClick={sendWithComposerSkill}>
                   {t('chat.send')}
                 </button>
               )}

@@ -3127,6 +3127,15 @@ body {
   background: color-mix(in srgb, var(--error-bg) 20%, var(--surface-2));
 }
 
+/* /skill 指令选择器：与助手/模型选择并排，窄化显示 */
+.ai-skill-select {
+  flex: 1 1 100%;
+  font-style: normal;
+}
+.ai-skill-select:has(option[value=""]:checked) {
+  color: var(--text-muted);
+}
+
 .ai-empty-state {
   padding: 16px;
   color: var(--text-muted);
