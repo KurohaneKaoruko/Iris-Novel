@@ -53,6 +53,8 @@ type AISlashCommand = {
 type AIChatPanelProps = {
   writerMode: WriterMode
   plannerLastRunError: string | null
+  /** 作品级默认技能 id（设置面板配置）；空 = 无默认 */
+  projectDefaultSkillId?: string
   plannerTasks: NovelTask[]
   plannerBusy: boolean
   plannerQueueRunning: boolean
@@ -629,6 +631,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
   const {
     writerMode,
     plannerLastRunError,
+    projectDefaultSkillId = '',
     plannerTasks,
     plannerBusy,
     plannerQueueRunning,
@@ -712,6 +715,11 @@ export function AIChatPanel(props: AIChatPanelProps) {
   const [expandedAssistantIds, setExpandedAssistantIds] = useState<Record<string, boolean>>({})
   const [availableSkills, setAvailableSkills] = useState<Array<{ id: string; name: string; description: string; category: string }>>([])
   const [selectedComposerSkillId, setSelectedComposerSkillId] = useState('')
+
+  // 作品级默认技能变化时同步下拉（用户手动改选后跟随最新作品设置）
+  useEffect(() => {
+    setSelectedComposerSkillId(projectDefaultSkillId)
+  }, [projectDefaultSkillId])
 
   // 技能库（Novelist-Skills 子模块 + 内置）懒加载：首次打开面板时取一次
   useEffect(() => {

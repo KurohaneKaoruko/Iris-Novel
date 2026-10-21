@@ -767,10 +767,29 @@ function App() {
     saveSettings: saveProjectWritingSettings,
   } = useProjectWritingSettings(workRoot)
   const chapterWordTarget = projectWritingSettings.chapterWordTarget
+  const defaultSkillId = projectWritingSettings.defaultSkillId
   const autoLongWriteMaxRounds = projectWritingSettings.autoMaxRounds
   const autoLongWriteMinChars = projectWritingSettings.autoMinChars
   const autoLongWriteMaxChars = projectWritingSettings.autoMaxChars
   const autoLongWriteMaxChapterAdvances = projectWritingSettings.autoMaxChapterAdvances
+  // 技能清单（设置面板下拉用；桌面端从后端取，含子模块与内置）
+  const [skillOptions, setSkillOptions] = useState<Array<{ id: string; name: string; category: string }>>([])
+  useEffect(() => {
+    if (!isTauriApp()) return
+    let cancelled = false
+    getSkills()
+      .then((skills) => {
+        if (!cancelled) {
+          setSkillOptions(skills.map((s) => ({ id: s.id, name: s.name, category: s.category })))
+        }
+      })
+      .catch(() => {
+        // 非 Tauri 或加载失败：下拉为空
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [workRoot])
   const [graphNodes, setGraphNodes] = useState<Array<{ id: string; name: string }>>([])
   const [graphEdges, setGraphEdges] = useState<Array<{ from: string; to: string; type?: string }>>([])
   const { validateTaskQuality } = useTaskQualityValidator()
@@ -2199,13 +2218,18 @@ function App() {
         }
       }
       // /skill <id>：把技能写作规范作为最高优先级指令注入本次请求
+      // 无显式指令时回退到作品级默认技能（defaultSkillId），显式 /skill 优先
       let skillPromptBlock = ''
-      if (parsedDirective.skillId) {
+      const effectiveSkillId = parsedDirective.skillId ?? (projectWritingSettings.defaultSkillId || null)
+      if (effectiveSkillId) {
         try {
           const skills = isTauriApp() ? await getSkills() : []
-          const skill = skills.find((s) => s.id.toLowerCase() === parsedDirective.skillId)
+          const skill = skills.find((s) => s.id.toLowerCase() === effectiveSkillId.toLowerCase())
           if (!skill) {
-            setError(t('chat.skillNotFound', { id: parsedDirective.skillId }))
+            // 仅显式指令才报错；默认技能失效（如子模块更新）静默降级
+            if (parsedDirective.skillId) {
+              setError(t('chat.skillNotFound', { id: parsedDirective.skillId }))
+            }
           } else {
             skillPromptBlock = `<skill:${skill.id} 写作规范>\n${skill.prompt}\n</skill:${skill.id}>`
           }
@@ -2392,6 +2416,7 @@ function App() {
       appSettings,
       buildPromptByMode,
       chatInput,
+      projectWritingSettings,
       effectiveProviderId,
       injectionRemovedKeys,
       ensurePlanningArtifacts,
@@ -4398,6 +4423,7 @@ function App() {
               <AIChatPanel
                 writerMode={writerMode}
                 plannerLastRunError={plannerLastRunError}
+                projectDefaultSkillId={defaultSkillId}
                 plannerTasks={plannerTasks}
                 plannerBusy={plannerBusy}
                 plannerQueueRunning={plannerQueueRunning}
@@ -4761,6 +4787,29 @@ function App() {
                       onBlur={() => void saveProjectWritingSettings()}
                     />
                   </div>
+                  {skillOptions.length > 0 ? (
+                    <div className="form-group">
+                      <label>{t('app.settings.defaultSkill')}</label>
+                      <select
+                        value={defaultSkillId}
+                        onChange={(e) => {
+                          updateProjectWritingSettings({ defaultSkillId: e.target.value })
+                          void saveProjectWritingSettings({ defaultSkillId: e.target.value })
+                        }}
+                      >
+                        <option value="">{t('chat.skillNone')}</option>
+                        {skillOptions.map((skill) => (
+                          <option key={skill.id} value={skill.id}>
+                            {skill.category ? `${skill.category} · ` : ''}
+                            {skill.name}
+                          </option>
+                        ))}
+                      </select>
+                      {defaultSkillId ? (
+                        <div className="settings-field-hint">{t('app.settings.defaultSkillHint')}</div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className="form-group">
                     <label>Auto Minimum Characters</label>
                     <input

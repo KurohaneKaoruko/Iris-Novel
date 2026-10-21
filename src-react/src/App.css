@@ -4658,6 +4658,13 @@ button.ai-session-row-main {
   color: var(--text-muted);
 }
 
+/* 表单字段下方的小字说明（如默认技能提示） */
+.settings-field-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .settings-load-state {
   padding: 10px;
   color: var(--text-secondary);

@@ -71,6 +71,7 @@ export type ProjectWritingSettings = {
   auto_max_chars: number
   auto_max_rounds: number
   auto_max_chapter_advances: number
+  default_skill_id?: string
 }
 
 export type ComposerDirectiveParseResult = {
