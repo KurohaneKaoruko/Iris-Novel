@@ -7,6 +7,7 @@ export type ProjectWritingSettingsState = {
   autoMaxChars: number
   autoMaxRounds: number
   autoMaxChapterAdvances: number
+  defaultSkillId: string
 }
 
 const DEFAULT_SETTINGS: ProjectWritingSettingsState = {
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: ProjectWritingSettingsState = {
   autoMaxChars: 2400,
   autoMaxRounds: 120,
   autoMaxChapterAdvances: 24,
+  defaultSkillId: '',
 }
 
 function sanitizeForSave(settings: ProjectWritingSettingsState): ProjectWritingSettingsState {
@@ -28,12 +30,16 @@ function sanitizeForSave(settings: ProjectWritingSettingsState): ProjectWritingS
   const autoMaxChapterAdvances = Number.isFinite(settings.autoMaxChapterAdvances)
     ? Math.max(0, Math.floor(settings.autoMaxChapterAdvances))
     : DEFAULT_SETTINGS.autoMaxChapterAdvances
+  // 与后端 normalize 同步：仅接受 [A-Za-z0-9_-] 的技能 id，否则清空
+  const trimmedSkillId = (settings.defaultSkillId ?? '').trim()
+  const defaultSkillId = /^[A-Za-z0-9_-]*$/.test(trimmedSkillId) ? trimmedSkillId : ''
   return {
     chapterWordTarget,
     autoMinChars,
     autoMaxChars,
     autoMaxRounds,
     autoMaxChapterAdvances,
+    defaultSkillId,
   }
 }
 
@@ -53,6 +59,7 @@ export function useProjectWritingSettings(workspaceRoot: string | null) {
       autoMaxChars: loaded.auto_max_chars,
       autoMaxRounds: loaded.auto_max_rounds,
       autoMaxChapterAdvances: loaded.auto_max_chapter_advances,
+      defaultSkillId: loaded.default_skill_id ?? '',
     })
   }, [workspaceRoot])
 
@@ -66,6 +73,7 @@ export function useProjectWritingSettings(workspaceRoot: string | null) {
       auto_max_chars: merged.autoMaxChars,
       auto_max_rounds: merged.autoMaxRounds,
       auto_max_chapter_advances: merged.autoMaxChapterAdvances,
+      default_skill_id: merged.defaultSkillId,
     })
     setSettings({
       chapterWordTarget: normalized.chapter_word_target,
@@ -73,6 +81,7 @@ export function useProjectWritingSettings(workspaceRoot: string | null) {
       autoMaxChars: normalized.auto_max_chars,
       autoMaxRounds: normalized.auto_max_rounds,
       autoMaxChapterAdvances: normalized.auto_max_chapter_advances,
+      defaultSkillId: normalized.default_skill_id ?? '',
     })
   }, [settings, workspaceRoot])
 

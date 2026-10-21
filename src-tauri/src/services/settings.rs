@@ -17,6 +17,9 @@ pub struct ProjectWritingSettings {
   pub auto_max_chars: u32,
   pub auto_max_rounds: u32,
   pub auto_max_chapter_advances: u32,
+  /// 作品级默认写作技能 id（如 novel-style-xianxia）；空 = 不启用
+  #[serde(default)]
+  pub default_skill_id: String,
 }
 
 impl Default for ProjectWritingSettings {
@@ -27,6 +30,7 @@ impl Default for ProjectWritingSettings {
       auto_max_chars: 2400,
       auto_max_rounds: 120,
       auto_max_chapter_advances: 24,
+      default_skill_id: String::new(),
     }
   }
 }
@@ -38,6 +42,8 @@ pub(crate) struct PartialProjectWritingSettings {
   pub(crate) auto_max_chars: Option<u32>,
   pub(crate) auto_max_rounds: Option<u32>,
   pub(crate) auto_max_chapter_advances: Option<u32>,
+  #[serde(default)]
+  pub(crate) default_skill_id: Option<String>,
 }
 // ---- 由 commands.rs 等价搬移（项目写作设置）----
 fn normalize_project_writing_settings(mut v: ProjectWritingSettings) -> ProjectWritingSettings {
@@ -49,6 +55,16 @@ fn normalize_project_writing_settings(mut v: ProjectWritingSettings) -> ProjectW
   }
   v.auto_max_rounds = v.auto_max_rounds.clamp(1, 1_000);
   v.auto_max_chapter_advances = v.auto_max_chapter_advances.clamp(0, 200);
+  v.default_skill_id = v.default_skill_id.trim().to_string();
+  // 技能 id 白名单校验：目录名风格（字母数字与连字符），拒绝路径穿越等脏值
+  let valid_id = !v.default_skill_id.is_empty()
+    && v
+      .default_skill_id
+      .chars()
+      .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+  if !valid_id {
+    v.default_skill_id.clear();
+  }
   v
 }
 
@@ -77,6 +93,9 @@ fn load_project_writing_settings_internal(root: &Path) -> Result<ProjectWritingS
     }
     if let Some(v) = parsed.auto_max_chapter_advances {
       settings.auto_max_chapter_advances = v;
+    }
+    if let Some(v) = parsed.default_skill_id {
+      settings.default_skill_id = v;
     }
   }
   Ok(normalize_project_writing_settings(settings))
@@ -462,3 +481,51 @@ pub fn import_agents(json: String) -> Result<(), String> {
   agents::save_custom( &list)
 }
 
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn default_skill_id_roundtrip_and_normalization() {
+    let dir = std::env::temp_dir().join(format!("iris-ws-test-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".novel").join(".settings")).unwrap();
+
+    // 默认值为空
+    let loaded = load_project_writing_settings_internal(&dir).unwrap();
+    assert_eq!(loaded.default_skill_id, "");
+
+    // 保存合法 id 后可读回
+    let mut s = ProjectWritingSettings::default();
+    s.default_skill_id = "novel-style-xianxia".to_string();
+    save_project_writing_settings_internal(&dir, &s).unwrap();
+    let loaded = load_project_writing_settings_internal(&dir).unwrap();
+    assert_eq!(loaded.default_skill_id, "novel-style-xianxia");
+
+    // 旧格式文件（无 default_skill_id）不破坏加载
+    std::fs::write(
+      project_settings_path(&dir),
+      r#"{"chapter_word_target": 3000}"#,
+    )
+    .unwrap();
+    let legacy = load_project_writing_settings_internal(&dir).unwrap();
+    assert_eq!(legacy.chapter_word_target, 3000);
+    assert_eq!(legacy.default_skill_id, "");
+
+    std::fs::remove_dir_all(&dir).unwrap();
+  }
+
+  #[test]
+  fn normalize_rejects_invalid_skill_ids() {
+    let mut s = ProjectWritingSettings::default();
+    s.default_skill_id = "../etc/passwd".to_string();
+    let n = normalize_project_writing_settings(s);
+    assert_eq!(n.default_skill_id, "");
+
+    let mut s = ProjectWritingSettings::default();
+    s.default_skill_id = "  novel-craft  ".to_string();
+    let n = normalize_project_writing_settings(s);
+    assert_eq!(n.default_skill_id, "novel-craft");
+  }
+}
