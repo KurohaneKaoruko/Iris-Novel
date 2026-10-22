@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { APP_LOCALES, DEFAULT_LOCALE, MESSAGES, type AppLocale, type TranslationParams } from './messages'
 
-const I18N_STORAGE_KEY = 'iris-novel-locale'
+const I18N_STORAGE_KEY = 'nice-locale'
 
 type I18nContextValue = {
   locale: AppLocale

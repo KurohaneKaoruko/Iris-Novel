@@ -303,13 +303,13 @@ pub struct SkillManager {
 static SKILLS_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 /// 解析技能库目录，优先级：
-/// 1. `IRIS_NOVEL_SKILLS_DIR` 环境变量（server / 开发覆盖）
+/// 1. `NICE_SKILLS_DIR` 环境变量（server / 开发覆盖）
 /// 2. 可执行文件旁的 `skills/`（随包分发的子模块）
 /// 3. 开发目录回退（target/../skills，即仓库根的 skills 子模块）
 fn resolve_skills_dir() -> Option<PathBuf> {
     SKILLS_DIR
         .get_or_init(|| {
-            if let Ok(from_env) = std::env::var("IRIS_NOVEL_SKILLS_DIR") {
+            if let Ok(from_env) = std::env::var("NICE_SKILLS_DIR") {
                 let trimmed = from_env.trim().to_string();
                 if !trimmed.is_empty() {
                     let path = PathBuf::from(trimmed);
@@ -320,12 +320,12 @@ fn resolve_skills_dir() -> Option<PathBuf> {
             }
             if let Ok(exe) = std::env::current_exe() {
                 if let Some(exe_dir) = exe.parent() {
-                    // 桌面安装布局：<install>/iris-novel + <install>/skills/
+                    // 桌面安装布局：<install>/nice + <install>/skills/
                     let beside = exe_dir.join("skills");
                     if beside.join("novel-craft").is_dir() {
                         return Some(beside);
                     }
-                    // 开发布局：<repo>/src-tauri/target/{profile}/iris-novel + <repo>/skills/
+                    // 开发布局：<repo>/src-tauri/target/{profile}/nice + <repo>/skills/
                     for ancestor in exe_dir.ancestors().skip(1) {
                         if ancestor.file_name().map(|n| n == "target").unwrap_or(false) {
                             continue;
@@ -499,7 +499,7 @@ mod tests {
 
     #[test]
     fn loads_skills_from_directory() {
-        let dir = std::env::temp_dir().join(format!("iris-skill-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("nice-skill-test-{}", std::process::id()));
         let sub = dir.join("novel-test-skill");
         std::fs::create_dir_all(&sub).unwrap();
         std::fs::write(

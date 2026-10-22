@@ -488,7 +488,7 @@ mod tests {
 
   #[test]
   fn default_skill_id_roundtrip_and_normalization() {
-    let dir = std::env::temp_dir().join(format!("iris-ws-test-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("nice-ws-test-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join(".novel").join(".settings")).unwrap();
 

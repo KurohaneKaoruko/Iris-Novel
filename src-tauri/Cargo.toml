@@ -1,29 +1,29 @@
 [package]
-name = "iris-novel"
+name = "nice"
 version = "0.0.2-test.1"
-description = "Iris-Novel"
+description = "N.I.C.E."
 authors = ["you"]
 edition = "2021"
-default-run = "iris-novel"
+default-run = "nice"
 
 [lib]
-name = "iris_novel"
+name = "nice"
 path = "src/lib.rs"
 
 [[bin]]
-name = "iris-novel"
+name = "nice"
 path = "src/main.rs"
 
 [[bin]]
-name = "iris-novel-server"
-path = "src/bin/iris-novel-server.rs"
+name = "nice-server"
+path = "src/bin/nice-server.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 ico = "0.5"
 
 [package.metadata.tauri]
-productName = "Iris-Novel"
+productName = "N.I.C.E."
 
 [dependencies]
 tauri = { version = "2", features = [] }

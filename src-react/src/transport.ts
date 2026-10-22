@@ -18,8 +18,8 @@ export function isTauriApp(): boolean {
 }
 
 function baseUrl(): string {
-  // 同源部署（静态文件由 iris-novel-server 托管）；开发模式走 Vite 代理或显式指定。
-  const explicit = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_IRIS_API_BASE
+  // 同源部署（静态文件由 nice-server 托管）；开发模式走 Vite 代理或显式指定。
+  const explicit = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_NICE_API_BASE
   if (explicit) return explicit.replace(/\/$/, '')
   return ''
 }

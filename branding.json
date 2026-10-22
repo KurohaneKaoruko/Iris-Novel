@@ -1,15 +1,15 @@
 {
-  "displayName": "Iris-Novel",
-  "npmName": "iris-novel",
-  "crateName": "iris-novel",
-  "tauriIdentifier": "com.irisnovel.app",
-  "dataDirName": "Iris-Novel",
+  "displayName": "N.I.C.E.",
+  "npmName": "nice",
+  "crateName": "nice",
+  "tauriIdentifier": "com.nice.app",
+  "dataDirName": "N.I.C.E.",
   "gitSignature": {
-    "name": "Iris-Novel",
-    "email": "iris-novel@local"
+    "name": "N.I.C.E.",
+    "email": "nice@local"
   },
   "editor": {
-    "namespace": "IrisNovelEditor",
-    "configStorageKey": "iris-novel-editor-config"
+    "namespace": "NiceEditor",
+    "configStorageKey": "nice-editor-config"
   }
 }

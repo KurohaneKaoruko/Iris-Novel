@@ -112,7 +112,7 @@ export function SettingsPanel({ isOpen, onClose, theme, onThemeChange }: Setting
           <div className="settings-section">
             <h3 className="settings-section-title">关于</h3>
             <div className="settings-about">
-              <p><strong>Iris-Novel</strong></p>
+              <p><strong>N.I.C.E.</strong></p>
               <p>版本 0.0.0</p>
               <p className="settings-about-desc">本地小说创作IDE，支持AI辅助写作</p>
             </div>

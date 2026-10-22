@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-Iris-Novel 是一个基于 **Tauri v2 + React + Lexical** 构建的桌面小说写作工作台。它不是通用 IDE，而是专注于小说作者需求的工具：
+N.I.C.E. 是一个基于 **Tauri v2 + React + Lexical** 构建的桌面小说写作工作台。它不是通用 IDE，而是专注于小说作者需求的工具：
 - 作品与资料管理
 - 章节写作与改稿
 - AI 规划、审阅与长期记忆
@@ -110,7 +110,7 @@ Rust 后端包含 AI 代理运行时：
 
 `skills/` 是 git submodule（https://github.com/KurohaneKaoruko/Novelist-Skills.git ），提供场景写作、正文铁律、剧情规划、连续性维护、风格库（热血/轻小说/悬疑/言情/科幻/仙侠）等 SKILL.md 技能：
 
-- 加载优先级：`IRIS_NOVEL_SKILLS_DIR` 环境变量 > 可执行文件旁 `skills/` > 编译期内嵌（build.rs 生成 `skills_data.rs`）
+- 加载优先级：`NICE_SKILLS_DIR` 环境变量 > 可执行文件旁 `skills/` > 编译期内嵌（build.rs 生成 `skills_data.rs`）
 - 克隆后需 `git submodule update --init --recursive`
 - 每个技能是 `<skills>/<id>/SKILL.md`，YAML frontmatter（name/description）+ 正文（prompt）
 

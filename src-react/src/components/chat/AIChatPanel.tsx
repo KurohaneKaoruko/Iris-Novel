@@ -918,7 +918,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem('iris-novel-pinned-sessions')
+      const raw = window.localStorage.getItem('nice-pinned-sessions')
       if (!raw) return
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
@@ -931,7 +931,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem('iris-novel-archived-sessions')
+      const raw = window.localStorage.getItem('nice-archived-sessions')
       if (!raw) return
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
@@ -944,7 +944,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem('iris-novel-deleted-sessions')
+      const raw = window.localStorage.getItem('nice-deleted-sessions')
       if (!raw) return
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
@@ -957,7 +957,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem('iris-novel-session-title-overrides')
+      const raw = window.localStorage.getItem('nice-session-title-overrides')
       if (!raw) return
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed === 'object') {
@@ -970,7 +970,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('iris-novel-pinned-sessions', JSON.stringify(pinnedSessionIds))
+      window.localStorage.setItem('nice-pinned-sessions', JSON.stringify(pinnedSessionIds))
     } catch {
       // ignore localStorage issues
     }
@@ -978,7 +978,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('iris-novel-archived-sessions', JSON.stringify(archivedSessionIds))
+      window.localStorage.setItem('nice-archived-sessions', JSON.stringify(archivedSessionIds))
     } catch {
       // ignore localStorage issues
     }
@@ -986,7 +986,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('iris-novel-deleted-sessions', JSON.stringify(deletedSessionIds))
+      window.localStorage.setItem('nice-deleted-sessions', JSON.stringify(deletedSessionIds))
     } catch {
       // ignore localStorage issues
     }
@@ -994,7 +994,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('iris-novel-session-title-overrides', JSON.stringify(sessionTitleOverrides))
+      window.localStorage.setItem('nice-session-title-overrides', JSON.stringify(sessionTitleOverrides))
     } catch {
       // ignore localStorage issues
     }

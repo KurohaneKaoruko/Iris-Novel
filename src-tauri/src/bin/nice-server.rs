@@ -1,17 +1,17 @@
-//! iris-novel-server：本地 Web 服务端。
+//! nice-server：本地 Web 服务端。
 //!
 //! 用法：
-//!   iris-novel-server [--host 127.0.0.1] [--port 8765] [--static-dir <dir>] [--data-dir <dir>]
+//!   nice-server [--host 127.0.0.1] [--port 8765] [--static-dir <dir>] [--data-dir <dir>]
 //!
 //! - 默认仅绑定 127.0.0.1（本机访问）；LAN 访问需显式 --host 0.0.0.0（用户自担风险）。
-//! - `--static-dir` 指向前端构建产物目录；默认 `../src-react/dist`（或 IRIS_NOVEL_STATIC_DIR）。
+//! - `--static-dir` 指向前端构建产物目录；默认 `../src-react/dist`（或 NICE_STATIC_DIR）。
 //! - `--data-dir` 覆盖数据目录（settings/secrets/chat_history/bookshelf）；默认与桌面端约定一致
-//!   （可执行文件所在目录），也可用 IRIS_NOVEL_DATA_DIR。
+//!   （可执行文件所在目录），也可用 NICE_DATA_DIR。
 
 use clap::Parser;
 
 #[derive(Parser, Debug)]
-#[command(name = "iris-novel-server", version, about = "Iris-Novel local web server")]
+#[command(name = "nice-server", version, about = "N.I.C.E. local web server")]
 struct Args {
   /// Bind host (default 127.0.0.1, loopback only)
   #[arg(long, default_value = "127.0.0.1")]
@@ -37,7 +37,7 @@ fn main() {
     .build()
     .expect("build tokio runtime");
   rt.block_on(async move {
-    if let Err(e) = iris_novel::server::run(iris_novel::server::ServerConfig {
+    if let Err(e) = nice::server::run(nice::server::ServerConfig {
       host: args.host,
       port: args.port,
       static_dir: args.static_dir,
@@ -45,7 +45,7 @@ fn main() {
     })
     .await
     {
-      eprintln!("[iris-novel-server] fatal: {e}");
+      eprintln!("[nice-server] fatal: {e}");
       std::process::exit(1);
     }
   });

@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 /// 存储根目录 override（由 server 启动参数或环境变量设置）。
 /// 桌面端默认不设置，沿用可执行文件所在目录；server 端通过
-/// `IRIS_NOVEL_DATA_DIR` 或 `--data-dir` 指向与桌面端相同的目录，
+/// `NICE_DATA_DIR` 或 `--data-dir` 指向与桌面端相同的目录，
 /// 以共享 settings/secrets/chat_history/bookshelf 状态。
 static STORAGE_ROOT_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
@@ -45,7 +45,7 @@ fn storage_root_dir() -> Result<PathBuf, String> {
   if let Some(dir) = STORAGE_ROOT_OVERRIDE.get() {
     return Ok(dir.clone());
   }
-  if let Ok(from_env) = std::env::var("IRIS_NOVEL_DATA_DIR") {
+  if let Ok(from_env) = std::env::var("NICE_DATA_DIR") {
     let trimmed = from_env.trim().to_string();
     if !trimmed.is_empty() {
       let path = PathBuf::from(trimmed);

@@ -1,6 +1,6 @@
-# Iris-Novel
+# N.I.C.E.
 
-Iris-Novel 是一个专注于长篇小说创作的本地桌面写作工作台，基于 `Tauri v2 + React + Lexical` 构建。
+**N.I.C.E.**（**N**ovel **I**ntegrated **C**reative **E**nvironment，亦可作 **N**ovel **I**ntelligent **C**omposition **E**ngine）是一个专注于长篇小说创作的本地桌面写作工作台，基于 `Tauri v2 + React + Lexical` 构建。
 
 它不是通用编程 IDE，也不是代码代理外壳，而是围绕小说作者的核心工作流设计：
 
@@ -121,6 +121,8 @@ Memory 索引位于：
 - Chat history: `<install-dir>/data/chat_history.json`
 - Bookshelf state: `<install-dir>/state/last_workspace.json`, `<install-dir>/state/external_projects.json`
 - API keys: `<install-dir>/secrets/secrets.json`
+
+服务端 / 开发环境可用 `NICE_DATA_DIR` 指定数据根目录、`NICE_SKILLS_DIR` 指定技能库目录（默认自动探测可执行文件旁或仓库内 `skills/`，编译期另有一份内嵌兜底）。
 
 ## 许可证
 

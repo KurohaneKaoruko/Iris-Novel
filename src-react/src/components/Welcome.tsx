@@ -24,7 +24,7 @@ export function Welcome({ onOpenWorkspace, recentWorkspaces = [] }: WelcomeProps
       {/* Hero Section */}
       <div className="welcome-hero">
         <div className="welcome-logo">📚</div>
-        <h1 className="welcome-title">Iris-Novel</h1>
+        <h1 className="welcome-title">N.I.C.E.</h1>
         <p className="welcome-subtitle">本地小说创作IDE</p>
         <p className="welcome-desc">
           专为小说作者设计的集成开发环境，AI辅助写作，智能编辑器，完整的工作流支持。

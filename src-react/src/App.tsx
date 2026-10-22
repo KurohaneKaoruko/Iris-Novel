@@ -4393,7 +4393,7 @@ function App() {
             </div>
           ) : (
             <div className="welcome-screen">
-              <h1>Iris-Novel</h1>
+              <h1>N.I.C.E.</h1>
               <div className="welcome-actions">
                 <button
                   className="welcome-btn"

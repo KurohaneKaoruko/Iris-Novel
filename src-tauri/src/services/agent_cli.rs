@@ -670,7 +670,7 @@ mod tests {
   use super::*;
 
   fn temp_workspace(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("iris-cli-test-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("nice-cli-test-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("stories")).unwrap();
     std::fs::create_dir_all(dir.join(".novel/state")).unwrap();

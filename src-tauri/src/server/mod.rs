@@ -68,7 +68,7 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
   let dist_dir = config
     .static_dir
     .clone()
-    .or_else(|| std::env::var("IRIS_NOVEL_STATIC_DIR").ok().map(PathBuf::from))
+    .or_else(|| std::env::var("NICE_STATIC_DIR").ok().map(PathBuf::from))
     .unwrap_or_else(|| PathBuf::from("../src-react/dist"));
 
   let index_file = dist_dir.join("index.html");
@@ -113,7 +113,7 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
     .await
     .map_err(|e| format!("bind {addr} failed: {e}"))?;
   println!(
-    "[iris-novel-server] listening on http://{}  (static: {})",
+    "[nice-server] listening on http://{}  (static: {})",
     addr,
     config
       .static_dir
@@ -127,7 +127,7 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
 }
 
 async fn health() -> impl IntoResponse {
-  json!({ "ok": true, "app": "iris-novel-server" }).to_string()
+  json!({ "ok": true, "app": "nice-server" }).to_string()
 }
 
 /// 来源校验：仅允许本机回环来源（防 DNS rebinding / 跨站访问）。

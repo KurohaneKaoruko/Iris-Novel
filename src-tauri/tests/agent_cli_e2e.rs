@@ -2,10 +2,10 @@
 //!
 //! 假 CLI：PATH 中的 `fake-writer` 脚本，在 cwd 内写两个文件（模拟 CLI 直接写作品目录）。
 
-use iris_novel::services::agent_cli::{
+use nice::services::agent_cli::{
     self, CliTaskRequest, decide_change, detect_clis, run_task,
 };
-use iris_novel::state::AppState;
+use nice::state::AppState;
 use std::path::PathBuf;
 
 fn fake_bin_dir() -> PathBuf {
@@ -19,7 +19,7 @@ fn path_with_fake_bin() {
 }
 
 fn make_workspace(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("iris-cli-e2e-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("nice-cli-e2e-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("stories")).unwrap();
     std::fs::create_dir_all(dir.join(".novel/state")).unwrap();
@@ -91,7 +91,7 @@ async fn e2e_detect_run_snapshot_review() {
 
     // 4. 变更集：ch1 modified + ch2 added；.novel 不在内
     let cs = task.change_set.expect("change set should exist in review mode");
-    let by_path: std::collections::HashMap<&str, &iris_novel::services::agent_cli::CliChangeEntry> =
+    let by_path: std::collections::HashMap<&str, &nice::services::agent_cli::CliChangeEntry> =
         cs.entries.iter().map(|e| (e.path.as_str(), e)).collect();
     assert_eq!(by_path["stories/ch1.md"].change_type, "modified");
     assert_eq!(by_path["stories/ch2.md"].change_type, "added");

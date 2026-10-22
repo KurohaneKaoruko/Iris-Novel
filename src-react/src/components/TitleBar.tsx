@@ -105,7 +105,7 @@ export function TitleBar({ title, onOpenBookshelf }: Props) {
           title={t('project.localLibrary')}
         >
           <AppIcon name="projectSwitch" size={13} />
-          <span>Iris-Novel</span>
+          <span>N.I.C.E.</span>
         </button>
         {title ? <span className="title-bar-context" title={title}>{title}</span> : null}
       </div>

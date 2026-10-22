@@ -6,7 +6,7 @@ fn main() {
 
 /// 把 skills/ 子模块（Novelist-Skills）的 SKILL.md 内嵌进二进制，
 /// 发布包即使不随包分发 skills/ 目录也能加载技能；
-/// 运行时目录（IRIS_NOVEL_SKILLS_DIR / exe 旁）仍可覆盖内嵌版本。
+/// 运行时目录（NICE_SKILLS_DIR / exe 旁）仍可覆盖内嵌版本。
 fn embed_skills() {
   let manifest_dir =
     std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo");

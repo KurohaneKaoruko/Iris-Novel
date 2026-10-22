@@ -1,10 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use iris_novel::commands;
+use nice::commands;
 
 fn main() {
-  let late_sink = std::sync::Arc::new(iris_novel::event_sink::LateTauriEventSink::default());
-  iris_novel::event_sink::global::init(late_sink.clone());
+  let late_sink = std::sync::Arc::new(nice::event_sink::LateTauriEventSink::default());
+  nice::event_sink::global::init(late_sink.clone());
   let late_for_setup = late_sink.clone();
   tauri::Builder::default()
     .setup(move |app| {
@@ -12,7 +12,7 @@ fn main() {
       Ok(())
     })
     .plugin(tauri_plugin_dialog::init())
-    .manage(iris_novel::state::AppState::default())
+    .manage(nice::state::AppState::default())
     .invoke_handler(tauri::generate_handler![
       commands::ping,
       commands::agent_cli_detect,

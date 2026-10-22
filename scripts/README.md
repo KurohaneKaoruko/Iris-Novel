@@ -1,6 +1,6 @@
 # Build Scripts
 
-This directory contains utility scripts for managing the Iris-Novel build process.
+This directory contains utility scripts for managing the N.I.C.E. build process.
 
 ## clean-build
 
