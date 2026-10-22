@@ -122,6 +122,8 @@ Memory 索引位于：
 - Bookshelf state: `<install-dir>/state/last_workspace.json`, `<install-dir>/state/external_projects.json`
 - API keys: `<install-dir>/secrets/secrets.json`
 
+服务端 / 开发环境可用 `IRIS_CREATION_DATA_DIR` 指定数据根目录、`IRIS_CREATION_SKILLS_DIR` 指定技能库目录（默认自动探测可执行文件旁或仓库内 `skills/`，编译期另有一份内嵌兜底）。
+
 ## 许可证
 
 GPL-3.0
