@@ -1,0 +1,84 @@
+.ai-write-bar {
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+}
+
+.ai-write-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+  align-items: center;
+}
+
+.ai-write-row select {
+  font-size: 12px;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+.ai-instruction {
+  flex: 1;
+  font-size: 12px;
+  padding: 4px 10px;
+  min-width: 0;
+}
+
+.ai-run,
+.ai-stop {
+  padding: 4px 16px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.ai-run {
+  background: var(--accent);
+  color: #10121a;
+}
+
+.ai-stop {
+  background: var(--danger);
+  color: #10121a;
+}
+
+.ai-output {
+  border-top: 1px solid var(--border);
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-output-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ai-output-actions button {
+  font-size: 12px;
+  color: var(--accent);
+  margin-left: 10px;
+  padding: 2px 8px;
+}
+
+.ai-output-actions button:hover {
+  text-decoration: underline;
+}
+
+.ai-output-body {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}

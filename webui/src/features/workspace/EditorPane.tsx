@@ -12,6 +12,8 @@ type EditorPaneProps = {
   onContentChanged: () => void
   onSaved: () => void
   onError: (msg: string | null) => void
+  /** AI 写入信号：'ai-replace' 整体替换 / 'ai-append' 追加末尾，消费后删除 key */
+  aiReplaceSignal?: React.MutableRefObject<Map<string, string>>
 }
 
 /**
@@ -19,7 +21,7 @@ type EditorPaneProps = {
  * 内容为纯文本行；保存时以 \n 连接段落。
  * Ctrl+S 由本组件捕获并走 onSave。
  */
-export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, onError }: EditorPaneProps) {
+export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, onError, aiReplaceSignal }: EditorPaneProps) {
   const [loading, setLoading] = useState(true)
   const [initialContent, setInitialContent] = useState('')
   const lastSyncedRef = useRef<string>('')
@@ -101,6 +103,42 @@ export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, on
       // 错误已由上层记录
     }
   }, [editor, onSaved, onSave])
+
+  // AI 写入信号：整体替换 / 追加
+  useEffect(() => {
+    if (!editor || !aiReplaceSignal) return
+    const iv = window.setInterval(() => {
+      const replace = aiReplaceSignal.current.get('ai-replace')
+      const append = aiReplaceSignal.current.get('ai-append')
+      if (replace !== undefined) {
+        aiReplaceSignal.current.delete('ai-replace')
+        editor.commands.setContent(linesToDoc(replace))
+        const text = editorText(editor)
+        lastSyncedRef.current = text
+        dirtyRef.current = true
+        onContentChanged()
+        void onSave(text).then(() => {
+          lastSyncedRef.current = text
+          dirtyRef.current = false
+          onSaved()
+        })
+      } else if (append !== undefined) {
+        aiReplaceSignal.current.delete('ai-append')
+        editor.commands.setTextSelection(editor.state.doc.content.size)
+        editor.commands.insertContent('\n\n' + append.trim())
+        const text = editorText(editor)
+        lastSyncedRef.current = text
+        dirtyRef.current = true
+        onContentChanged()
+        void onSave(text).then(() => {
+          lastSyncedRef.current = text
+          dirtyRef.current = false
+          onSaved()
+        })
+      }
+    }, 300)
+    return () => window.clearInterval(iv)
+  }, [aiReplaceSignal, editor, onContentChanged, onSaved, onSave])
 
   // 卸载前提示未保存（简单兜底；后续可加 beforeunload）
   useEffect(() => {

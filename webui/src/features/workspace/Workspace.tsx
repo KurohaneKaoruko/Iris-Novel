@@ -1,101 +1,143 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
-import { createFile, deleteEntry, listWorkspaceTree, readText, renameEntry, writeText } from '../../api/backend'
+import { createFile, createDir, deleteEntry, listWorkspaceTree, readText, renameEntry, writeText } from '../../api/backend'
+import {
+  computeWorkStats, createChapterFile, listChapters, listCharacters, listConceptFiles, listPlotLines,
+  loadMemoryIndices, markChapterStatus, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
+  type Chapter, type Character, type DocFile, type MemoryIndex, type PlotLine, type WorkStats,
+} from '../../api/novel'
 import { useWork } from '../../state/WorkContext'
 import { useChat } from '../../hooks/useChat'
 import { EditorPane } from './EditorPane'
 import { ChatPanel } from './ChatPanel'
+import { CharactersPanel } from './CharactersPanel'
+import { PlotLinesPanel } from './PlotLinesPanel'
+import { MemoryPanel } from './MemoryPanel'
+import { StatsPanel } from './StatsPanel'
+import { AiWriteBar } from './AiWriteBar'
 import './Workspace.css'
 
-function collectMarkdownFiles(entry: FsEntry): FsEntry[] {
+type SideTab = 'chapters' | 'characters' | 'plotlines' | 'docs' | 'memory'
+
+const SIDE_TABS: Array<{ id: SideTab; label: string }> = [
+  { id: 'chapters', label: '章节' },
+  { id: 'characters', label: '人物' },
+  { id: 'plotlines', label: '情节线' },
+  { id: 'docs', label: '资料' },
+  { id: 'memory', label: '记忆' },
+]
+
+function collectFiles(entry: FsEntry, test: (p: string) => boolean): FsEntry[] {
   const out: FsEntry[] = []
   const walk = (e: FsEntry) => {
-    if (e.kind === 'file' && /\.(md|txt)$/i.test(e.name)) out.push(e)
+    if (e.kind === 'file' && test(e.path)) out.push(e)
     for (const c of e.children ?? []) walk(c)
   }
   walk(entry)
   return out
 }
 
-function groupByDir(files: FsEntry[]): Array<{ dir: string; files: FsEntry[] }> {
-  const map = new Map<string, FsEntry[]>()
-  for (const f of files) {
-    const idx = f.path.lastIndexOf('/')
-    const dir = idx >= 0 ? f.path.slice(0, idx) : ''
-    const list = map.get(dir) ?? []
-    list.push(f)
-    map.set(dir, list)
-  }
-  return [...map.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([dir, fs]) => ({ dir, files: fs }))
-}
-
-type ChatContextOpts = {
-  assistantId: string | null
-}
-
 export function Workspace({ onExit }: { onExit: () => void }) {
-  const { workRoot, activePath, setActivePath, error, setError } = useWork()
+  const { workRoot, activePath, setActivePath, error, setError, writingSettings } = useWork()
+  const [sideTab, setSideTab] = useState<SideTab>('chapters')
   const [tree, setTree] = useState<FsEntry | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [chapters, setChapters] = useState<Chapter[]>([])
+  const [characters, setCharacters] = useState<Character[]>([])
+  const [plotLines, setPlotLines] = useState<PlotLine[]>([])
+  const [memory, setMemory] = useState<MemoryIndex[]>([])
+  const [docs, setDocs] = useState<DocFile[]>([])
+  const [stats, setStats] = useState<WorkStats | null>(null)
   const [dirty, setDirty] = useState(false)
   const [assistantId, setAssistantId] = useState<string | null>(null)
   const chat = useChat()
-  const chatContextRef = useRef<ChatContextOpts>({ assistantId: null })
+  const contentRef = useRef<Map<string, string>>(new Map())
 
-  const refreshTree = useCallback(async () => {
+  const refreshAll = useCallback(async () => {
     if (!workRoot) return
     try {
-      setTree(await listWorkspaceTree(6))
+      const [t, ch, chars, plots, mem] = await Promise.all([
+        listWorkspaceTree(6),
+        listChapters(),
+        listCharacters(),
+        listPlotLines(),
+        loadMemoryIndices(),
+      ])
+      setTree(t)
+      setChapters(ch)
+      setCharacters(chars)
+      setPlotLines(plots)
+      setMemory(mem)
+      setDocs(await listConceptFiles())
+      setStats(await computeWorkStats())
     } catch (e) {
-      setError(`加载目录失败：${e instanceof Error ? e.message : String(e)}`)
+      setError(`加载数据失败：${e instanceof Error ? e.message : String(e)}`)
     }
   }, [setError, workRoot])
 
   useEffect(() => {
-    void refreshTree()
-  }, [refreshTree])
+    void refreshAll()
+  }, [refreshAll])
 
-  const files = useMemo(() => (tree ? collectMarkdownFiles(tree) : []), [tree])
-  const groups = useMemo(() => groupByDir(files), [files])
+  const chapterFiles = useMemo(
+    () => (tree ? collectFiles(tree, (p) => /^stories\/.*\.(md|txt)$/i.test(p)) : []),
+    [tree],
+  )
+  const docFiles = useMemo(() => docs, [docs])
+  const allOpenable = useMemo(
+    () => (tree ? collectFiles(tree, (p) => /\.(md|txt)$/i.test(p) && !p.startsWith('.novel')) : []),
+    [tree],
+  )
+  const openableMap = useMemo(() => new Map(allOpenable.map((f) => [f.path, f])), [allOpenable])
 
   // 自动打开第一章
   useEffect(() => {
-    if (!activePath && files.length > 0) {
-      const first = [...files].sort((a, b) => a.path.localeCompare(b.path))[0]
-      setActivePath(first.path)
+    if (!activePath && chapterFiles.length > 0) {
+      setActivePath([...chapterFiles].sort((a, b) => a.path.localeCompare(b.path))[0].path)
     }
-  }, [activePath, files, setActivePath])
+  }, [activePath, chapterFiles, setActivePath])
 
-  const handleSave = useCallback(
-    async (content: string) => {
-      if (!activePath) return
-      setSaving(true)
+  const handleSaved = useCallback(
+    async (path: string, content: string) => {
+      setDirty(false)
+      // 同步章节元数据 + 记录今日字数
       try {
-        await writeText(activePath, content)
-        setDirty(false)
-      } catch (e) {
-        setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
-      } finally {
-        setSaving(false)
+        const updated = await syncChapterContent(path, content)
+        if (updated) {
+          setChapters((prev) => prev.map((c) => (c.filePath === path ? updated : c)))
+        }
+      } catch {
+        /* 元数据同步失败不影响主流程 */
       }
+      void refreshAll()
     },
-    [activePath, setError],
+    [refreshAll],
   )
 
-  const handleCreateFile = useCallback(async () => {
-    const name = window.prompt('新文件名（相对 stories/，如 chapter-0002.md）')
-    if (!name) return
-    const rel = name.startsWith('stories/') ? name : `stories/${name}`
+  const handleCreateChapter = useCallback(async () => {
+    const title = window.prompt('章节标题', `第 ${chapters.length + 1} 章`)
+    if (title === null) return
     try {
+      const path = await createChapterFile(title.trim())
+      await refreshAll()
+      setActivePath(path)
+    } catch (e) {
+      setError(`创建章节失败：${e instanceof Error ? e.message : String(e)}`)
+    }
+  }, [chapters.length, refreshAll, setActivePath, setError])
+
+  const handleCreateFile = useCallback(async () => {
+    const name = window.prompt('新文件相对路径（如 concept/世界观.md）')
+    if (!name) return
+    const rel = name.replace(/^\/+/, '')
+    try {
+      if (rel.includes('/')) await createDir(rel.slice(0, rel.lastIndexOf('/')))
       await createFile(rel)
-      await refreshTree()
+      await refreshAll()
       setActivePath(rel)
     } catch (e) {
       setError(`创建失败：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [refreshTree, setActivePath, setError])
+  }, [refreshAll, setActivePath, setError])
 
   const handleDelete = useCallback(
     async (path: string) => {
@@ -103,12 +145,12 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       try {
         await deleteEntry(path)
         if (activePath === path) setActivePath(null)
-        await refreshTree()
+        await refreshAll()
       } catch (e) {
         setError(`删除失败：${e instanceof Error ? e.message : String(e)}`)
       }
     },
-    [activePath, refreshTree, setActivePath, setError],
+    [activePath, refreshAll, setActivePath, setError],
   )
 
   const handleRename = useCallback(
@@ -120,23 +162,53 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       try {
         await renameEntry(path, toPath)
         if (activePath === path) setActivePath(toPath)
-        await refreshTree()
+        await refreshAll()
       } catch (e) {
         setError(`重命名失败：${e instanceof Error ? e.message : String(e)}`)
       }
     },
-    [activePath, refreshTree, setActivePath, setError],
+    [activePath, refreshAll, setActivePath, setError],
+  )
+
+  const openDoc = useCallback((path: string) => setActivePath(path), [setActivePath])
+
+  const handleSetStatus = useCallback(
+    async (path: string, status: Chapter['status']) => {
+      try {
+        await markChapterStatus(path, status)
+        await refreshAll()
+      } catch (e) {
+        setError(`更新状态失败：${e instanceof Error ? e.message : String(e)}`)
+      }
+    },
+    [refreshAll, setError],
+  )
+
+  const handleSaveMemory = useCallback(
+    async (path: string, content: string) => {
+      try {
+        await saveMemoryIndex(path, content)
+        await refreshAll()
+      } catch (e) {
+        setError(`保存索引失败：${e instanceof Error ? e.message : String(e)}`)
+      }
+    },
+    [refreshAll, setError],
   )
 
   const workName = workRoot?.split(/[/\\]/).filter(Boolean).pop() ?? ''
+  const activeIsOpenable = activePath ? openableMap.has(activePath) : false
 
   return (
     <div className="workspace">
       <header className="workspace-header">
-        <button className="header-btn" onClick={onExit} title="返回书架">
-          ← 书架
-        </button>
+        <button className="header-btn" onClick={onExit} title="返回书架">← 书架</button>
         <span className="work-name">{workName}</span>
+        {stats ? (
+          <span className="header-stats">
+            {stats.totalWords.toLocaleString()} 字 · {stats.chapterCount} 章 · 今日 {stats.todayWords} 字
+          </span>
+        ) : null}
         <span className="header-spacer" />
         {error ? (
           <span className="header-error" role="alert" onClick={() => setError(null)}>
@@ -144,68 +216,133 @@ export function Workspace({ onExit }: { onExit: () => void }) {
           </span>
         ) : null}
         <span className={`save-state ${dirty ? 'dirty' : ''}`}>
-          {saving ? '保存中…' : dirty ? '未保存' : '已保存'}
+          {dirty ? '未保存' : '已保存'}
         </span>
       </header>
 
       <div className="workspace-body">
-        <aside className="chapter-sidebar">
-          <div className="sidebar-head">
-            <span>章节</span>
-            <button onClick={() => void handleCreateFile()} title="新建文件">
-              ＋
-            </button>
-          </div>
-          <div className="sidebar-list">
-            {groups.map(({ dir, files: fs }) => (
-              <div key={dir} className="dir-group">
-                <div className="dir-name">{dir || '根目录'}</div>
-                {fs.map((f) => (
+        <aside className="side-panel">
+          <nav className="side-tabs">
+            {SIDE_TABS.map((t) => (
+              <button
+                key={t.id}
+                className={sideTab === t.id ? 'active' : ''}
+                onClick={() => setSideTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="side-content">
+            {sideTab === 'chapters' ? (
+              <div className="panel-section">
+                <div className="panel-head">
+                  <span>章节（{chapters.length}）</span>
+                  <button onClick={() => void handleCreateChapter()} title="新建章节">＋</button>
+                </div>
+                {chapters.map((c) => (
                   <div
-                    key={f.path}
-                    className={`file-item ${activePath === f.path ? 'active' : ''}`}
-                    onClick={() => setActivePath(f.path)}
+                    key={c.filePath}
+                    className={`file-item ${activePath === c.filePath ? 'active' : ''}`}
+                    onClick={() => setActivePath(c.filePath)}
                   >
-                    <span className="file-name">{f.name}</span>
+                    <span className="file-main">
+                      <span className="file-name">{c.title}</span>
+                      <span className="file-sub">
+                        {c.wordCount > 0 ? `${c.wordCount} 字` : '空'} ·{' '}
+                        {c.status === 'completed' ? '✓完结' : c.status === 'revising' ? '改稿中' : '草稿'}
+                      </span>
+                    </span>
                     <span className="file-actions">
-                      <button
-                        title="重命名"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          void handleRename(f.path)
-                        }}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        title="删除"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          void handleDelete(f.path)
-                        }}
-                      >
-                        ✕
-                      </button>
+                      {c.status !== 'completed' ? (
+                        <button title="标记完结" onClick={(e) => { e.stopPropagation(); void handleSetStatus(c.filePath, 'completed') }}>✓</button>
+                      ) : null}
+                      <button title="重命名" onClick={(e) => { e.stopPropagation(); void handleRename(c.filePath) }}>✎</button>
+                      <button title="删除" onClick={(e) => { e.stopPropagation(); void handleDelete(c.filePath) }}>✕</button>
                     </span>
                   </div>
                 ))}
               </div>
-            ))}
-            {files.length === 0 ? <div className="sidebar-empty">暂无文档</div> : null}
+            ) : null}
+
+            {sideTab === 'characters' ? (
+              <CharactersPanel
+                characters={characters}
+                onSave={async (next) => { await saveCharacters(next); await refreshAll() }}
+                onError={setError}
+              />
+            ) : null}
+
+            {sideTab === 'plotlines' ? (
+              <PlotLinesPanel
+                plotLines={plotLines}
+                onSave={async (next) => { await savePlotLines(next); await refreshAll() }}
+                onError={setError}
+              />
+            ) : null}
+
+            {sideTab === 'docs' ? (
+              <div className="panel-section">
+                <div className="panel-head">
+                  <span>设定 / 大纲</span>
+                  <button onClick={() => void handleCreateFile()} title="新建文档">＋</button>
+                </div>
+                {docFiles.map((d) => (
+                  <div
+                    key={d.path}
+                    className={`file-item ${activePath === d.path ? 'active' : ''}`}
+                    onClick={() => openDoc(d.path)}
+                  >
+                    <span className="file-main">
+                      <span className="file-name">{d.name}</span>
+                      <span className="file-sub">{d.path}</span>
+                    </span>
+                    <span className="file-actions">
+                      <button title="重命名" onClick={(e) => { e.stopPropagation(); void handleRename(d.path) }}>✎</button>
+                      <button title="删除" onClick={(e) => { e.stopPropagation(); void handleDelete(d.path) }}>✕</button>
+                    </span>
+                  </div>
+                ))}
+                {docFiles.length === 0 ? <div className="panel-empty">暂无资料文档</div> : null}
+              </div>
+            ) : null}
+
+            {sideTab === 'memory' ? (
+              <MemoryPanel memory={memory} onSave={handleSaveMemory} onError={setError} />
+            ) : null}
           </div>
+
+          {stats ? <StatsPanel stats={stats} /> : null}
         </aside>
 
         <main className="editor-main">
-          {activePath ? (
-            <EditorPane
-              key={activePath}
-              path={activePath}
-              onContentChanged={() => setDirty(true)}
-              onSaved={() => setDirty(false)}
-              saving={saving}
-              onSave={handleSave}
-              onError={setError}
-            />
+          {activePath && activeIsOpenable ? (
+            <>
+              <AiWriteBar
+                activePath={activePath}
+                assistantId={assistantId}
+                targetWords={writingSettings?.chapterWordTarget}
+                contentRef={contentRef}
+                onApply={(content) => {
+                  contentRef.current.set('ai-replace', content)
+                }}
+                onError={setError}
+              />
+              <EditorPane
+                key={activePath}
+                path={activePath}
+                saving={false}
+                onSave={async (content) => {
+                  await writeText(activePath, content)
+                  await handleSaved(activePath, content)
+                }}
+                onContentChanged={() => setDirty(true)}
+                onSaved={() => setDirty(false)}
+                onError={setError}
+                aiReplaceSignal={contentRef}
+              />
+            </>
           ) : (
             <div className="editor-empty">
               <p>从左侧选择或新建一个文档</p>
@@ -217,7 +354,6 @@ export function Workspace({ onExit }: { onExit: () => void }) {
           chat={chat}
           assistantId={assistantId}
           onAssistantChange={setAssistantId}
-          contextRef={chatContextRef}
           activePath={activePath}
         />
       </div>
@@ -225,5 +361,4 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   )
 }
 
-// 供 EditorPane 惰性读取内容时复用
 export { readText }

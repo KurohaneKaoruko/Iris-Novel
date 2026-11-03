@@ -9,7 +9,6 @@ type ChatPanelProps = {
   chat: ReturnType<typeof useChat>
   assistantId: string | null
   onAssistantChange: (id: string | null) => void
-  contextRef: React.MutableRefObject<{ assistantId: string | null }>
   activePath: string | null
 }
 

@@ -1,0 +1,117 @@
+.plotlines-panel {
+  padding: 0;
+}
+
+.plot-card,
+.plot-editor {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.plot-card {
+  cursor: pointer;
+}
+
+.plot-card:hover {
+  background: var(--bg-tertiary);
+}
+
+.plot-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plot-name {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plot-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.plot-status.ongoing {
+  background: rgba(122, 162, 247, 0.18);
+  color: var(--accent);
+}
+
+.plot-status.completed {
+  background: rgba(158, 206, 106, 0.18);
+  color: var(--success);
+}
+
+.plot-status.paused {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+}
+
+.plot-chapters {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.plot-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.plot-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+  margin: 6px;
+}
+
+.plot-row {
+  display: flex;
+  gap: 8px;
+}
+
+.plot-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.plot-editor select,
+.plot-editor textarea {
+  font-size: 12px;
+}
+
+.plot-editor textarea {
+  resize: vertical;
+}
+
+.plot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.plot-actions button {
+  padding: 4px 14px;
+  background: var(--accent);
+  color: #10121a;
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.plot-actions button:last-child {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
