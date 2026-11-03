@@ -1,0 +1,150 @@
+/**
+ * 后端命令绑定：类型化封装 rpc_dispatch 已有的命令。
+ * 命名与 payload 与 src-tauri/src/server/rpc_dispatch.rs 一一对应。
+ */
+import { rpc } from './rpc'
+
+// ---- 类型 ----
+
+export type FsEntry = {
+  name: string
+  path: string
+  kind: 'file' | 'dir'
+  children?: FsEntry[]
+}
+
+export type WorkspaceInfo = {
+  root: string
+  /** 其他随 set_workspace 返回的字段按需扩展 */
+  [k: string]: unknown
+}
+
+export type ProjectItem = {
+  name: string
+  path: string
+  description: string | null
+  chapters_count: number
+  total_words: number
+  updated_at: number
+  is_valid_workspace: boolean
+  source: 'default' | 'external' | 'imported'
+}
+
+export type BookshelfState = {
+  default_projects: ProjectItem[]
+  external_projects: ProjectItem[]
+  default_root: string
+  last_workspace: string | null
+  launch_mode: 'picker' | 'auto_last'
+}
+
+export type AppSettings = {
+  active_provider_id: string | null
+  active_agent_id: string | null
+  active_writing_assistant_id: string | null
+  launch_mode?: 'picker' | 'auto_last'
+  providers: Array<{
+    id: string
+    name?: string
+    kind?: string
+    base_url?: string
+    model_name?: string
+    api_key?: string | null
+    [k: string]: unknown
+  }>
+  [k: string]: unknown
+}
+
+export type ProjectWritingSettings = {
+  chapterWordTarget: number
+  defaultSkillId: string | null
+  autoMaxRounds?: number
+  autoMinChars?: number
+  autoMaxChars?: number
+  autoMaxChapterAdvances?: number
+  [k: string]: unknown
+}
+
+export type Skill = {
+  id: string
+  name: string
+  description: string
+  prompt: string
+  category: string
+  enabled: boolean
+}
+
+export type ChatSessionSummary = {
+  id: string
+  title: string
+  updated_at?: number
+  [k: string]: unknown
+}
+
+export type ChatMessagePayload = {
+  role: 'user' | 'assistant'
+  content: string
+  [k: string]: unknown
+}
+
+export type ChatSession = {
+  id: string
+  title?: string
+  messages: ChatMessagePayload[]
+  [k: string]: unknown
+}
+
+// ---- workspace / bookshelf ----
+
+export const setWorkspace = (path: string) => rpc<WorkspaceInfo>('set_workspace', { path })
+export const getBookshelfState = () => rpc<BookshelfState>('get_bookshelf_state')
+export const createNovelWork = (name: string, description?: string) =>
+  rpc<ProjectItem>('create_novel_work', { name, description: description ?? null })
+export const updateWorkDescription = (path: string, description: string) =>
+  rpc<void>('update_work_description', { path, description })
+export const getLastWorkspace = () => rpc<string | null>('get_last_workspace')
+
+// ---- fs ----
+
+export const listWorkspaceTree = (maxDepth = 6) => rpc<FsEntry>('list_workspace_tree', { maxDepth })
+export const readText = (relativePath: string) => rpc<string>('read_text', { relativePath })
+export const writeText = (relativePath: string, content: string) =>
+  rpc<void>('write_text', { relativePath, content })
+export const createFile = (relativePath: string) => rpc<void>('create_file', { relativePath })
+export const createDir = (relativePath: string) => rpc<void>('create_dir', { relativePath })
+export const deleteEntry = (relativePath: string) => rpc<void>('delete_entry', { relativePath })
+export const renameEntry = (fromPath: string, toPath: string) =>
+  rpc<void>('rename_entry', { fromRelativePath: fromPath, toRelativePath: toPath })
+
+// ---- settings / skills ----
+
+export const getAppSettings = () => rpc<AppSettings>('get_app_settings')
+export const setAppSettings = (settings: AppSettings) => rpc<void>('set_app_settings', { settings })
+export const getProjectWritingSettings = () => rpc<ProjectWritingSettings>('get_project_writing_settings')
+export const setProjectWritingSettings = (settings: ProjectWritingSettings) =>
+  rpc<void>('set_project_writing_settings', { settings })
+export const getSkills = () => rpc<Skill[]>('get_skills')
+
+// ---- chat ----
+
+export const listChatSessions = (workspaceRoot?: string | null) =>
+  rpc<ChatSessionSummary[]>('list_chat_sessions', { workspaceRoot: workspaceRoot ?? null })
+export const getChatSession = (id: string) => rpc<ChatSession>('get_chat_session', { id })
+export const saveChatSession = (session: ChatSession) => rpc<void>('save_chat_session', { session })
+
+/** 发起 AI 流式生成；token 经 WS ai_stream_token 事件到达。 */
+export const chatGenerateStream = (args: {
+  streamId: string
+  messages: ChatMessagePayload[]
+  assistantId?: string | null
+  providerId?: string | null
+}) =>
+  rpc<void>('chat_generate_stream', {
+    streamId: args.streamId,
+    messages: args.messages,
+    useMarkdown: true,
+    agentId: args.assistantId ?? null,
+    providerId: args.providerId ?? null,
+  })
+
+export const chatCancelStream = (streamId: string) => rpc<void>('chat_cancel_stream', { streamId })
