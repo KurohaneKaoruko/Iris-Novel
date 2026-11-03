@@ -15,6 +15,8 @@ import { PlotLinesPanel } from './PlotLinesPanel'
 import { MemoryPanel } from './MemoryPanel'
 import { StatsPanel } from './StatsPanel'
 import { AiWriteBar } from './AiWriteBar'
+import { SettingsModal } from './SettingsModal'
+import { ToolsModal } from './ToolsModal'
 import './Workspace.css'
 
 type SideTab = 'chapters' | 'characters' | 'plotlines' | 'docs' | 'memory'
@@ -49,6 +51,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [stats, setStats] = useState<WorkStats | null>(null)
   const [dirty, setDirty] = useState(false)
   const [assistantId, setAssistantId] = useState<string | null>(null)
+  const [modal, setModal] = useState<'settings' | 'tools' | null>(null)
   const chat = useChat()
   const contentRef = useRef<Map<string, string>>(new Map())
 
@@ -210,6 +213,8 @@ export function Workspace({ onExit }: { onExit: () => void }) {
           </span>
         ) : null}
         <span className="header-spacer" />
+        <button className="header-btn" onClick={() => setModal('tools')} title="搜索 / 导出 / 风险审阅">工具箱</button>
+        <button className="header-btn" onClick={() => setModal('settings')} title="Provider / 写作偏好 / 技能">设置</button>
         {error ? (
           <span className="header-error" role="alert" onClick={() => setError(null)}>
             {error} ✕
@@ -322,7 +327,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
               <AiWriteBar
                 activePath={activePath}
                 assistantId={assistantId}
-                targetWords={writingSettings?.chapterWordTarget}
+                targetWords={writingSettings?.chapter_word_target}
                 contentRef={contentRef}
                 onApply={(content) => {
                   contentRef.current.set('ai-replace', content)
@@ -356,6 +361,22 @@ export function Workspace({ onExit }: { onExit: () => void }) {
           onAssistantChange={setAssistantId}
           activePath={activePath}
         />
+
+        {modal === 'settings' ? (
+          <SettingsModal
+            onClose={() => setModal(null)}
+            onError={setError}
+            onSaved={() => void refreshAll()}
+          />
+        ) : null}
+        {modal === 'tools' ? (
+          <ToolsModal
+            onClose={() => setModal(null)}
+            onError={setError}
+            onOpenFile={(p) => setActivePath(p)}
+            activePath={activePath}
+          />
+        ) : null}
       </div>
     </div>
   )

@@ -1,0 +1,160 @@
+.tools-box {
+  width: min(640px, 92vw);
+}
+
+.tools-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tools-row {
+  display: flex;
+  gap: 8px;
+}
+
+.tools-row input,
+.tools-row select {
+  flex: 1;
+  font-size: 13px;
+  padding: 7px 10px;
+  min-width: 0;
+}
+
+.tools-run {
+  background: var(--accent);
+  color: #10121a;
+  padding: 7px 18px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.tools-run:disabled {
+  opacity: 0.5;
+}
+
+.tools-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.search-hits {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.search-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-hit:last-child {
+  border-bottom: none;
+}
+
+.search-hit:hover {
+  background: var(--bg-tertiary);
+}
+
+.search-hit-path {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: monospace;
+}
+
+.search-hit-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools-section label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.tools-section label select {
+  font-size: 13px;
+  padding: 5px 8px;
+}
+
+.risk-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.risk-summary {
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--text-muted);
+}
+
+.risk-summary.level-high {
+  border-left-color: var(--danger);
+}
+
+.risk-summary.level-medium {
+  border-left-color: #e0af68;
+}
+
+.risk-summary.level-low {
+  border-left-color: var(--success);
+}
+
+.risk-finding {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  align-items: flex-start;
+}
+
+.risk-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.risk-finding.level-high .risk-badge {
+  background: rgba(247, 118, 142, 0.15);
+  color: var(--danger);
+}
+
+.risk-finding.level-medium .risk-badge {
+  background: rgba(224, 175, 104, 0.15);
+  color: #e0af68;
+}
+
+.risk-excerpt {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.risk-suggestion {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}

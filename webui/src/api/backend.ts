@@ -39,30 +39,23 @@ export type BookshelfState = {
 }
 
 export type AppSettings = {
-  active_provider_id: string | null
-  active_agent_id: string | null
-  active_writing_assistant_id: string | null
-  launch_mode?: 'picker' | 'auto_last'
-  providers: Array<{
-    id: string
-    name?: string
-    kind?: string
-    base_url?: string
-    model_name?: string
-    api_key?: string | null
-    [k: string]: unknown
-  }>
-  [k: string]: unknown
+  active_provider_id: string
+  active_agent_id: string
+  active_writing_assistant_id: string
+  agent_cli_write_mode?: 'review' | 'auto_apply'
+  ai_edit_apply_mode?: 'review' | 'auto_apply'
+  launch_mode: 'picker' | 'auto_last'
+  output?: { use_markdown: boolean }
+  providers: Provider[]
 }
 
 export type ProjectWritingSettings = {
-  chapterWordTarget: number
-  defaultSkillId: string | null
-  autoMaxRounds?: number
-  autoMinChars?: number
-  autoMaxChars?: number
-  autoMaxChapterAdvances?: number
-  [k: string]: unknown
+  chapter_word_target: number
+  auto_min_chars: number
+  auto_max_chars: number
+  auto_max_rounds: number
+  auto_max_chapter_advances: number
+  default_skill_id: string
 }
 
 export type Skill = {
@@ -72,6 +65,36 @@ export type Skill = {
   prompt: string
   category: string
   enabled: boolean
+}
+
+export type Provider = {
+  id: string
+  name: string
+  kind: 'OpenAI' | 'Anthropic' | 'OpenAICompatible'
+  api_key: string
+  base_url: string
+  model_name: string
+}
+
+export type ProviderConnectivityResult = {
+  ok: boolean
+  message?: string
+  [k: string]: unknown
+}
+
+export type RiskFinding = {
+  category: string
+  level: string
+  excerpt: string
+  suggestion?: string
+  [k: string]: unknown
+}
+
+export type RiskScanResult = {
+  summary: string
+  overall_level: string
+  findings: RiskFinding[]
+  scanned_chars: number
 }
 
 export type ChatSessionSummary = {
@@ -148,3 +171,16 @@ export const chatGenerateStream = (args: {
   })
 
 export const chatCancelStream = (streamId: string) => rpc<void>('chat_cancel_stream', { streamId })
+
+// ---- provider / key ----
+
+export const getApiKeyStatus = (providerId: string) => rpc<boolean>('get_api_key_status', { providerId })
+export const setApiKey = (providerId: string, apiKey: string) =>
+  rpc<void>('set_api_key', { providerId, apiKey })
+export const testProviderConnectivity = (provider: Provider, apiKey?: string) =>
+  rpc<ProviderConnectivityResult>('test_provider_connectivity', { provider, apiKey: apiKey ?? null })
+
+// ---- risk scan ----
+
+export const riskScanContent = (filePath: string | null, content: string) =>
+  rpc<RiskScanResult>('risk_scan_content', { filePath: filePath ?? null, content })
