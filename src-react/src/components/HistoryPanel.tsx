@@ -10,6 +10,7 @@ import {
 } from '../tauri'
 import { useI18n } from '../i18n'
 import { AppIcon } from './icons/AppIcon'
+import { Timeline, type TimelineItem } from './Timeline'
 import './HistoryPanel.css'
 
 type HistoryPanelProps = {
@@ -34,6 +35,7 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
   const [actionBusy, setActionBusy] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [activeOnly, setActiveOnly] = useState(true)
+  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list')
 
   const activePathKey = useMemo(() => {
     if (!activePath) return null
@@ -59,6 +61,18 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
   const selectedEntry = useMemo(
     () => filteredEntries.find((item) => item.id === selectedId) ?? null,
     [filteredEntries, selectedId],
+  )
+
+  const timelineItems = useMemo<TimelineItem[]>(
+    () =>
+      filteredEntries.map((entry) => ({
+        id: entry.id,
+        date: new Date(entry.created_at),
+        title: entry.file_path.split(/[\\/]/).pop() ?? entry.file_path,
+        description: `${entry.reason} · ${t('history.wordCount', { count: entry.word_count })}`,
+        type: entry.reason === 'manual' ? 'milestone' : 'chapter',
+      })),
+    [filteredEntries, t],
   )
 
   const refresh = useCallback(async () => {
@@ -206,11 +220,24 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
           onChange={(e) => setSearchText(e.target.value)}
           placeholder={t('history.searchPlaceholder')}
         />
+        <button
+          type="button"
+          className={`history-view-toggle ${viewMode === 'timeline' ? 'active' : ''}`}
+          onClick={() => setViewMode((m) => (m === 'list' ? 'timeline' : 'list'))}
+          title={viewMode === 'list' ? t('history.viewTimeline') : t('history.viewList')}
+        >
+          <AppIcon name={viewMode === 'list' ? 'timeline' : 'files'} size={13} />
+        </button>
         <span className="history-panel-count">
           {filteredEntries.length}/{entries.length}
         </span>
       </div>
 
+      {viewMode === 'timeline' ? (
+        <div className="history-timeline-wrap">
+          <Timeline items={timelineItems} onItemClick={(item) => setSelectedId(item.id)} />
+        </div>
+      ) : (
       <div className="history-layout">
         <div className="history-list">
           {filteredEntries.length === 0 ? (
@@ -271,6 +298,7 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }

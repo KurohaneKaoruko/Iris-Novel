@@ -22,6 +22,11 @@ export type AppIconName =
   | 'preview'
   | 'stop'
   | 'terminal'
+  | 'stats'
+  | 'timeline'
+  | 'book'
+  | 'search'
+  | 'command'
 
 type AppIconProps = {
   name: AppIconName
@@ -164,6 +169,48 @@ function IconPath({ name }: { name: AppIconName }) {
       )
     case 'stop':
       return <rect x="7" y="7" width="10" height="10" rx="1.5" />
+    case 'stats':
+      return (
+        <>
+          <path d="M4 20V10" />
+          <path d="M10 20V4" />
+          <path d="M16 20v-7" />
+          <path d="M22 20H2" />
+        </>
+      )
+    case 'timeline':
+      return (
+        <>
+          <path d="M12 3v18" />
+          <circle cx="12" cy="7" r="2" />
+          <circle cx="12" cy="17" r="2" />
+          <path d="M4 7h6M14 7h6M4 17h6M14 17h6" strokeDasharray="0" />
+        </>
+      )
+    case 'book':
+      return (
+        <>
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </>
+      )
+    case 'search':
+      return (
+        <>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.3-4.3" />
+        </>
+      )
+    case 'command':
+      return (
+        <>
+          <path d="M9 9h6v6H9z" />
+          <path d="M9 9V6a3 3 0 1 0-3 3h3z" />
+          <path d="M15 9V6a3 3 0 1 1 3 3h-3z" />
+          <path d="M9 15v3a3 3 0 1 1-3-3h3z" />
+          <path d="M15 15v3a3 3 0 1 0 3-3h-3z" />
+        </>
+      )
     default:
       return null
   }

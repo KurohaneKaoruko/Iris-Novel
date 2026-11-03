@@ -1,5 +1,5 @@
 /**
- * 右下悬浮快速操作（FAB）：新建章节 / 保存 / 导出 / 沉浸模式。
+ * 右下悬浮快速操作（FAB）：新建章节 / 保存 / 导出 / 拆书 / 命令面板 / 沉浸模式。
  * 玻璃菜单 + 主按钮旋转；仅工作台视图渲染。
  */
 
@@ -12,11 +12,15 @@ type Props = {
   onNewChapter: () => void
   onSave: () => void
   onExport: () => void
+  onBookAnalyze: () => void
+  onCommandPalette: () => void
   onImmersive: () => void
   labels: {
     newChapter: string
     save: string
     export: string
+    bookAnalyzer: string
+    commandPalette: string
     immersive: string
   }
 }
@@ -28,6 +32,8 @@ export function FabQuickActions({
   onNewChapter,
   onSave,
   onExport,
+  onBookAnalyze,
+  onCommandPalette,
   onImmersive,
   labels,
 }: Props) {
@@ -49,6 +55,8 @@ export function FabQuickActions({
     { key: 'new', label: labels.newChapter, run: onNewChapter },
     { key: 'save', label: labels.save, disabled: !canSave, run: onSave },
     { key: 'export', label: labels.export, disabled: !canExport, run: onExport },
+    { key: 'book-analyze', label: labels.bookAnalyzer, run: onBookAnalyze },
+    { key: 'command-palette', label: `${labels.commandPalette} (Ctrl+K)`, run: onCommandPalette },
     {
       key: 'immersive',
       label: labels.immersive,

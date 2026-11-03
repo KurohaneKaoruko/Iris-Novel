@@ -113,6 +113,37 @@
   color: var(--text-muted);
 }
 
+.history-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.history-view-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-view-toggle.active {
+  background: var(--bg-active, var(--bg-hover));
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+.history-timeline-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .history-layout {
   flex: 1;
   min-height: 0;

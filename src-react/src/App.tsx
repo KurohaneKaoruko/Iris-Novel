@@ -89,6 +89,11 @@ import { HistoryPanel } from './components/HistoryPanel'
 import { AppIcon } from './components/icons/AppIcon'
 import { AIChatPanel } from './components/chat/AIChatPanel'
 import { AgentCliPanel } from './components/AgentCliPanel'
+import { BookAnalyzer } from './components/BookAnalyzer'
+import { CommandPalette, type CommandItem } from './components/CommandPalette'
+import { StatsPanel } from './components/StatsPanel'
+import { ProgressTracker } from './components/ProgressTracker'
+import { NotificationContainer, useNotifications } from './components/Notification'
 import { ExportPanel, type ExportOptions } from './components/Export'
 import {
   COMMON_PROVIDER_PRESETS,
@@ -599,6 +604,8 @@ function App() {
   // Modern UI State
   const initialUISettings = uiSettingsManager.getSettings() as UISettingsState
   const [showSearchPanel, setShowSearchPanel] = useState(false)
+  const [showBookAnalyzer, setShowBookAnalyzer] = useState(false)
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [theme, setTheme] = useState<'light' | 'dark'>(initialUISettings.theme)
   const [uiDensity, setUiDensity] = useState<'compact' | 'comfortable'>(initialUISettings.density)
   const [uiMotion, setUiMotion] = useState<'full' | 'reduced'>(initialUISettings.motion)
@@ -616,7 +623,7 @@ function App() {
 
   // Activity Bar State
   const [activeSidebarTab, setActiveSidebarTab] = useState<'files' | 'history' | 'chapters' | 'characters' | 'plotlines' | 'risk'>('characters')
-  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | 'writing-goal' | 'agent-cli' | null>('chat')
+  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'graph' | 'writing-goal' | 'stats' | 'agent-cli' | null>('chat')
 
   // Workspace & Files
   const [appView, setAppView] = useState<'bookshelf' | 'studio'>('bookshelf')
@@ -652,6 +659,9 @@ function App() {
   const [immersiveMode, setImmersiveMode] = useState(false)
   const [injectionPlan, setInjectionPlan] = useState<InjectionPlan | null>(null)
   const [injectionRemovedKeys, setInjectionRemovedKeys] = useState<Set<string>>(new Set())
+
+  // 全局通知（保存/导出/AI 完成等操作的即时反馈）
+  const { notifications, addNotification, removeNotification } = useNotifications()
 
   // New state for model modal
   const [showModelModal, setShowModelModal] = useState(false)
@@ -1309,7 +1319,7 @@ function App() {
   )
 
   const toggleRightTab = useCallback(
-    (tab: 'chat' | 'graph' | 'writing-goal' | 'agent-cli') => {
+    (tab: 'chat' | 'graph' | 'writing-goal' | 'stats' | 'agent-cli') => {
       setActiveRightTab((prev) => {
         const next = prev === tab ? null : tab
         if (next === 'graph') {
@@ -1524,6 +1534,7 @@ function App() {
       clearAutoSavedContent(activeFile.path)
 
       await refreshTree()
+      addNotification({ type: 'success', message: t('app.notify.saved', { name: activeFile.name }) })
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e))
 
@@ -1547,6 +1558,8 @@ function App() {
         },
       })
 
+      addNotification({ type: 'error', message: error.message, title: t('app.notify.saveFailed') })
+
       // Keep dirty flag if save failed
       if (result === 'cancel') {
         setError(error.message)
@@ -1554,7 +1567,7 @@ function App() {
     } finally {
       setBusy(false)
     }
-  }, [activeFile, refreshTree])
+  }, [activeFile, refreshTree, addNotification, t])
 
   const showConfirm = useCallback(async (text: string): Promise<boolean> => {
     const { dialogConfirm } = await import('./transport')
@@ -1910,8 +1923,10 @@ function App() {
       const { exportWork } = await import('./services/ExportService')
       const result = await exportWork(options)
       setShowExportPanel(false)
-      await showErrorDialog(
-        result.downloaded
+      addNotification({
+        type: 'success',
+        title: t('app.notify.exportDone'),
+        message: result.downloaded
           ? t('app.export.done.downloaded', {
               name: result.fileName,
               count: result.chapterCount,
@@ -1922,14 +1937,18 @@ function App() {
               count: result.chapterCount,
               chars: result.totalChars,
             }),
-      )
+      })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      await showErrorDialog(`${t('app.export.failed')}：${msg.includes('no chapters') ? t('app.export.empty') : msg}`)
+      addNotification({
+        type: 'error',
+        title: t('app.notify.exportFailed'),
+        message: msg.includes('no chapters') ? t('app.export.empty') : msg,
+      })
     } finally {
       setExportBusy(false)
     }
-  }, [workRoot, showErrorDialog, t])
+  }, [workRoot, addNotification, t])
 
   const persistAppSettings = useCallback(
     async (next: AppSettings, prev?: AppSettings | null) => {
@@ -3954,6 +3973,16 @@ function App() {
         setShowSearchPanel(true)
         return
       }
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setShowCommandPalette(true)
+        return
+      }
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        setShowBookAnalyzer(true)
+        return
+      }
       if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault()
         setShowSearchPanel(true)
@@ -4064,6 +4093,119 @@ function App() {
       ctx.fillText(p.name, p.x, p.y)
     }
   }, [activeRightTab, graphNodes, graphEdges]) // Re-render when tab changes or data changes
+
+  // --- 命令面板条目（Ctrl+K） ---
+  const commandPaletteItems: CommandItem[] = useMemo(() => {
+    const items: CommandItem[] = [
+      {
+        id: 'new-chapter',
+        title: t('app.action.newChapter'),
+        category: t('app.command.category.writing'),
+        icon: '📝',
+        disabled: !workRoot,
+        run: () => void onNewChapter(),
+      },
+      {
+        id: 'save',
+        title: t('app.action.save'),
+        category: t('app.command.category.writing'),
+        shortcut: 'Ctrl+S',
+        icon: '💾',
+        disabled: !activeFile?.dirty,
+        run: () => void onSaveActive(),
+      },
+      {
+        id: 'search',
+        title: t('app.action.search'),
+        category: t('app.command.category.writing'),
+        shortcut: 'Ctrl+F',
+        icon: '🔍',
+        run: () => setShowSearchPanel(true),
+      },
+      {
+        id: 'book-analyzer',
+        title: t('app.panel.bookAnalyzer'),
+        category: t('app.command.category.ai'),
+        shortcut: 'Ctrl+P',
+        icon: '📖',
+        run: () => setShowBookAnalyzer(true),
+      },
+      {
+        id: 'export',
+        title: t('app.action.export'),
+        category: t('app.command.category.writing'),
+        icon: '📤',
+        disabled: !workRoot,
+        run: () => setShowExportPanel(true),
+      },
+      {
+        id: 'settings',
+        title: t('common.settings'),
+        icon: '⚙️',
+        run: () => {
+          setShowSettings(true)
+          if (!appSettings) void reloadAppSettings()
+        },
+      },
+      {
+        id: 'toggle-sidebar',
+        title: t('app.action.toggleSidebar'),
+        shortcut: 'Ctrl+B',
+        icon: '▤',
+        run: toggleSidebar,
+      },
+      {
+        id: 'immersive',
+        title: t('app.action.immersive'),
+        icon: '🌙',
+        run: () => setImmersiveMode((v) => !v),
+      },
+      {
+        id: 'bookshelf',
+        title: t('app.action.openProjectPicker'),
+        icon: '📚',
+        run: () => {
+          setAppView('bookshelf')
+          void refreshBookshelfState()
+        },
+      },
+    ]
+    // 面板切换
+    const panelEntries: Array<{ id: string; title: string; run: () => void }> = [
+      { id: 'panel-chat', title: t('app.panel.aiChat'), run: () => toggleRightTab('chat') },
+      { id: 'panel-graph', title: t('app.panel.characterGraph'), run: () => toggleRightTab('graph') },
+      { id: 'panel-writing-goal', title: t('app.panel.writingGoal'), run: () => toggleRightTab('writing-goal') },
+      { id: 'panel-stats', title: t('app.panel.stats'), run: () => toggleRightTab('stats') },
+      { id: 'panel-agent-cli', title: t('app.panel.agentCli'), run: () => toggleRightTab('agent-cli') },
+      { id: 'panel-files', title: t('app.activity.workspaceStructure'), run: () => toggleSidebarTab('files') },
+      { id: 'panel-characters', title: t('app.activity.characters'), run: () => toggleSidebarTab('characters') },
+      { id: 'panel-plotlines', title: t('app.activity.plotLines'), run: () => toggleSidebarTab('plotlines') },
+      { id: 'panel-risk', title: t('app.activity.riskReview'), run: () => toggleSidebarTab('risk') },
+      { id: 'panel-history', title: t('app.activity.history'), run: () => toggleSidebarTab('history') },
+    ]
+    for (const entry of panelEntries) {
+      items.push({
+        id: entry.id,
+        title: entry.title,
+        category: t('app.command.category.panel'),
+        icon: '🗔',
+        run: entry.run,
+      })
+    }
+    return items
+  }, [
+    t,
+    workRoot,
+    activeFile,
+    appSettings,
+    onNewChapter,
+    onSaveActive,
+    toggleSidebar,
+    toggleRightTab,
+    toggleSidebarTab,
+    refreshBookshelfState,
+    reloadAppSettings,
+  ])
 
   // --- Render ---
 
@@ -4291,6 +4433,13 @@ function App() {
           <div className="editor-tabs-actions">
             <button className="icon-button" disabled={!workRoot} onClick={() => void onNewChapter()} title={t('app.action.newChapter')}>
               <AppIcon name="add" size={14} />
+            </button>
+            <button
+              className="icon-button"
+              onClick={() => setShowBookAnalyzer(true)}
+              title={t('app.panel.bookAnalyzer')}
+            >
+              <AppIcon name="book" size={15} />
             </button>
             <button
               className="icon-button"
@@ -4547,6 +4696,13 @@ function App() {
               />
             ) : null}
 
+            {activeRightTab === 'stats' ? (
+              <div className="right-stats-stack">
+                <ProgressTracker />
+                <StatsPanel />
+              </div>
+            ) : null}
+
             {activeRightTab === 'agent-cli' ? <AgentCliPanel workspaceRoot={workRoot} /> : null}
           </div>
         }
@@ -4584,6 +4740,13 @@ function App() {
             title={t('app.panel.writingGoal')}
           >
             <span className="right-activity-icon"><AppIcon name="target" /></span>
+          </div>
+          <div
+            className={`right-activity-item ${activeRightTab === 'stats' ? 'active' : ''}`}
+            onClick={() => toggleRightTab('stats')}
+            title={t('app.panel.stats')}
+          >
+            <span className="right-activity-icon"><AppIcon name="stats" /></span>
           </div>
           <div
             className={`right-activity-item ${activeRightTab === 'agent-cli' ? 'active' : ''}`}
@@ -5487,11 +5650,15 @@ function App() {
         onNewChapter={() => void onNewChapter()}
         onSave={() => void onSaveActive()}
         onExport={() => setShowExportPanel(true)}
+        onBookAnalyze={() => setShowBookAnalyzer(true)}
+        onCommandPalette={() => setShowCommandPalette(true)}
         onImmersive={() => setImmersiveMode((v) => !v)}
         labels={{
           newChapter: t('app.action.newChapter'),
           save: t('app.action.save'),
           export: t('app.action.export'),
+          bookAnalyzer: t('app.panel.bookAnalyzer'),
+          commandPalette: t('app.action.commandPalette'),
           immersive: t('layout.enterImmersive'),
         }}
       />
@@ -5600,6 +5767,16 @@ function App() {
         busy={exportBusy}
         workspaceName={activeWorkLabel ?? ''}
       />
+
+      <BookAnalyzer isOpen={showBookAnalyzer} onClose={() => setShowBookAnalyzer(false)} />
+
+      <CommandPalette
+        isOpen={showCommandPalette}
+        items={commandPaletteItems}
+        onClose={() => setShowCommandPalette(false)}
+      />
+
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
     </div>
   )
 }

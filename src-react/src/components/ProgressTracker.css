@@ -1,177 +1,98 @@
+/* 写作进度追踪 —— 三环布局 */
+
 .progress-tracker {
   padding: 16px;
-}
-
-.progress-section {
-  margin-bottom: 16px;
-}
-
-.progress-section:last-of-type {
-  margin-bottom: 16px;
-}
-
-.progress-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.progress-tracker-header {
+  display: flex;
   align-items: center;
-  margin-bottom: 6px;
+  justify-content: space-between;
 }
 
-.progress-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary, #666);
-}
-
-.progress-value {
+.progress-tracker-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent-primary, #d0d0d0);
+  color: var(--text-secondary, #999);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.progress-bar {
-  height: 6px;
-  background: var(--bg-hover, #e0e0e0);
-  border-radius: 3px;
-  overflow: hidden;
+.progress-tracker-refresh {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #777);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.progress-bar.daily {
-  background: var(--bg-hover, #ededed);
+.progress-tracker-refresh:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(127, 127, 127, 0.15));
+  color: var(--text-primary, #eee);
 }
 
-.progress-bar.chapters {
-  background: var(--bg-hover, #f1f1f1);
+.progress-tracker-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.progress-bar-fill {
-  height: 100%;
-  background: var(--accent-primary, #d0d0d0);
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.progress-bar.daily .progress-bar-fill {
-  background: #6e6e6e;
-}
-
-.progress-bar.chapters .progress-bar-fill {
-  background: #888888;
-}
-
-.progress-stats {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--text-muted, #999);
-}
-
-/* Quick Stats */
-.progress-quick-stats {
+.progress-rings {
   display: flex;
   justify-content: space-around;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle, #eee);
-  margin-top: 8px;
+  gap: 8px;
 }
 
-.quick-stat {
+.progress-ring-item {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
-.quick-stat-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary, #333);
-}
-
-.quick-stat-label {
-  font-size: 10px;
-  color: var(--text-muted, #999);
-  margin-top: 2px;
-}
-
-/* Compact */
-.progress-tracker-compact {
-  padding: 8px 12px;
-}
-
-.compact-item {
+.progress-ring {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  justify-content: center;
+  position: relative;
 }
 
-.compact-item:last-child {
-  margin-bottom: 0;
+.progress-ring-inner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg-primary, #1a1d28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.compact-label {
+.progress-ring-percent {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary, #eee);
+}
+
+.progress-ring-label {
   font-size: 11px;
-  color: var(--text-secondary, #666);
-  width: 36px;
+  color: var(--text-muted, #888);
 }
 
-.compact-bar {
-  flex: 1;
-  height: 4px;
-  background: var(--bg-hover, #e0e0e0);
-  border-radius: 2px;
+.progress-ring-value {
+  font-size: 10px;
+  color: var(--text-secondary, #aaa);
+  max-width: 90px;
   overflow: hidden;
-}
-
-.compact-bar.daily {
-  background: #ededed;
-}
-
-.compact-bar-fill {
-  height: 100%;
-  background: var(--accent-primary, #d0d0d0);
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-
-.compact-bar.daily .compact-bar-fill {
-  background: #6e6e6e;
-}
-
-.compact-value {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-primary, #333);
-  width: 32px;
-  text-align: right;
-}
-
-/* Dark mode */
-[data-theme="dark"] .progress-bar {
-  background: #333;
-}
-
-[data-theme="dark"] .progress-bar.daily {
-  background: #242424;
-}
-
-[data-theme="dark"] .progress-bar.chapters {
-  background: #282828;
-}
-
-[data-theme="dark"] .progress-quick-stats {
-  border-color: #333;
-}
-
-[data-theme="dark"] .quick-stat-value {
-  color: #e0e0e0;
-}
-
-[data-theme="dark"] .compact-bar {
-  background: #333;
-}
-
-[data-theme="dark"] .compact-bar.daily {
-  background: #242424;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

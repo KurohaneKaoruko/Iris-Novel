@@ -20,6 +20,15 @@
   display: flex;
   position: relative;
   padding-bottom: 20px;
+  cursor: default;
+}
+
+.timeline-item.clickable {
+  cursor: pointer;
+}
+
+.timeline-item.clickable:hover .timeline-title {
+  color: var(--accent-primary, currentColor);
 }
 
 .timeline-item:last-child {

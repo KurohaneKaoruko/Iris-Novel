@@ -1,6 +1,10 @@
-'use client'
+/**
+ * 写作进度追踪：总目标 / 日更目标 / 章节完成三环进度。
+ * 数据来自 WorkStatsService.getProgress；目标值可由外部注入。
+ */
 
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { workStatsService } from '../services/WorkStatsService'
 import './ProgressTracker.css'
 
 export type WritingProgress = {
@@ -13,119 +17,95 @@ export type WritingProgress = {
 }
 
 type ProgressTrackerProps = {
-  progress: WritingProgress
+  progress?: WritingProgress
+  /** 作品目标字数（如 100 万），不传则总目标环显示占位 */
+  targetWords?: number
 }
 
-export function ProgressTracker({ progress }: ProgressTrackerProps) {
-  const { totalWords, targetWords, chapters, completedChapters, dailyTarget, todayWords } = progress
-
-  const totalProgress = useMemo(() => {
-    if (targetWords <= 0) return 0
-    return Math.min(100, Math.round((totalWords / targetWords) * 100))
-  }, [totalWords, targetWords])
-
-  const dailyProgress = useMemo(() => {
-    if (dailyTarget <= 0) return 0
-    return Math.min(100, Math.round((todayWords / dailyTarget) * 100))
-  }, [todayWords, dailyTarget])
-
-  const chapterProgress = useMemo(() => {
-    if (chapters <= 0) return 0
-    return Math.round((completedChapters / chapters) * 100)
-  }, [completedChapters, chapters])
-
+function ProgressRing({ percent, label, value }: { percent: number; label: string; value: string }) {
+  const clamped = Math.max(0, Math.min(100, percent))
   return (
-    <div className="progress-tracker">
-      {/* Overall Progress */}
-      <div className="progress-section">
-        <div className="progress-header">
-          <span className="progress-label">总进度</span>
-          <span className="progress-value">{totalProgress}%</span>
-        </div>
-        <div className="progress-bar">
-          <div className="progress-bar-fill" style={{ width: `${totalProgress}%` }} />
-        </div>
-        <div className="progress-stats">
-          <span>{totalWords.toLocaleString()} / {targetWords.toLocaleString()} 字</span>
+    <div className="progress-ring-item">
+      <div
+        className="progress-ring"
+        style={{ background: `conic-gradient(var(--accent-primary, #7aa2f7) ${clamped * 3.6}deg, var(--bg-secondary, rgba(127,127,127,0.15)) 0deg)` }}
+      >
+        <div className="progress-ring-inner">
+          <span className="progress-ring-percent">{clamped}%</span>
         </div>
       </div>
-
-      {/* Daily Progress */}
-      <div className="progress-section">
-        <div className="progress-header">
-          <span className="progress-label">今日</span>
-          <span className="progress-value">{dailyProgress}%</span>
-        </div>
-        <div className="progress-bar daily">
-          <div className="progress-bar-fill" style={{ width: `${dailyProgress}%` }} />
-        </div>
-        <div className="progress-stats">
-          <span>{todayWords.toLocaleString()} / {dailyTarget.toLocaleString()} 字</span>
-        </div>
-      </div>
-
-      {/* Chapter Progress */}
-      <div className="progress-section">
-        <div className="progress-header">
-          <span className="progress-label">章节</span>
-          <span className="progress-value">{chapterProgress}%</span>
-        </div>
-        <div className="progress-bar chapters">
-          <div className="progress-bar-fill" style={{ width: `${chapterProgress}%` }} />
-        </div>
-        <div className="progress-stats">
-          <span>{completedChapters} / {chapters} 章</span>
-        </div>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="progress-quick-stats">
-        <div className="quick-stat">
-          <span className="quick-stat-value">{chapters}</span>
-          <span className="quick-stat-label">章节</span>
-        </div>
-        <div className="quick-stat">
-          <span className="quick-stat-value">{Math.round(totalWords / 10000 * 10) / 10}万</span>
-          <span className="quick-stat-label">总字数</span>
-        </div>
-        <div className="quick-stat">
-          <span className="quick-stat-value">{Math.max(0, targetWords - totalWords).toLocaleString()}</span>
-          <span className="quick-stat-label">剩余</span>
-        </div>
-      </div>
+      <span className="progress-ring-label">{label}</span>
+      <span className="progress-ring-value">{value}</span>
     </div>
   )
 }
 
-// Compact version for sidebar
-export function ProgressTrackerCompact({ progress }: ProgressTrackerProps) {
-  const { totalWords, targetWords, dailyTarget, todayWords } = progress
+export function ProgressTracker({ progress: progressProp, targetWords }: ProgressTrackerProps) {
+  const [progress, setProgress] = useState<WritingProgress | null>(progressProp ?? null)
+  const [loading, setLoading] = useState(false)
 
-  const totalProgress = useMemo(() => {
-    if (targetWords <= 0) return 0
-    return Math.min(100, Math.round((totalWords / targetWords) * 100))
-  }, [totalWords, targetWords])
+  const refresh = useCallback(async () => {
+    if (typeof targetWords !== 'number') return
+    setLoading(true)
+    try {
+      setProgress(await workStatsService.getProgress(targetWords))
+    } catch {
+      /* 静默降级：保留上次数据 */
+    } finally {
+      setLoading(false)
+    }
+  }, [targetWords])
 
-  const dailyProgress = useMemo(() => {
-    if (dailyTarget <= 0) return 0
-    return Math.min(100, Math.round((todayWords / dailyTarget) * 100))
-  }, [todayWords, dailyTarget])
+  useEffect(() => {
+    if (!progressProp) void refresh()
+  }, [progressProp, refresh])
+
+  const derived = useMemo(() => {
+    const p =
+      progress ??
+      ({ totalWords: 0, targetWords: 0, chapters: 0, completedChapters: 0, dailyTarget: 0, todayWords: 0 } as WritingProgress)
+    const totalProgress = p.targetWords > 0 ? Math.min(100, Math.round((p.totalWords / p.targetWords) * 100)) : 0
+    const dailyProgress = p.dailyTarget > 0 ? Math.min(100, Math.round((p.todayWords / p.dailyTarget) * 100)) : 0
+    const chapterProgress = p.chapters > 0 ? Math.round((p.completedChapters / p.chapters) * 100) : 0
+    return { p, totalProgress, dailyProgress, chapterProgress }
+  }, [progress])
+
+  if (!progress && !loading) {
+    return null
+  }
+
+  const { p, totalProgress, dailyProgress, chapterProgress } = derived
 
   return (
-    <div className="progress-tracker-compact">
-      <div className="compact-item">
-        <span className="compact-label">总进度</span>
-        <div className="compact-bar">
-          <div className="compact-bar-fill" style={{ width: `${totalProgress}%` }} />
-        </div>
-        <span className="compact-value">{totalProgress}%</span>
+    <div className="progress-tracker">
+      <div className="progress-tracker-header">
+        <span className="progress-tracker-title">写作进度</span>
+        <button
+          type="button"
+          className="progress-tracker-refresh"
+          onClick={() => void refresh()}
+          disabled={loading || typeof targetWords !== 'number'}
+          title="刷新进度"
+        >
+          {loading ? '…' : '↻'}
+        </button>
       </div>
-      <div className="compact-item">
-        <span className="compact-label">今日</span>
-        <div className="compact-bar daily">
-          <div className="compact-bar-fill" style={{ width: `${dailyProgress}%` }} />
-        </div>
-        <span className="compact-value">{dailyProgress}%</span>
+      <div className="progress-rings">
+        <ProgressRing
+          percent={totalProgress}
+          label="总目标"
+          value={p.targetWords > 0 ? `${p.totalWords.toLocaleString()} / ${p.targetWords.toLocaleString()}` : '未设置'}
+        />
+        <ProgressRing
+          percent={dailyProgress}
+          label="今日"
+          value={p.dailyTarget > 0 ? `${p.todayWords.toLocaleString()} / ${p.dailyTarget.toLocaleString()}` : '未设置'}
+        />
+        <ProgressRing
+          percent={chapterProgress}
+          label="章节"
+          value={`${p.completedChapters} / ${p.chapters}`}
+        />
       </div>
     </div>
   )

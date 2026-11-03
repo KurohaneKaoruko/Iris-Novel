@@ -564,7 +564,7 @@ export type ClimaxPoint = {
   description: string
 }
 
-export type 爽点 = {
+export type PowerMoment = {
   chapter: number
   type: string
   description: string
@@ -608,7 +608,7 @@ export type WritingTechnique = {
   application: string
 }
 
-export type Book拆书Result = {
+export type BookAnalysisReport = {
   title: string
   author: string | null
   source: string
@@ -616,7 +616,7 @@ export type Book拆书Result = {
   plot_arcs: PlotArc[]
   rhythm: RhythmAnalysis
   climax_points: ClimaxPoint[]
-  爽点列表: 爽点[]
+  power_moments: PowerMoment[]
   characters: CharacterAnalysis[]
   character_relationships: CharacterRelationship[]
   world_settings: WorldSetting[]
@@ -626,12 +626,14 @@ export type Book拆书Result = {
   learnable_points: string[]
 }
 
-export async function 拆书Analyze(content: string, title: string): Promise<Book拆书Result> {
-  return callCommand<Book拆书Result>('拆书_analyze', { content, title })
+/** 拆书：整体分析（结构/节奏/人物/世界观/技法），对应后端 book_analyze 命令 */
+export async function bookAnalyze(content: string, title: string): Promise<BookAnalysisReport> {
+  return callCommand<BookAnalysisReport>('book_analyze', { content, title })
 }
 
-export async function 拆书ExtractTechniques(content: string): Promise<WritingTechnique[]> {
-  return callCommand<WritingTechnique[]>('拆书_extract__echniques', { content })
+/** 拆书：仅提取写作技法，对应后端 book_extract_techniques 命令 */
+export async function bookExtractTechniques(content: string): Promise<WritingTechnique[]> {
+  return callCommand<WritingTechnique[]>('book_extract_techniques', { content })
 }
 
 // ============ External Agent CLI ============

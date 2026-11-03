@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useI18n } from '../i18n'
 import './Timeline.css'
 
 export type TimelineItem = {
@@ -17,6 +18,8 @@ type TimelineProps = {
 }
 
 export function Timeline({ items, onItemClick }: TimelineProps) {
+  const { locale } = useI18n()
+
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
       const dateA = new Date(a.date).getTime()
@@ -27,7 +30,7 @@ export function Timeline({ items, onItemClick }: TimelineProps) {
 
   const formatDate = (date: Date | string) => {
     const d = new Date(date)
-    return d.toLocaleDateString('zh-CN', {
+    return d.toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -56,7 +59,7 @@ export function Timeline({ items, onItemClick }: TimelineProps) {
     return (
       <div className="timeline-empty">
         <span className="timeline-empty-icon">📅</span>
-        <span>暂无时间线</span>
+        <span className="timeline-empty-text">暂无时间线</span>
       </div>
     )
   }
@@ -66,7 +69,7 @@ export function Timeline({ items, onItemClick }: TimelineProps) {
       {sortedItems.map((item, index) => (
         <div
           key={item.id}
-          className={`timeline-item ${getTypeClass(item.type)}`}
+          className={`timeline-item ${getTypeClass(item.type)} ${onItemClick ? 'clickable' : ''}`}
           onClick={() => onItemClick?.(item)}
         >
           <div className="timeline-dot">

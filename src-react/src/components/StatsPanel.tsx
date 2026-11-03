@@ -1,7 +1,15 @@
-'use client'
+/**
+ * 作品统计面板：总字数 / 章节数 / 日均等核心指标 + 长短板章节明细。
+ * 数据来自 WorkStatsService；可刷新。
+ */
 
-import { useMemo } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { workStatsService } from '../services/WorkStatsService'
 import './StatsPanel.css'
+
+type StatsPanelProps = {
+  stats?: WritingStats
+}
 
 export type WritingStats = {
   totalWords: number
@@ -15,28 +23,70 @@ export type WritingStats = {
   shortestChapter?: { title: string; words: number }
 }
 
-type StatsPanelProps = {
-  stats: WritingStats
+function formatWords(n: number): string {
+  if (n >= 10000) return `${(n / 10000).toFixed(1)} 万`
+  return n.toLocaleString()
 }
 
-export function StatsPanel({ stats }: StatsPanelProps) {
-  const wordCountFormatted = useMemo(() => {
-    if (stats.totalWords >= 10000) {
-      return `${(stats.totalWords / 10000).toFixed(1)} 万字`
-    }
-    return `${stats.totalWords.toLocaleString()} 字`
-  }, [stats.totalWords])
+export function StatsPanel({ stats: statsProp }: StatsPanelProps) {
+  const [stats, setStats] = useState<WritingStats | null>(statsProp ?? null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const avgFormatted = useMemo(() => {
-    return stats.avgWordsPerDay.toLocaleString()
-  }, [stats.avgWordsPerDay])
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const next = await workStatsService.getWorkStats()
+      setStats({
+        totalWords: next.totalWords,
+        chapterCount: next.chapterCount,
+        characterCount: 0,
+        conceptCount: next.conceptCount,
+        outlineCount: next.outlineCount,
+        daysWriting: next.daysWriting,
+        avgWordsPerDay: next.avgWordsPerDay,
+        longestChapter: next.longestChapter,
+        shortestChapter: next.shortestChapter,
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!statsProp) void refresh()
+  }, [statsProp, refresh])
+
+  if (error) {
+    return <div className="stats-panel stats-panel-error">{error}</div>
+  }
+
+  if (!stats) {
+    return <div className="stats-panel stats-panel-loading">统计加载中…</div>
+  }
 
   return (
     <div className="stats-panel">
+      <div className="stats-panel-header">
+        <span className="stats-panel-title">作品统计</span>
+        <button
+          type="button"
+          className="stats-panel-refresh"
+          onClick={() => void refresh()}
+          disabled={loading}
+          title="刷新统计"
+        >
+          {loading ? '…' : '↻'}
+        </button>
+      </div>
+
       {/* Main Stats */}
       <div className="stats-main">
         <div className="stats-main-item">
-          <span className="stats-main-value">{wordCountFormatted}</span>
+          <span className="stats-main-value">{formatWords(stats.totalWords)}</span>
           <span className="stats-main-label">总字数</span>
         </div>
         <div className="stats-main-divider" />
@@ -46,7 +96,7 @@ export function StatsPanel({ stats }: StatsPanelProps) {
         </div>
         <div className="stats-main-divider" />
         <div className="stats-main-item">
-          <span className="stats-main-value">{avgFormatted}</span>
+          <span className="stats-main-value">{stats.avgWordsPerDay.toLocaleString()}</span>
           <span className="stats-main-label">日均</span>
         </div>
       </div>
@@ -54,79 +104,33 @@ export function StatsPanel({ stats }: StatsPanelProps) {
       {/* Details */}
       <div className="stats-details">
         <div className="stats-detail">
-          <span className="stats-detail-icon">📄</span>
-          <span className="stats-detail-label">章节</span>
-          <span className="stats-detail-value">{stats.chapterCount}</span>
-        </div>
-        <div className="stats-detail">
-          <span className="stats-detail-icon">👤</span>
-          <span className="stats-detail-label">人物</span>
-          <span className="stats-detail-value">{stats.characterCount}</span>
-        </div>
-        <div className="stats-detail">
-          <span className="stats-detail-icon">📋</span>
-          <span className="stats-detail-label">设定</span>
           <span className="stats-detail-value">{stats.conceptCount}</span>
+          <span className="stats-detail-label">设定资料</span>
         </div>
         <div className="stats-detail">
-          <span className="stats-detail-icon">📑</span>
-          <span className="stats-detail-label">大纲</span>
           <span className="stats-detail-value">{stats.outlineCount}</span>
+          <span className="stats-detail-label">大纲文件</span>
         </div>
         <div className="stats-detail">
-          <span className="stats-detail-icon">📅</span>
-          <span className="stats-detail-label">创作天数</span>
           <span className="stats-detail-value">{stats.daysWriting}</span>
+          <span className="stats-detail-label">写作天数</span>
         </div>
-      </div>
-
-      {/* Chapter Stats */}
-      {(stats.longestChapter || stats.shortestChapter) && (
-        <div className="stats-chapters">
-          <h4 className="stats-chapters-title">章节之最</h4>
-          {stats.longestChapter && (
-            <div className="stats-chapter-stat">
-              <span className="stats-chapter-label">最长</span>
-              <span className="stats-chapter-title">{stats.longestChapter.title}</span>
-              <span className="stats-chapter-words">{stats.longestChapter.words.toLocaleString()}字</span>
-            </div>
-          )}
-          {stats.shortestChapter && (
-            <div className="stats-chapter-stat">
-              <span className="stats-chapter-label">最短</span>
-              <span className="stats-chapter-title">{stats.shortestChapter.title}</span>
-              <span className="stats-chapter-words">{stats.shortestChapter.words.toLocaleString()}字</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Progress Ring */}
-      <div className="stats-ring-container">
-        <svg className="stats-ring" viewBox="0 0 100 100">
-          <circle
-            className="stats-ring-bg"
-            cx="50"
-            cy="50"
-            r="45"
-            fill="none"
-            strokeWidth="8"
-          />
-          <circle
-            className="stats-ring-fill"
-            cx="50"
-            cy="50"
-            r="45"
-            fill="none"
-            strokeWidth="8"
-            strokeDasharray={`${Math.min(100, (stats.avgWordsPerDay / 5000) * 100) * 2.83} 283`}
-            transform="rotate(-90 50 50)"
-          />
-        </svg>
-        <div className="stats-ring-text">
-          <span className="stats-ring-value">{Math.min(100, Math.round((stats.avgWordsPerDay / 5000) * 100))}%</span>
-          <span className="stats-ring-label">日目标完成</span>
-        </div>
+        {stats.longestChapter ? (
+          <div className="stats-detail-wide">
+            <span className="stats-detail-label">最长章节</span>
+            <span className="stats-detail-text">
+              {stats.longestChapter.title}（{formatWords(stats.longestChapter.words)} 字）
+            </span>
+          </div>
+        ) : null}
+        {stats.shortestChapter ? (
+          <div className="stats-detail-wide">
+            <span className="stats-detail-label">最短章节</span>
+            <span className="stats-detail-text">
+              {stats.shortestChapter.title}（{formatWords(stats.shortestChapter.words)} 字）
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   )

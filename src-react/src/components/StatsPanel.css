@@ -1,5 +1,58 @@
+/* 作品统计面板 */
+
 .stats-panel {
-  padding: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stats-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stats-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #999);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stats-panel-refresh {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #777);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.stats-panel-refresh:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(127, 127, 127, 0.15));
+  color: var(--text-primary, #eee);
+}
+
+.stats-panel-refresh:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.stats-panel-loading,
+.stats-panel-error {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted, #777);
+}
+
+.stats-panel-error {
+  color: var(--danger, #e06c75);
 }
 
 /* Main Stats */
@@ -7,10 +60,10 @@
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 20px;
-  background: var(--accent-primary, #d0d0d0);
-  border-radius: 12px;
-  margin-bottom: 20px;
+  padding: 18px 12px;
+  background: var(--bg-secondary, rgba(127, 127, 127, 0.08));
+  border: 1px solid var(--border-subtle, rgba(127, 127, 127, 0.12));
+  border-radius: var(--radius-lg, 14px);
 }
 
 .stats-main-item {
@@ -20,145 +73,65 @@
 }
 
 .stats-main-value {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
-  color: var(--accent-contrast, #111111);
+  color: var(--text-primary, #eee);
 }
 
 .stats-main-label {
-  font-size: 12px;
-  color: var(--accent-contrast, #111111);
-  opacity: 0.78;
+  font-size: 11px;
+  color: var(--text-muted, #888);
   margin-top: 4px;
 }
 
 .stats-main-divider {
   width: 1px;
-  height: 40px;
-  background: var(--accent-contrast, #111111);
-  opacity: 0.32;
+  height: 36px;
+  background: var(--border-subtle, rgba(127, 127, 127, 0.2));
 }
 
 /* Details */
 .stats-details {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
 }
 
 .stats-detail {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px;
-  background: var(--bg-secondary, #f5f5f5);
-  border-radius: 8px;
-}
-
-.stats-detail-icon {
-  font-size: 20px;
-  margin-bottom: 4px;
+  padding: 10px 8px;
+  background: var(--bg-secondary, rgba(127, 127, 127, 0.06));
+  border-radius: var(--radius-md, 10px);
 }
 
 .stats-detail-label {
   font-size: 11px;
-  color: var(--text-secondary, #666);
+  color: var(--text-muted, #888);
 }
 
 .stats-detail-value {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
-  color: var(--text-primary, #333);
+  color: var(--text-primary, #ddd);
   margin-top: 2px;
 }
 
-/* Chapter Stats */
-.stats-chapters {
-  margin-bottom: 20px;
-}
-
-.stats-chapters-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary, #888);
-  margin: 0 0 12px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.stats-chapter-stat {
+.stats-detail-wide {
+  grid-column: 1 / -1;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: var(--bg-secondary, #f9f9f9);
-  border-radius: 6px;
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--bg-secondary, rgba(127, 127, 127, 0.06));
+  border-radius: var(--radius-md, 10px);
 }
 
-.stats-chapter-label {
-  font-size: 11px;
-  color: var(--text-muted, #999);
-  width: 32px;
-}
-
-.stats-chapter-title {
-  flex: 1;
+.stats-detail-text {
   font-size: 13px;
-  color: var(--text-primary, #333);
-  white-space: nowrap;
+  color: var(--text-primary, #ddd);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
-.stats-chapter-words {
-  font-size: 12px;
-  color: var(--accent-primary, #d0d0d0);
-  font-weight: 500;
-}
-
-/* Progress Ring */
-.stats-ring-container {
-  position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto;
-}
-
-.stats-ring {
-  width: 100%;
-  height: 100%;
-}
-
-.stats-ring-bg {
-  stroke: var(--bg-hover, #e0e0e0);
-}
-
-.stats-ring-fill {
-  stroke: var(--accent-primary, #d0d0d0);
-  stroke-linecap: round;
-  transition: stroke-dasharray 0.5s ease;
-}
-
-.stats-ring-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-}
-
-.stats-ring-value {
-  display: block;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary, #333);
-}
-
-.stats-ring-label {
-  font-size: 10px;
-  color: var(--text-muted, #999);
-}
-
-/* Theme is controlled by global tokens */

@@ -34,6 +34,18 @@ export default defineConfig(async () => ({
   build: {
     outDir: path.join(frontendRoot, 'dist'),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules')) {
+            if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) return 'vendor-charts'
+            if (id.includes('/lexical') || id.includes('@lexical/')) return 'vendor-lexical'
+            if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) return 'vendor-react'
+          }
+          return undefined
+        },
+      },
+    },
   },
   server: {
     host: '127.0.0.1',
