@@ -350,23 +350,19 @@ pub fn chat_cancel_stream(
   Ok(())
 }
 
-#[tauri::command]
-pub async fn ai_assistance_generate(
-  _app: AppHandle,
-  _state: State<'_, AppState>,
-  prompt: String,
-) -> Result<String, String> {
+/// 核心实现：不依赖 Tauri 运行时，供 Tauri 命令与 Web RPC 共用。
+pub async fn ai_assistance_generate_impl(prompt: String) -> Result<String, String> {
   let settings = app_settings::load()?;
   let client = crate::services::build_http_client()?;
 
   let current_provider = resolve_current_provider(&settings)?;
-  
+
   // Create a simple message for AI assistance
   let messages = vec![ChatMessage {
     role: "user".to_string(),
     content: prompt,
   }];
-  
+
   // Call the appropriate AI provider
   match current_provider.kind {
     app_settings::ProviderKind::OpenAI | app_settings::ProviderKind::OpenAICompatible => {
@@ -389,6 +385,15 @@ pub async fn ai_assistance_generate(
       ).await
     }
   }
+}
+
+#[tauri::command]
+pub async fn ai_assistance_generate(
+  _app: AppHandle,
+  _state: State<'_, AppState>,
+  prompt: String,
+) -> Result<String, String> {
+  ai_assistance_generate_impl(prompt).await
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -631,14 +636,13 @@ fn append_risk_scan_log(root: &Path, entry: serde_json::Value) -> Result<(), Str
     .map_err(|e| format!("append risk log failed: {e}"))
 }
 
-#[tauri::command]
-pub async fn risk_scan_content(
-  _app: AppHandle,
-  state: State<'_, AppState>,
+/// 核心实现：不依赖 Tauri 运行时，供 Tauri 命令与 Web RPC 共用。
+pub async fn risk_scan_content_impl(
+  state: &AppState,
   file_path: Option<String>,
   content: String,
 ) -> Result<RiskScanResult, String> {
-  let root = get_workspace_root(&state)?;
+  let root = get_workspace_root(state)?;
   let trimmed = content.trim();
   if trimmed.is_empty() {
     return Err("content is empty".to_string());
@@ -716,6 +720,16 @@ pub async fn risk_scan_content(
     }),
   );
   Ok(result)
+}
+
+#[tauri::command]
+pub async fn risk_scan_content(
+  _app: AppHandle,
+  state: State<'_, AppState>,
+  file_path: Option<String>,
+  content: String,
+) -> Result<RiskScanResult, String> {
+  risk_scan_content_impl(&state, file_path, content).await
 }
 
 pub(crate) fn normalize_plaintext(s: &str) -> String {

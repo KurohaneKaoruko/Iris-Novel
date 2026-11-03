@@ -45,7 +45,6 @@ export function ProgressTracker({ progress: progressProp, targetWords }: Progres
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async () => {
-    if (typeof targetWords !== 'number') return
     setLoading(true)
     try {
       setProgress(await workStatsService.getProgress(targetWords))
@@ -84,7 +83,7 @@ export function ProgressTracker({ progress: progressProp, targetWords }: Progres
           type="button"
           className="progress-tracker-refresh"
           onClick={() => void refresh()}
-          disabled={loading || typeof targetWords !== 'number'}
+          disabled={loading}
           title="刷新进度"
         >
           {loading ? '…' : '↻'}

@@ -390,6 +390,52 @@ pub async fn dispatch(ctx: &ServerContext, command: &str, args: Value) -> Result
       serde_json::to_value(v).map_err(|e| e.to_string())
     }
 
+    // ---- AI / 风险 / 拆书 ----
+    "risk_scan_content" => {
+      let file_path = arg_opt_str(&args, &["filePath", "file_path"]);
+      let content = arg_str(&args, &["content"])?;
+      let v = crate::commands::risk_scan_content_impl(state, file_path, content).await?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "ai_assistance_generate" => {
+      let prompt = arg_str(&args, &["prompt"])?;
+      let v = crate::commands::ai_assistance_generate_impl(prompt).await?;
+      Ok(json!(v))
+    }
+    "analyze_book" => {
+      let content = arg_str(&args, &["content"])?;
+      let title = arg_str(&args, &["title"])?;
+      let v = crate::commands::analyze_book(content, title).await?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "split_book" => {
+      let content = arg_str(&args, &["content"])?;
+      let title = arg_str(&args, &["title"])?;
+      let config = arg_t::<crate::book_split::BookSplitConfig>(&args, "config")?;
+      let v = crate::commands::split_book(content, title, config).await?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "extract_chapters" => {
+      let content = arg_str(&args, &["content"])?;
+      let v = crate::commands::extract_chapters(content).await?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "book_analyze" => {
+      let content = arg_str(&args, &["content"])?;
+      let title = arg_str(&args, &["title"])?;
+      let v = crate::commands::book_analyze(content, title).await?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "book_extract_techniques" => {
+      let content = arg_str(&args, &["content"])?;
+      let v = crate::commands::book_extract_techniques(content).await?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "ai_analyze_book_deep" | "ai_split_by_ai" => {
+      // 占位实现：需要配置 Provider 后才有真实能力，保持与桌面端一致返回提示文本
+      Ok(json!("AI analysis requires a configured provider and key."))
+    }
+
     _ => Err(format!("unknown command: {command}")),
   }
 }

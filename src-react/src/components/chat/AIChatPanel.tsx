@@ -725,8 +725,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
   useEffect(() => {
     let cancelled = false
     import('../../tauri')
-      .then(({ getSkills, isTauriApp }) => {
-        if (!isTauriApp()) return
+      .then(({ getSkills }) => {
         return getSkills().then((skills) => {
           if (!cancelled) {
             setAvailableSkills(
@@ -736,7 +735,7 @@ export function AIChatPanel(props: AIChatPanelProps) {
         })
       })
       .catch(() => {
-        // 非 Tauri 环境或加载失败：保持空技能表，/skill 指令不可用
+        // 加载失败：保持空技能表，/skill 指令不可用
       })
     return () => {
       cancelled = true

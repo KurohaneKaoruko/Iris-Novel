@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { dialogConfirm } from '../transport'
 import {
   createHistorySnapshot,
-  isTauriApp,
   listHistoryEntries,
   readHistorySnapshot,
   restoreHistorySnapshot,
@@ -76,7 +75,7 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
   )
 
   const refresh = useCallback(async () => {
-    if (!workRoot || !isTauriApp()) {
+    if (!workRoot) {
       setEntries([])
       setSelectedId(null)
       setPreview('')
@@ -100,7 +99,7 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
 
   const loadPreview = useCallback(
     async (id: string) => {
-      if (!workRoot || !isTauriApp()) return
+      if (!workRoot) return
       setSelectedId(id)
       try {
         const text = await readHistorySnapshot(id)
@@ -114,7 +113,7 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
   )
 
   const handleCreateManualSnapshot = useCallback(async () => {
-    if (!activePath || !workRoot || !isTauriApp()) return
+    if (!activePath || !workRoot) return
     setActionBusy(true)
     try {
       const created = await createHistorySnapshot(activePath, 'manual')
@@ -130,7 +129,7 @@ export function HistoryPanel({ workRoot, activePath, onOpenPath, onAfterRestore 
 
   const handleRestore = useCallback(
     async (entry: HistoryEntry) => {
-      if (!workRoot || !isTauriApp()) return
+      if (!workRoot) return
       const ok = await dialogConfirm(
         t('history.restoreConfirm', {
           path: entry.file_path,

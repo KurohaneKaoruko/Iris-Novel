@@ -110,19 +110,29 @@ function InitialContentPlugin({
   onChange: (content: string, editor: LexicalEditorType) => void
 }) {
   const [editor] = useLexicalComposerContext()
-  
+
+  // 外部内容（initialContent prop）→ 编辑器 同步。
+  // 仅当编辑器真实文本与 prop 不一致时才重建文档，避免反馈循环。
   useEffect(() => {
-    // Skip full-document sync when this change came from local editor input.
+    editor.getEditorState().read(() => {
+      const current = $getRoot().getTextContent()
+      lastEditorContentRef.current = current
+    })
     if (content === lastEditorContentRef.current) {
       return
     }
+
     editor.update(() => {
       const root = $getRoot()
       root.clear()
-      
-      // Split content by newlines and create paragraphs
+
+      // Split content by newlines and create paragraphs.
+      // 连续空行折叠为段落间隔，避免空段落往返（getTextContent）时产生 \n\n 膨胀。
       const lines = content.split('\n')
-      lines.forEach((line) => {
+      lines.forEach((line, index) => {
+        if (!line && index > 0 && index < lines.length - 1) {
+          return
+        }
         const paragraph = $createParagraphNode()
         if (line) {
           paragraph.append($createTextNode(line))
@@ -130,15 +140,21 @@ function InitialContentPlugin({
         root.append(paragraph)
       })
     })
+  }, [editor, content, lastEditorContentRef])
 
-    editor.getEditorState().read(() => {
-      const root = $getRoot()
-      const textContent = root.getTextContent()
+  // 编辑器 → 外部（onChange）回传。在 update 提交后读取真实文本，
+  // 仅当与 prop 不一致时回写，杜绝 InitialContent → onChange → setState → 渲染循环。
+  useEffect(() => {
+    const unregister = editor.registerUpdateListener(({ editorState }) => {
+      const textContent = editorState.read(() => $getRoot().getTextContent())
       lastEditorContentRef.current = textContent
-      onChange(textContent, editor)
+      if (textContent !== content) {
+        onChange(textContent, editor)
+      }
     })
+    return unregister
   }, [editor, content, lastEditorContentRef, onChange])
-  
+
   return null
 }
 

@@ -785,7 +785,6 @@ function App() {
   // 技能清单（设置面板下拉用；桌面端从后端取，含子模块与内置）
   const [skillOptions, setSkillOptions] = useState<Array<{ id: string; name: string; category: string }>>([])
   useEffect(() => {
-    if (!isTauriApp()) return
     let cancelled = false
     getSkills()
       .then((skills) => {
@@ -1089,7 +1088,6 @@ function App() {
   }, [workRoot])
 
   const reloadAppSettings = useCallback(async () => {
-    if (!isTauriApp()) return
     try {
       const s = await getAppSettings()
       setAppSettingsState(s)
@@ -1138,14 +1136,14 @@ function App() {
   }, [])
 
   const refreshPlannerQueue = useCallback(async () => {
-    if (!workRoot || !isTauriApp()) return
+    if (!workRoot) return
     await novelPlannerService.ensurePlannerWorkspace()
     const queue = await novelPlannerService.loadRunQueue()
     setPlannerTasks(queue)
   }, [workRoot])
 
   const loadPlannerSession = useCallback(async () => {
-    if (!workRoot || !isTauriApp()) return
+    if (!workRoot) return
     await novelPlannerService.ensurePlannerWorkspace()
     const sessionId = chatSessionIdRef.current
     const session = await novelPlannerService.getSessionState(sessionId)
@@ -1206,7 +1204,7 @@ function App() {
 
   const ensurePlanningArtifacts = useCallback(
     async (mode: WriterMode, instruction?: string) => {
-      if (!workRoot || !isTauriApp()) return
+      if (!workRoot) return
       if (mode === 'normal') return
       await novelPlannerService.ensurePlannerWorkspace()
       await novelPlannerService.ensureMasterPlan(mode, {
@@ -1231,7 +1229,7 @@ function App() {
 
   const buildPromptByMode = useCallback(
     async (userInput: string, mode: WriterMode): Promise<string> => {
-      if (!workRoot || !isTauriApp()) return userInput
+      if (!workRoot) return userInput
       await novelPlannerService.ensurePlannerWorkspace()
       if (mode !== 'normal') {
         await ensurePlanningArtifacts(mode, userInput)
@@ -1372,7 +1370,6 @@ function App() {
 
   const onCreateProjectFromPicker = useCallback(
     async (name: string, description?: string) => {
-      if (!isTauriApp()) return
       setError(null)
       setBusy(true)
       try {
@@ -1396,7 +1393,6 @@ function App() {
 
   const onUpdateWorkDescriptionFromPicker = useCallback(
     async (path: string, description: string) => {
-      if (!isTauriApp()) return
       setError(null)
       try {
         await updateWorkDescription(path, description)
@@ -2134,7 +2130,7 @@ function App() {
         setAutoLongWriteEnabled(nextEnabled)
         autoLongWriteStopRef.current = !nextEnabled
         setAutoLongWriteStatus(nextEnabled ? 'Auto enabled.' : 'Auto disabled.')
-        if (!nextEnabled && activeStreamId && isTauriApp()) {
+        if (!nextEnabled && activeStreamId) {
           manualCancelledStreamsRef.current.add(activeStreamId)
           void import('./tauriChat')
             .then(({ chatCancelStream }) => chatCancelStream(activeStreamId))
@@ -2180,7 +2176,7 @@ function App() {
       setInjectionPlan(injectionPlanLocal)
       const applyRequestedMode = async (mode: WriterMode) => {
         if (mode === writerModeRef.current) return
-        if (!workRoot || !isTauriApp()) {
+        if (!workRoot) {
           setWriterMode(mode)
           writerModeRef.current = mode
           return
@@ -2242,7 +2238,7 @@ function App() {
       const effectiveSkillId = parsedDirective.skillId ?? (projectWritingSettings.defaultSkillId || null)
       if (effectiveSkillId) {
         try {
-          const skills = isTauriApp() ? await getSkills() : []
+          const skills = await getSkills()
           const skill = skills.find((s) => s.id.toLowerCase() === effectiveSkillId.toLowerCase())
           if (!skill) {
             // 仅显式指令才报错；默认技能失效（如子模块更新）静默降级
@@ -2334,7 +2330,7 @@ function App() {
         setChatInput('')
       }
 
-      if (!isTauriApp()) {
+      if (!workRoot) {
         cleanupStreamRefs(streamRefs, streamId)
         setChatMessages((prev) =>
           prev.map((m) =>
@@ -2451,7 +2447,7 @@ function App() {
   const onStopChat = useCallback(async () => {
     autoLongWriteStopRef.current = true
     setAutoLongWriteEnabled(false)
-    if (!activeStreamId || !isTauriApp()) return
+    if (!activeStreamId) return
     try {
       manualCancelledStreamsRef.current.add(activeStreamId)
       const { chatCancelStream } = await import('./tauriChat')
@@ -2592,7 +2588,7 @@ function App() {
 
   const maybeAutoRetryNoTokenStream = useCallback(
     async (streamId: string) => {
-      if (!isTauriApp()) return
+      if (!streamId) return
       const active = chatMessagesRef.current.find((m) => m.role === 'assistant' && m.streamId === streamId && m.streaming)
       if (!active) return
       const hasOutput = (streamOutputRef.current.get(streamId) ?? '').length > 0
@@ -2668,7 +2664,6 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [activeStreamId, maybeAutoRetryNoTokenStream])
   useEffect(() => {
-    if (!isTauriApp()) return
     const timer = window.setInterval(() => {
       const now = Date.now()
       const activeStreams = chatMessagesRef.current.filter((m): m is ChatItem & { streamId: string } => {
@@ -2932,7 +2927,7 @@ function App() {
   const getLatestFileCharCount = useCallback(
     async (filePath: string, fallback = ''): Promise<number> => {
       if (!filePath) return 0
-      if (workRoot && isTauriApp()) {
+      if (workRoot) {
         try {
           const latest = await readText(filePath)
           return latest.replace(/\s/g, '').length
@@ -3003,7 +2998,7 @@ function App() {
 
   useEffect(() => {
     if (!autoLongWriteEnabled) return
-    if (!workRoot || !isTauriApp()) return
+    if (!workRoot) return
     if (!activeFile) return
     if (autoLongWriteRunning) return
     if (chatMessages.some((m) => m.streaming)) return
@@ -3012,7 +3007,7 @@ function App() {
 
   const onWriterModeChange = useCallback(
     async (mode: WriterMode) => {
-      if (!workRoot || !isTauriApp()) {
+      if (!workRoot) {
         setWriterMode(mode)
         writerModeRef.current = mode
         return
@@ -3080,7 +3075,7 @@ function App() {
   )
 
   const onRunNextPlannerTask = useCallback(async () => {
-    if (!workRoot || !isTauriApp()) return
+    if (!workRoot) return
     if (plannerQueueRunning || plannerBusy) return
     const nextTask = novelPlannerService.getNextExecutableTask(plannerTasks)
     if (!nextTask) return
@@ -3090,7 +3085,7 @@ function App() {
 
   const onRetryPlannerTask = useCallback(
     async (taskId: string) => {
-      if (!workRoot || !isTauriApp()) return
+      if (!workRoot) return
       const next = await novelPlannerService.updateTask(writerMode, taskId, (task) => ({
         ...task,
         status: 'retry',
@@ -3103,7 +3098,7 @@ function App() {
 
   const onMarkPlannerTaskDone = useCallback(
     async (taskId: string) => {
-      if (!workRoot || !isTauriApp()) return
+      if (!workRoot) return
       const target = plannerTasks.find((task) => task.id === taskId)
       if (!target) return
       const next = await novelPlannerService.updateTask(writerMode, taskId, (task) => ({
@@ -3323,20 +3318,14 @@ function App() {
   const handleEditorChange = useCallback((content: string) => {
     if (!activePath) return
 
-    // Skip state updates when content is unchanged to reduce re-renders.
+    // f.content 是编辑器当前内容（非已保存版本）：仅在内容真的变化时同步并标记 dirty。
+    // dirty 只在保存成功后由保存流程重置——不能在这里根据内容相同回写 dirty:false，
+    // 否则防抖/重复 onChange 会把未保存标记立即冲掉，导致保存按钮永远不可用。
     setOpenFiles((prev) => {
       let changed = false
       const next = prev.map((f) => {
         if (f.path !== activePath) return f
-        // Only mark as dirty if content actually changed from saved version
-        if (f.content === content) {
-          // Content matches saved version, ensure dirty is false
-          if (f.dirty) {
-            changed = true
-            return { ...f, dirty: false }
-          }
-          return f
-        }
+        if (f.content === content) return f
         changed = true
         return { ...f, content, dirty: true }
       })
@@ -3399,7 +3388,6 @@ function App() {
   }, [activeFile, isMarkdownFile, showPreview])
 
   useEffect(() => {
-    if (!isTauriApp()) return
     void reloadAppSettings()
     void getWritingAssistants()
       .then((list) => {
@@ -3489,7 +3477,7 @@ function App() {
         setLastWorkPath(pickerState.last_workspace)
         setLaunchModeState(pickerState.launch_mode)
 
-        if (isTauriApp() && pickerState.launch_mode === 'auto_last' && pickerState.last_workspace) {
+        if (pickerState.launch_mode === 'auto_last' && pickerState.last_workspace) {
           const opened = await openWorkPath(pickerState.last_workspace)
           if (opened) {
             setAppView('studio')
@@ -3505,7 +3493,6 @@ function App() {
   }, [openWorkPath])
 
   useEffect(() => {
-    if (!isTauriApp()) return
     if (!workRoot) return
     void (async () => {
       try {
@@ -3521,7 +3508,6 @@ function App() {
   }, [loadProjectWritingSettings, refreshBookshelfState, workRoot])
 
   useEffect(() => {
-    if (!isTauriApp()) return
     if (!workRoot) return
     void loadPlannerSession().catch((e) => {
       setPlannerLastRunError(e instanceof Error ? e.message : String(e))
@@ -3531,7 +3517,7 @@ function App() {
   }, [loadPlannerSession, refreshChatSessionSummaries, refreshMemoryIndices, workRoot])
 
   useEffect(() => {
-    if (!workRoot || !isTauriApp()) return
+    if (!workRoot) return
     if (writerMode === 'normal') return
     if (!(plannerState?.auto_run ?? false)) return
     if (plannerQueueRunning || plannerBusy) return
@@ -3541,7 +3527,6 @@ function App() {
   }, [isTauriApp, plannerBusy, plannerQueueRunning, plannerState, plannerTasks, runPlannerQueue, workRoot, writerMode])
 
   useEffect(() => {
-    if (!isTauriApp()) return
     if (!workRoot) return
     const timer = window.setTimeout(() => {
       setShowRecoveryDialog(true)
@@ -4014,7 +3999,7 @@ function App() {
   }, [openFiles, settingsDirty, showConfirm])
 
   useEffect(() => {
-    if (!isTauriApp()) return
+    if (!workRoot) return
     if (chatMessages.length === 0) return
     if (chatMessages.some((m) => m.streaming)) return
     void saveChatSession({
@@ -4698,7 +4683,7 @@ function App() {
 
             {activeRightTab === 'stats' ? (
               <div className="right-stats-stack">
-                <ProgressTracker />
+                <ProgressTracker targetWords={chapterWordTarget > 0 ? chapterWordTarget : undefined} />
                 <StatsPanel />
               </div>
             ) : null}

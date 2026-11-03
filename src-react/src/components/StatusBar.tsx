@@ -81,9 +81,13 @@ export function StatusBar({ info, onThemeToggle, onHistoryClick }: StatusBarProp
             {info.lineCount} {t('status.lines')}
           </div>
         )}
-        {info.language && <div className="status-bar-item">{info.language}</div>}
+        {info.language && (
+          <div className="status-bar-item" title={t('common.language')}>
+            {info.language === 'zh-CN' ? '中文' : info.language === 'en-US' ? 'English' : info.language}
+          </div>
+        )}
         <div className="status-bar-item clickable theme-toggle" onClick={onThemeToggle} title={t('status.toggleTheme')}>
-          {info.theme === 'dark' ? t('common.light') : t('common.dark')}
+          {info.theme === 'dark' ? '🌙' : '☀️'}
         </div>
       </div>
     </div>

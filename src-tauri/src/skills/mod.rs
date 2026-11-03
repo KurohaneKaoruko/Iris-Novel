@@ -66,7 +66,9 @@ fn frontmatter_body(text: &str) -> &str {
 }
 
 impl Skill {
-    pub fn new(id: &str, name: &str, description: &str, category: &str, prompt: &str) -> Self {
+    /// 注意：调用方约定为 (id, name, description, prompt, category)，
+    /// 历史实现曾把 prompt/category 位置颠倒，导致技能 prompt 变成分类名。
+    pub fn new(id: &str, name: &str, description: &str, prompt: &str, category: &str) -> Self {
         Self {
             id: id.to_string(),
             name: name.to_string(),
@@ -365,8 +367,8 @@ fn embedded_skills() -> &'static [Skill] {
                     id,
                     &fm_name.unwrap_or_else(|| id.to_string()),
                     &fm_desc.unwrap_or_default(),
-                    "Novelist-Skills",
                     &prompt,
+                    "Novelist-Skills",
                 ))
             })
             .collect()
@@ -397,8 +399,8 @@ pub fn load_skills_from_dir(dir: &Path) -> Vec<Skill> {
             &dir_name,
             &name,
             &description,
-            "Novelist-Skills",
             &prompt,
+            "Novelist-Skills",
         ));
     }
     out.sort_by(|a, b| a.id.cmp(&b.id));
