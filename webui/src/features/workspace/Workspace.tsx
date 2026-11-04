@@ -360,6 +360,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
           assistantId={assistantId}
           onAssistantChange={setAssistantId}
           activePath={activePath}
+          onError={(msg) => setError(msg)}
         />
 
         {modal === 'settings' ? (

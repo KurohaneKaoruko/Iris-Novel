@@ -105,7 +105,7 @@ export type ChatSessionSummary = {
 }
 
 export type ChatMessagePayload = {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   [k: string]: unknown
 }

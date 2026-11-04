@@ -10,6 +10,8 @@ type ChatPanelProps = {
   assistantId: string | null
   onAssistantChange: (id: string | null) => void
   activePath: string | null
+  /** 轻量错误上抛（可选，缺省用 alert） */
+  onError?: (msg: string) => void
 }
 
 function sessionTitleOf(messages: ChatItem[]): string {
@@ -17,11 +19,12 @@ function sessionTitleOf(messages: ChatItem[]): string {
   return firstUser ? firstUser.content.slice(0, 30) : '新会话'
 }
 
-export function ChatPanel({ chat, assistantId, onAssistantChange, activePath }: ChatPanelProps) {
+export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, onError }: ChatPanelProps) {
   const { workRoot } = useWork()
   const [input, setInput] = useState('')
   const [settings, setSettings] = useState<AppSettings | null>(null)
-  const [, setSkillsState] = useState<Skill[]>([])
+  const [skills, setSkills] = useState<Skill[]>([])
+  const [skillId, setSkillId] = useState<string>('')
   const [showHistory, setShowHistory] = useState(false)
   const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([])
   const listRef = useRef<HTMLDivElement>(null)
@@ -32,8 +35,8 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath }: 
       .then(setSettings)
       .catch(() => setSettings(null))
     void getSkills()
-      .then((s) => setSkillsState(s))
-      .catch(() => setSkillsState([]))
+      .then(setSkills)
+      .catch(() => setSkills([]))
   }, [])
 
   // 自动滚动
@@ -71,18 +74,13 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath }: 
     async (id: string) => {
       try {
         const s = await getChatSession(id)
-        const msgs = (s.messages ?? []).map((m, i) => ({
-          id: `h-${i}`,
+        const msgs = (s.messages ?? []).map((m) => ({
           role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
           content: String(m.content ?? ''),
         }))
-        chat.clear()
-        // 直接恢复历史（绕过 useChat 内部状态——这里用 clear + 手动填充的最小方案）
-        setInput('')
+        chat.restore(msgs)
+        savedLenRef.current = 0
         setShowHistory(false)
-        // useChat 未暴露 restore；历史只读展示通过 send 之外的方式：
-        window.alert('历史会话查看功能即将开放；已加载到本地。')
-        void msgs
       } catch {
         window.alert('会话加载失败')
       }
@@ -94,8 +92,26 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath }: 
     const text = input.trim()
     if (!text || chat.busy) return
     setInput('')
-    void chat.send(text, { assistantId })
-  }, [assistantId, chat, input])
+    // /skill <id> <prompt> 指令：把该技能写作规范注入本次请求（后续轮次也保持）
+    const m = text.match(/^\/skill\s+(\S+)\s*([\s\S]*)$/)
+    if (m) {
+      const [, id, rest] = m
+      const skill = skills.find((s) => s.id === id || s.name === id)
+      if (!skill) {
+        onError?.(`未找到技能「${id}」`)
+        return
+      }
+      setSkillId(skill.id)
+      const prompt = rest.trim()
+      if (!prompt) {
+        onError?.(`已切换到技能「${skill.name}」，请继续输入写作要求`)
+        return
+      }
+      void chat.send(prompt, { assistantId, systemPrompt: skill.prompt })
+      return
+    }
+    void chat.send(text, { assistantId, systemPrompt: skillId ? skills.find((s) => s.id === skillId)?.prompt : undefined })
+  }, [assistantId, chat, input, onError, skillId, skills])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -166,6 +182,18 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath }: 
               <option key={p.id} value={p.id}>
                 {p.name || p.id}
                 {p.api_key ? '' : '（缺 API Key）'}
+              </option>
+            ))}
+          </select>
+          <select
+            value={skillId}
+            onChange={(e) => setSkillId(e.target.value)}
+            title="写作技能：注入该技能的写作规范"
+          >
+            <option value="">无技能</option>
+            {skills.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.category ? `[${s.category}] ` : ''}{s.name}
               </option>
             ))}
           </select>

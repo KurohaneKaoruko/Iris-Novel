@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { subscribeEvent, wsSend, type Unlisten } from '../api/rpc'
-import { chatCancelStream, chatGenerateStream } from '../api/backend'
+import { chatCancelStream, chatGenerateStream, type ChatMessagePayload } from '../api/backend'
 
 export type ChatRole = 'user' | 'assistant'
 
@@ -102,10 +102,12 @@ export function useChat() {
       setSubscribedStreamId(streamId)
 
       try {
-        const history = messages.map((m) => ({ role: m.role, content: m.content }))
+        const history: ChatMessagePayload[] = messages.map((m) => ({ role: m.role, content: m.content }))
+        const withSys: ChatMessagePayload[] = [...history, { role: 'user', content: text }]
+        if (opts?.systemPrompt) withSys.unshift({ role: 'system', content: opts.systemPrompt })
         await chatGenerateStream({
           streamId,
-          messages: [...history, { role: 'user', content: text }],
+          messages: withSys,
           assistantId: opts?.assistantId ?? null,
           providerId: opts?.providerId ?? null,
         })
@@ -135,5 +137,15 @@ export function useChat() {
     streamOutputRef.current.clear()
   }, [cancel])
 
-  return { messages, busy, send, cancel, clear }
+  /** 恢复历史会话（会话历史面板用）：取消进行中的流并整体替换消息列表 */
+  const restore = useCallback(
+    (msgs: Array<{ role: ChatRole; content: string }>) => {
+      cancel()
+      streamOutputRef.current.clear()
+      setMessages(msgs.map((m) => ({ id: newId(), role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content ?? '') })))
+    },
+    [cancel],
+  )
+
+  return { messages, busy, send, cancel, clear, restore }
 }
