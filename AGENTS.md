@@ -33,31 +33,28 @@ pnpm run tauri:ios:dev
 
 ## 架构
 
-### 前端 (`src-react/src/`)
+### 前端 (`webui/`)
 
-- **`App.tsx`** - 主应用组件，包含工作区管理、标签系统和 AI 鰰板集成
-- **`components/`** - UI 组件：
-  - `LexicalEditor/` - 基于 Lexical 的富文本编辑器
-  - `chat/AIChatPanel.tsx` - AI 聊天界面
-  - `TabBar.tsx` - 多标签文件管理
-  - `FileExplorer.tsx` - 项目文件树
-  - `ProjectPickerPage.tsx` - 书架/工作区选择器
-- **`services/`** - 业务逻辑：
-  - `AIAssistanceService.ts` - AI 集成
-  - `ChapterService.ts` - 章节管理
-  - `CharacterService.ts` - 人物追踪
-  - `PlotLineService.ts` - 情节线管理
-  - `autoLongWriteWorkflow.ts` - 自动化写作工作流
-  - `plannerQueueWorkflow.ts` - 任务规划工作流
-- **`hooks/`** - 自定义 React 钩子：自动保存、导航、聊天会话、记忆工作台
-- **`tauri.ts`** - 所有 Tauri 后端命令的 TypeScript 类型绑定
+`src-react/`（旧桌面端 Lexical 前端）已于 2026-11 退役删除，`webui/` 是唯一前端。要点：
+
+- **`api/backend.ts`** - 类型化 RPC 命令绑定（与 `rpc_dispatch.rs` 一一对应）
+- **`api/novel.ts`** - 作品内数据层：章节元数据、人物卡、情节线、记忆索引、写作历史（Markdown/JSON 直读直写，`parseCharacters`/`parsePlotLines` 等纯函数有单测）
+- **`api/planner.ts`** - 规划队列：run-queue.md JSON frontmatter 读写（与旧桌面端格式兼容）
+- **`api/writing.ts`** - AI 写作工作流：续写/大纲/细纲/润色提示词构建 + 流式生成
+- **`features/bookshelf/`** - 书架页
+- **`features/workspace/`** - 工作台：TipTap 编辑器、聊天面板、人物/情节线/记忆/历史/规划面板、命令面板（Ctrl+K）、设置中心、工具箱（搜索/导出/风险审阅）、拆书
+- **`hooks/useChat.ts`** - 流式聊天（WS token 过滤/取消/会话恢复）
+- **`state/WorkContext.tsx`** - workRoot/activePath/写作设置全局状态
 
 ### 后端 (`src-tauri/src/`)
 
-- **`main.rs`** - Tauri 应用入口点，注册所有命令
-- **`commands.rs`** - Tauri 命令实现：文件 I/O、工作区管理、设置、聊天历史
+- **`lib.rs`** - 共享库：桌面（Tauri）与 `iris-creation-server` 共用的服务层
+- **`main.rs`** - Tauri 桌面壳入口（注册命令；当前主产品形态为 iris-creation-server + webui）
+- **`bin/iris-creation-server.rs`** - 本地 Web 服务端入口：托管 webui 静态资源 + RPC + WS
+- **`server/`** - HTTP/WS 服务：`rpc_dispatch.rs`（67 命令分发）、WS 升级与 cancel 指令
+- **`commands.rs`** - 命令实现（`*_impl` 共用函数供 Tauri/RPC 双通道调用）
 - **`agent_system.rs`** - AI 代理运行时，包含工具注册表和记忆存储
-- **`skills/mod.rs`** - 写作技能：内置技能（风格：无为/馆zolh/简洁，剧情技巧，人物工具）+ Novelist-Skills 子模块（`skills/` 目录，编译期内嵌 + 运行时目录覆盖）
+- **`skills/mod.rs`** - 写作技能：内置技能 + Novelist-Skills 子模块（`skills/` 目录，编译期内嵌 + 运行时目录覆盖）
 - **`app_settings.rs`** - 应用设置和提供商配置
 - **`secrets.rs`** - API 密钥存储（平台特定：Windows DPAPI，macOS/Linux keyring）
 - **`chat_history.rs`** - 聊天会话持久化
@@ -116,11 +113,11 @@ Rust 后端包含 AI 代理运行时：
 
 ### 前后端通信
 
-所有 Tauri 命令在 `src-react/src/tauri.ts` 中有类型定义。 使用 `@tauri-apps/api/core` 的 `invoke` 函数调用后端命令。
+Web 前端与后端通过 **HTTP RPC + WebSocket** 通信（见下方「新版 Web UI」）；桌面壳另保留 Tauri invoke 通道。
 
-### 新版 Web UI（`webui/`）
+### Web UI（`webui/`）
 
-`webui/` 是正在开发的全新 Web 前端（React 18 + Vite + TipTap 2 + TS strict），由 `iris-creation-server` 托管静态资源并暴露 RPC/WS，最终将替代 `src-react/`：
+`webui/` 是唯一 Web 前端（React 18 + Vite + TipTap 2 + TS strict），由 `iris-creation-server` 托管静态资源并暴露 RPC/WS：
 
 ```bash
 cd webui

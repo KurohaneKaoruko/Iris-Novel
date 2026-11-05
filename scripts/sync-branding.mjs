@@ -86,22 +86,6 @@ function generateRustBrandingSource(branding) {
   );
 }
 
-function tsStringLiteral(value) {
-  return JSON.stringify(String(value ?? ""));
-}
-
-function generateFrontendBrandingSource(branding) {
-  const displayName = branding.displayName ?? "";
-  const editorNamespace = branding?.editor?.namespace ?? "";
-  const editorConfigStorageKey = branding?.editor?.configStorageKey ?? "";
-
-  return (
-    `export const DISPLAY_NAME = ${tsStringLiteral(displayName)} as const\n` +
-    `export const EDITOR_NAMESPACE = ${tsStringLiteral(editorNamespace)} as const\n` +
-    `export const EDITOR_CONFIG_STORAGE_KEY = ${tsStringLiteral(editorConfigStorageKey)} as const\n`
-  );
-}
-
 async function main() {
   const brandingPath = path.join(repoRoot, "branding.json");
   const branding = JSON.parse(await readText(brandingPath));
@@ -122,7 +106,7 @@ async function main() {
   }
 
   {
-    const indexHtmlPath = path.join(repoRoot, "src-react", "index.html");
+    const indexHtmlPath = path.join(repoRoot, "webui", "index.html");
     const html = await readText(indexHtmlPath);
     if (await writeTextIfChanged(indexHtmlPath, updateHtmlTitle(html, displayName))) {
       changedFiles.push(indexHtmlPath);
@@ -165,13 +149,6 @@ async function main() {
     const rustBrandingPath = path.join(repoRoot, "src-tauri", "src", "branding.rs");
     if (await writeTextIfChanged(rustBrandingPath, generateRustBrandingSource(branding))) {
       changedFiles.push(rustBrandingPath);
-    }
-  }
-
-  {
-    const frontendBrandingPath = path.join(repoRoot, "src-react", "src", "branding.ts");
-    if (await writeTextIfChanged(frontendBrandingPath, generateFrontendBrandingSource(branding))) {
-      changedFiles.push(frontendBrandingPath);
     }
   }
 

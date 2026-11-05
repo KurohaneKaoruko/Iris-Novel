@@ -5,7 +5,7 @@
 //!   请求体为命令参数的 JSON 对象，返回 `{"ok": result}` 或 `{"err": message}`。
 //! - `/ws`：WebSocket 事件通道，转发 EventSink 上的全部流式事件；
 //!   客户端可发送 `{"type":"cancel","streamId":...}` 取消流任务。
-//! - 静态托管前端构建产物（默认 `../src-react/dist`）。
+//! - 静态托管前端构建产物（默认 `../webui/dist`）。
 //! - 默认绑定 `127.0.0.1`，端口可配置；来源校验（Host/Origin）防 DNS rebinding。
 
 use crate::event_sink::{BroadcastEventSink, SharedEventSink};
@@ -69,7 +69,7 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
     .static_dir
     .clone()
     .or_else(|| std::env::var("IRIS_CREATION_STATIC_DIR").ok().map(PathBuf::from))
-    .unwrap_or_else(|| PathBuf::from("../src-react/dist"));
+    .unwrap_or_else(|| PathBuf::from("../webui/dist"));
 
   let index_file = dist_dir.join("index.html");
   let serve_frontend = tower_http::services::ServeDir::new(&dist_dir)
@@ -115,11 +115,7 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
   println!(
     "[iris-creation-server] listening on http://{}  (static: {})",
     addr,
-    config
-      .static_dir
-      .as_ref()
-      .map(|p| p.display().to_string())
-      .unwrap_or_else(|| "disabled".to_string())
+    dist_dir.display()
   );
   axum::serve(listener, app)
     .await

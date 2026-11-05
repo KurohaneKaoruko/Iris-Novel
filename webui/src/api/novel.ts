@@ -135,13 +135,8 @@ const CHAR_FIELDS: CharField[] = [
   { key: 'notes', zh: '备注' },
 ]
 
-export async function listCharacters(): Promise<Character[]> {
-  let content = ''
-  try {
-    content = await readText(CHAR_FILE)
-  } catch {
-    return []
-  }
+/** 解析人物卡 markdown（旧桌面端同格式：`## 名字 <!-- id: ... -->` + `- **字段**:` 行） */
+export function parseCharacters(content: string): Character[] {
   const chars: Character[] = []
   const sections = content.split(/^## /m).slice(1)
   for (const section of sections) {
@@ -179,7 +174,17 @@ export async function listCharacters(): Promise<Character[]> {
   return chars
 }
 
-export async function saveCharacters(characters: Character[]): Promise<void> {
+export async function listCharacters(): Promise<Character[]> {
+  let content = ''
+  try {
+    content = await readText(CHAR_FILE)
+  } catch {
+    return []
+  }
+  return parseCharacters(content)
+}
+
+export function serializeCharacters(characters: Character[]): string {
   const lines: string[] = ['# 人物卡', '']
   for (const c of characters) {
     lines.push(`## ${c.name} <!-- id: ${c.id} -->`, '')
@@ -189,7 +194,11 @@ export async function saveCharacters(characters: Character[]): Promise<void> {
     }
     lines.push('')
   }
-  await writeText(CHAR_FILE, lines.join('\n'))
+  return lines.join('\n')
+}
+
+export async function saveCharacters(characters: Character[]): Promise<void> {
+  await writeText(CHAR_FILE, serializeCharacters(characters))
 }
 
 // ============ 情节线（outline/plotlines.md） ============
@@ -215,13 +224,8 @@ const STATUS_ZH: Record<PlotLineStatus, string> = {
 
 const STATUS_FROM_ZH = new Map(Object.entries(STATUS_ZH).map(([k, v]) => [v, k as PlotLineStatus]))
 
-export async function listPlotLines(): Promise<PlotLine[]> {
-  let content = ''
-  try {
-    content = await readText(PLOT_FILE)
-  } catch {
-    return []
-  }
+/** 解析情节线 markdown（旧桌面端同格式） */
+export function parsePlotLines(content: string): PlotLine[] {
   const out: PlotLine[] = []
   const sections = content.split(/^## /m).slice(1)
   for (const section of sections) {
@@ -248,7 +252,17 @@ export async function listPlotLines(): Promise<PlotLine[]> {
   return out
 }
 
-export async function savePlotLines(plotLines: PlotLine[]): Promise<void> {
+export async function listPlotLines(): Promise<PlotLine[]> {
+  let content = ''
+  try {
+    content = await readText(PLOT_FILE)
+  } catch {
+    return []
+  }
+  return parsePlotLines(content)
+}
+
+export function serializePlotLines(plotLines: PlotLine[]): string {
   const lines: string[] = ['# 情节线', '']
   for (const p of plotLines) {
     lines.push(`## ${p.name} <!-- id: ${p.id} -->`, '')
@@ -258,7 +272,11 @@ export async function savePlotLines(plotLines: PlotLine[]): Promise<void> {
     if (p.description?.trim()) lines.push(`- **简介**: ${p.description.trim()}`)
     lines.push('')
   }
-  await writeText(PLOT_FILE, lines.join('\n'))
+  return lines.join('\n')
+}
+
+export async function savePlotLines(plotLines: PlotLine[]): Promise<void> {
+  await writeText(PLOT_FILE, serializePlotLines(plotLines))
 }
 
 // ============ 记忆索引（.novel/state/*.md） ============

@@ -4,7 +4,7 @@
 //!   iris-creation-server [--host 127.0.0.1] [--port 8765] [--static-dir <dir>] [--data-dir <dir>]
 //!
 //! - 默认仅绑定 127.0.0.1（本机访问）；LAN 访问需显式 --host 0.0.0.0（用户自担风险）。
-//! - `--static-dir` 指向前端构建产物目录；默认 `../src-react/dist`（或 IRIS_CREATION_STATIC_DIR）。
+//! - `--static-dir` 指向前端构建产物目录；默认 `../webui/dist`（或 IRIS_CREATION_STATIC_DIR）。
 //! - `--data-dir` 覆盖数据目录（settings/secrets/chat_history/bookshelf）；默认与桌面端约定一致
 //!   （可执行文件所在目录），也可用 IRIS_CREATION_DATA_DIR。
 

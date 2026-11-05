@@ -15,20 +15,20 @@ else
   echo "src-tauri/target already clean"
 fi
 
-echo "Cleaning Vite build output (src-react/dist)..."
-if [[ -d "src-react/dist" ]]; then
-  rm -rf "src-react/dist"
-  echo "Removed src-react/dist"
+echo "Cleaning Vite build output (webui/dist)..."
+if [[ -d "webui/dist" ]]; then
+  rm -rf "webui/dist"
+  echo "Removed webui/dist"
 else
-  echo "src-react/dist already clean"
+  echo "webui/dist already clean"
 fi
 
-echo "Cleaning TypeScript build cache (src-react/node_modules/.tmp)..."
-if [[ -d "src-react/node_modules/.tmp" ]]; then
-  rm -rf "src-react/node_modules/.tmp"
-  echo "Removed src-react/node_modules/.tmp"
+echo "Cleaning TypeScript build cache (webui/node_modules/.tmp)..."
+if [[ -d "webui/node_modules/.tmp" ]]; then
+  rm -rf "webui/node_modules/.tmp"
+  echo "Removed webui/node_modules/.tmp"
 else
-  echo "src-react/node_modules/.tmp already clean"
+  echo "webui/node_modules/.tmp already clean"
 fi
 
 # Clean node_modules (optional - uncomment if needed)

@@ -14,21 +14,21 @@ if (Test-Path "src-tauri/target") {
 }
 
 # Clean Vite build output
-Write-Host "Cleaning Vite build output (src-react/dist)..." -ForegroundColor Yellow
-if (Test-Path "src-react/dist") {
-    Remove-Item -Recurse -Force "src-react/dist"
-    Write-Host "Removed src-react/dist" -ForegroundColor Green
+Write-Host "Cleaning Vite build output (webui/dist)..." -ForegroundColor Yellow
+if (Test-Path "webui/dist") {
+    Remove-Item -Recurse -Force "webui/dist"
+    Write-Host "Removed webui/dist" -ForegroundColor Green
 } else {
-    Write-Host "src-react/dist already clean" -ForegroundColor Green
+    Write-Host "webui/dist already clean" -ForegroundColor Green
 }
 
 # Clean TypeScript build output cache
-Write-Host "Cleaning TypeScript build cache (src-react/node_modules/.tmp)..." -ForegroundColor Yellow
-if (Test-Path "src-react/node_modules/.tmp") {
-    Remove-Item -Recurse -Force "src-react/node_modules/.tmp"
-    Write-Host "Removed src-react/node_modules/.tmp" -ForegroundColor Green
+Write-Host "Cleaning TypeScript build cache (webui/node_modules/.tmp)..." -ForegroundColor Yellow
+if (Test-Path "webui/node_modules/.tmp") {
+    Remove-Item -Recurse -Force "webui/node_modules/.tmp"
+    Write-Host "Removed webui/node_modules/.tmp" -ForegroundColor Green
 } else {
-    Write-Host "src-react/node_modules/.tmp already clean" -ForegroundColor Green
+    Write-Host "webui/node_modules/.tmp already clean" -ForegroundColor Green
 }
 
 Write-Host ""
