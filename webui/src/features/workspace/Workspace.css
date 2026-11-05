@@ -223,3 +223,32 @@
   margin: auto;
   color: var(--text-muted);
 }
+
+/* 章节目标进度 */
+.chapter-goal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--border, #2a2a38);
+}
+
+.chapter-goal-bar {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.chapter-goal-fill {
+  height: 100%;
+  background: #9ece6a;
+  transition: width 0.4s ease;
+}
+
+.chapter-goal-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

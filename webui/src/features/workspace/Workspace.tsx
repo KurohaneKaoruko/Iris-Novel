@@ -524,6 +524,22 @@ export function Workspace({ onExit }: { onExit: () => void }) {
           </div>
 
           <SprintTimer chapterWords={activeChapterWords} activePath={activePath} />
+          {writingSettings?.chapter_word_target ? (
+            <div className="chapter-goal" title={`本章目标 ${writingSettings.chapter_word_target} 字（设置中心可调）`}>
+              <div className="chapter-goal-bar">
+                <div
+                  className="chapter-goal-fill"
+                  style={{
+                    width: `${Math.min(100, Math.round((activeChapterWords / writingSettings.chapter_word_target) * 100))}%`,
+                  }}
+                />
+              </div>
+              <span className="chapter-goal-text">
+                本章 {activeChapterWords}/{writingSettings.chapter_word_target} 字
+                {activeChapterWords >= writingSettings.chapter_word_target ? ' ✓ 达标' : ''}
+              </span>
+            </div>
+          ) : null}
           {stats ? <StatsPanel stats={stats} /> : null}
         </aside>
 
