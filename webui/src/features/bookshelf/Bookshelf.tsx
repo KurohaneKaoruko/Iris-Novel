@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { BookshelfState, ProjectItem } from '../../api/backend'
-import { createNovelWork, getBookshelfState, setWorkspace, updateWorkDescription } from '../../api/backend'
+import { createNovelWork, forgetWork, getBookshelfState, setWorkspace, updateWorkDescription } from '../../api/backend'
 import { useWork } from '../../state/WorkContext'
 import './Bookshelf.css'
 
@@ -172,6 +172,18 @@ export function Bookshelf({ onOpen }: { onOpen: (root: string) => void }) {
               <button className="open-btn" disabled={busy} onClick={() => void openWork(selected.path)}>
                 打开作品 →
               </button>
+              {selected.source !== 'default' ? (
+                <button
+                  className="forget-btn"
+                  title="从书架列表移除记录（不删除盘上文件）"
+                  onClick={() => {
+                    if (!window.confirm(`从书架移除「${selected.name}」？\n（不会删除盘上的文件）`)) return
+                    void forgetWork(selected.path).then(refresh).then(() => setSelected(null))
+                  }}
+                >
+                  从书架移除
+                </button>
+              ) : null}
             </div>
           ) : (
             <div className="detail-empty">

@@ -125,6 +125,8 @@ export const createNovelWork = (name: string, description?: string) =>
   rpc<ProjectItem>('create_novel_work', { name, description: description ?? null })
 export const updateWorkDescription = (path: string, description: string) =>
   rpc<void>('update_work_description', { path, description })
+/** 从书架移除记录（不删盘上文件） */
+export const forgetWork = (path: string) => rpc<void>('forget_external_project', { path })
 export const getLastWorkspace = () => rpc<string | null>('get_last_workspace')
 
 // ---- fs ----
