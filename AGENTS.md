@@ -38,11 +38,14 @@ pnpm run tauri:ios:dev
 `src-react/`（旧桌面端 Lexical 前端）已于 2026-11 退役删除，`webui/` 是唯一前端。要点：
 
 - **`api/backend.ts`** - 类型化 RPC 命令绑定（与 `rpc_dispatch.rs` 一一对应）
-- **`api/novel.ts`** - 作品内数据层：章节元数据、人物卡、情节线、记忆索引、写作历史（Markdown/JSON 直读直写，`parseCharacters`/`parsePlotLines` 等纯函数有单测）
-- **`api/planner.ts`** - 规划队列：run-queue.md JSON frontmatter 读写（与旧桌面端格式兼容）
+- **`api/novel.ts`** - 作品内数据层：章节元数据、人物卡、设定集 Codex、情节线、记忆索引、写作历史、章节排序（Markdown/JSON 直读直写，`parseCharacters`/`parsePlotLines`/`parseCodex` 等纯函数有单测）
+- **`api/planner.ts`** - 规划队列：run-queue.md JSON frontmatter 读写 + 大纲→任务链导入（`parseOutlineChapters`/`outlineToTasks`，与旧桌面端格式兼容）
+- **`api/lint.ts`** - 正文铁律体检：对齐 novel-ai-lexicon 的规则引擎（一级套路/二级限频/句式模板）
+- **`api/import.ts`** - 存量作品导入：智能切章（第X章/Chapter X/数字序号，中文数字转阿拉伯）
+- **`api/consistency.ts`** - 一致性检查：人物断档/情节线推进/伏笔回收/章节健康四维交叉核对
 - **`api/writing.ts`** - AI 写作工作流：续写/大纲/细纲/润色提示词构建 + 流式生成
 - **`features/bookshelf/`** - 书架页
-- **`features/workspace/`** - 工作台：TipTap 编辑器、聊天面板、人物/情节线/记忆/历史/规划面板、命令面板（Ctrl+K）、设置中心、工具箱（搜索/导出/风险审阅）、拆书
+- **`features/workspace/`** - 工作台：TipTap 编辑器（TTS 听稿、lint 定位跳转）、聊天面板（技能/角色扮演/附本章上下文）、人物/设定集 Codex/情节线/记忆/历史/规划面板、命令面板（Ctrl+K）、快捷键帮助（?）、设置中心、工具箱（搜索/一致性检查/正文铁律体检/导入切章/导出/风险审阅）、拆书、写作冲刺计时、章节拖拽排序
 - **`hooks/useChat.ts`** - 流式聊天（WS token 过滤/取消/会话恢复）
 - **`state/WorkContext.tsx`** - workRoot/activePath/写作设置全局状态
 

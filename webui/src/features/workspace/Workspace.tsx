@@ -348,9 +348,19 @@ export function Workspace({ onExit }: { onExit: () => void }) {
         run: () => setActivePath(f.path),
       })
     }
+    // 设定集条目直达（搜名称即开面板）
+    for (const e of codex) {
+      cmds.push({
+        id: `codex-${e.id}`,
+        group: '设定',
+        label: `${e.name}（${e.summary.slice(0, 12) || '设定条目'}）`,
+        keywords: 'codex sheding',
+        run: () => gotoSide('codex'),
+      })
+    }
     return cmds
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allOpenable, handleCreateChapter, handleCreateFile, onExit])
+  }, [allOpenable, handleCreateChapter, handleCreateFile, onExit, codex])
 
   // Ctrl+K / Ctrl+P 打开
   useEffect(() => {
