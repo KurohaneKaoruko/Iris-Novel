@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectWritingSettings } from '../api/backend'
 import { getProjectWritingSettings } from '../api/backend'
+import { writeDeepLink } from '../api/deeplink'
 
 type WorkState = {
   /** 当前作品根目录绝对路径 */
@@ -36,6 +37,12 @@ export function WorkProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (workRoot) void reloadWritingSettings()
   }, [workRoot, reloadWritingSettings])
+
+  // activePath 变化同步到 hash 深链（刷新后恢复当前章节）
+  useEffect(() => {
+    if (workRoot) writeDeepLink(workRoot, activePath)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePath])
 
   const value = useMemo(
     () => ({

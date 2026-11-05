@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
 import { createFile, createDir, deleteEntry, listWorkspaceTree, renameEntry, writeText } from '../../api/backend'
 import { subscribeEvent } from '../../api/rpc'
+import { readDeepLink } from '../../api/deeplink'
 import {
   computeWorkStats, createChapterFile, listChapters, listCharacters, listConceptFiles, listPlotLines,
   loadMemoryIndices, markChapterStatus, recordTodayWords, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
@@ -114,11 +115,16 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   )
   const openableMap = useMemo(() => new Map(allOpenable.map((f) => [f.path, f])), [allOpenable])
 
-  // 自动打开第一章
+  // 自动打开第一章；深链 hash 里有 chapter 时优先恢复它
   useEffect(() => {
-    if (!activePath && chapterFiles.length > 0) {
-      setActivePath([...chapterFiles].sort((a, b) => a.path.localeCompare(b.path))[0].path)
+    if (activePath || chapterFiles.length === 0) return
+    const link = readDeepLink()
+    const target = link.chapter && chapterFiles.some((f) => f.path === link.chapter) ? link.chapter : null
+    if (target) {
+      setActivePath(target)
+      return
     }
+    setActivePath([...chapterFiles].sort((a, b) => a.path.localeCompare(b.path))[0].path)
   }, [activePath, chapterFiles, setActivePath])
 
   const handleSaved = useCallback(
