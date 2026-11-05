@@ -18,9 +18,11 @@ import { StatsPanel } from './StatsPanel'
 import { AiWriteBar } from './AiWriteBar'
 import { SettingsModal } from './SettingsModal'
 import { ToolsModal } from './ToolsModal'
+import { HistoryPanel } from './HistoryPanel'
+import { BookAnalyzerPanel } from './BookAnalyzerPanel'
 import './Workspace.css'
 
-type SideTab = 'chapters' | 'characters' | 'plotlines' | 'docs' | 'memory'
+type SideTab = 'chapters' | 'characters' | 'plotlines' | 'docs' | 'memory' | 'history'
 
 const SIDE_TABS: Array<{ id: SideTab; label: string }> = [
   { id: 'chapters', label: '章节' },
@@ -28,6 +30,7 @@ const SIDE_TABS: Array<{ id: SideTab; label: string }> = [
   { id: 'plotlines', label: '情节线' },
   { id: 'docs', label: '资料' },
   { id: 'memory', label: '记忆' },
+  { id: 'history', label: '历史' },
 ]
 
 function collectFiles(entry: FsEntry, test: (p: string) => boolean): FsEntry[] {
@@ -52,7 +55,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [stats, setStats] = useState<WorkStats | null>(null)
   const [dirty, setDirty] = useState(false)
   const [assistantId, setAssistantId] = useState<string | null>(null)
-  const [modal, setModal] = useState<'settings' | 'tools' | null>(null)
+  const [modal, setModal] = useState<'settings' | 'tools' | 'book' | null>(null)
   const chat = useChat()
   const contentRef = useRef<Map<string, string>>(new Map())
 
@@ -232,6 +235,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
           </span>
         ) : null}
         <span className="header-spacer" />
+        <button className="header-btn" onClick={() => setModal('book')} title="AI 拆书分析">拆书</button>
         <button className="header-btn" onClick={() => setModal('tools')} title="搜索 / 导出 / 风险审阅">工具箱</button>
         <button className="header-btn" onClick={() => setModal('settings')} title="Provider / 写作偏好 / 技能">设置</button>
         {error ? (
@@ -335,6 +339,10 @@ export function Workspace({ onExit }: { onExit: () => void }) {
             {sideTab === 'memory' ? (
               <MemoryPanel memory={memory} onSave={handleSaveMemory} onError={setError} />
             ) : null}
+
+            {sideTab === 'history' ? (
+              <HistoryPanel activePath={activePath} onError={setError} onRestored={() => void refreshAll()} />
+            ) : null}
           </div>
 
           {stats ? <StatsPanel stats={stats} /> : null}
@@ -385,6 +393,9 @@ export function Workspace({ onExit }: { onExit: () => void }) {
             onError={setError}
             onSaved={() => void refreshAll()}
           />
+        ) : null}
+        {modal === 'book' ? (
+          <BookAnalyzerPanel onError={setError} />
         ) : null}
         {modal === 'tools' ? (
           <ToolsModal

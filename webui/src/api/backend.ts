@@ -184,3 +184,49 @@ export const testProviderConnectivity = (provider: Provider, apiKey?: string) =>
 
 export const riskScanContent = (filePath: string | null, content: string) =>
   rpc<RiskScanResult>('risk_scan_content', { filePath: filePath ?? null, content })
+
+// ---- history（版本快照）----
+
+export type HistoryEntry = {
+  id: string
+  file_path: string
+  created_at: number
+  reason: string
+  word_count: number
+  char_count: number
+  summary: string
+}
+
+export const listHistoryEntries = (max = 120) => rpc<HistoryEntry[]>('list_history_entries', { max })
+export const createHistorySnapshot = (relativePath: string, label?: string) =>
+  rpc<HistoryEntry>('create_history_snapshot', { relativePath: relativePath, label: label ?? null })
+export const readHistorySnapshot = (id: string) => rpc<string>('read_history_snapshot', { id })
+export const restoreHistorySnapshot = (id: string) => rpc<void>('restore_history_snapshot', { id })
+
+// ---- book analysis（拆书）----
+
+export type BookAct = { id: number; name: string; chapters: number[]; description: string }
+export type BookPlotLine = { name: string; main: boolean; chapters: number[]; description: string }
+export type BookCharacter = { [k: string]: unknown }
+export type BookTechnique = { [k: string]: unknown }
+
+export type BookAnalysisResult = {
+  title: string
+  author: string | null
+  source: string
+  structure: { type: string; acts: BookAct[]; pacing: string; audience: string }
+  plot_arcs: BookPlotLine[]
+  rhythm: { [k: string]: unknown }
+  climax_points: Array<{ [k: string]: unknown }>
+  power_moments: Array<{ [k: string]: unknown }>
+  characters: BookCharacter[]
+  character_relationships: Array<{ [k: string]: unknown }>
+  world_settings: Array<{ [k: string]: unknown }>
+  power_system: Array<{ [k: string]: unknown }>
+  techniques: BookTechnique[]
+  summary: string
+  learnable_points: string[]
+}
+
+export const bookAnalyze = (content: string, title: string) =>
+  rpc<BookAnalysisResult>('book_analyze', { content, title })
