@@ -221,10 +221,69 @@ export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, on
     }
   }, [path])
 
+  const [speaking, setSpeaking] = useState(false)
+  const speakRef = useRef<{ stop: () => void } | null>(null)
+
+  /** TTS 听稿：朗读本章（中文优先声线），再次点击停止 */
+  const toggleSpeak = () => {
+    if (speaking) {
+      speakRef.current?.stop()
+      return
+    }
+    if (!editor) return
+    if (!('speechSynthesis' in window)) {
+      onError('当前浏览器不支持语音合成')
+      return
+    }
+    const synth = window.speechSynthesis
+    synth.cancel()
+    // 按段落分句喂给 TTS，边读边取（长文本一次性 speak 会被截断）
+    const paras = editorText(editor)
+      .split('\n')
+      .map((p) => p.replace(/^#{1,3}\s+/, '').trim())
+      .filter((p) => p.length > 0)
+    if (paras.length === 0) return
+    let i = 0
+    const utter = () => {
+      if (i >= paras.length) {
+        setSpeaking(false)
+        return
+      }
+      const u = new SpeechSynthesisUtterance(paras[i])
+      u.lang = 'zh-CN'
+      u.rate = 1
+      const zhVoice = synth.getVoices().find((v) => v.lang.startsWith('zh'))
+      if (zhVoice) u.voice = zhVoice
+      u.onend = () => {
+        i += 1
+        utter()
+      }
+      u.onerror = () => setSpeaking(false)
+      synth.speak(u)
+    }
+    speakRef.current = { stop: () => { synth.cancel(); setSpeaking(false) } }
+    setSpeaking(true)
+    utter()
+  }
+
+  // 卸载时停止朗读
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis?.cancel()
+    }
+  }, [path])
+
   return (
     <div className="editor-pane">
       <div className="editor-file-bar">
         <span className="editor-path">{path}</span>
+        <button
+          className={`save-btn ${speaking ? 'speaking' : ''}`}
+          title={speaking ? '停止朗读' : '朗读本章（TTS 听稿）'}
+          onClick={toggleSpeak}
+        >
+          {speaking ? '⏹ 停止朗读' : '🔊 听稿'}
+        </button>
         <button className="save-btn" disabled={saving || loading} onClick={() => void doSave()}>
           保存 (Ctrl+S)
         </button>

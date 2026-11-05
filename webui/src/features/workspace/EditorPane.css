@@ -87,3 +87,8 @@
   height: 0;
   pointer-events: none;
 }
+
+.save-btn.speaking {
+  color: #9ece6a;
+  border-color: #9ece6a;
+}
