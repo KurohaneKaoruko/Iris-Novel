@@ -12,6 +12,23 @@ fn fake_bin_dir() -> PathBuf {
     PathBuf::from("/tmp/opencode/fake-bin")
 }
 
+/// 创建 fake-writer 本体：在 cwd 内修改 ch1、新增 ch2，输出标记文本。
+/// 之前该脚本只存在于会话级 /tmp，克隆环境跑测试必失败——现在测试自包含。
+fn install_fake_writer() {
+    let dir = fake_bin_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    let writer = dir.join("fake-writer");
+    let _ = std::fs::write(
+        &writer,
+        "#!/bin/bash\ncd \"$PWD\" || exit 1\nmkdir -p stories\nprintf '# 第一章\\n\\n新内容（CLI 改）。\\n' > stories/ch1.md\nprintf '# 第二章\\n\\nCLI 新增章节。\\n' > stories/ch2.md\necho \"fake-writer done\"\n",
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&writer, std::fs::Permissions::from_mode(0o755));
+    }
+}
+
 fn path_with_fake_bin() {
     let bin = fake_bin_dir();
     let path = std::env::var("PATH").unwrap_or_default();
@@ -51,6 +68,7 @@ static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 async fn e2e_detect_run_snapshot_review() {
     let _guard = TEST_LOCK.lock().unwrap();
     path_with_fake_bin();
+    install_fake_writer();
     install_fake_claude();
 
     // 1. 检测：claude 可用（fake），其余不可用
@@ -120,6 +138,7 @@ async fn e2e_detect_run_snapshot_review() {
 async fn e2e_mutex_rejects_concurrent_same_workspace() {
     let _guard = TEST_LOCK.lock().unwrap();
     path_with_fake_bin();
+    install_fake_writer();
     install_fake_claude();
 
     let ws = make_workspace("mutex");
