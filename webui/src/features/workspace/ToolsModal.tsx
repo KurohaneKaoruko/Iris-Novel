@@ -13,6 +13,8 @@ type Props = {
   activePath: string | null
   /** 导入/体检等操作后外部刷新 */
   onRefresh?: () => void
+  /** 初始页签（命令面板直达） */
+  initialTab?: Tab
 }
 
 type Tab = 'search' | 'export' | 'risk' | 'lint' | 'import'
@@ -37,8 +39,8 @@ function collectFiles(entry: FsEntry, test: (p: string) => boolean): FsEntry[] {
 
 const stripMd = (t: string) => t.replace(/^#{1,6}\s+/gm, '').replace(/[*_`>]/g, '')
 
-export function ToolsModal({ onClose, onError, onOpenFile, activePath, onRefresh }: Props) {
-  const [tab, setTab] = useState<Tab>('search')
+export function ToolsModal({ onClose, onError, onOpenFile, activePath, onRefresh, initialTab }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'search')
 
   // ---- 搜索 ----
   const [query, setQuery] = useState('')

@@ -67,6 +67,11 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [dirty, setDirty] = useState(false)
   const [assistantId, setAssistantId] = useState<string | null>(null)
   const [modal, setModal] = useState<'settings' | 'tools' | 'book' | null>(null)
+  const [toolsInitialTab, setToolsInitialTab] = useState<'search' | 'lint' | 'import'>('search')
+  const setModalWithTools = (tab: 'search' | 'lint' | 'import') => {
+    setToolsInitialTab(tab)
+    setModal('tools')
+  }
   const [selection, setSelection] = useState<{ has: boolean; text: string } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const chat = useChat()
@@ -295,7 +300,9 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       { id: 'new-chapter', group: '动作', label: '新建章节', keywords: 'xinjian create', run: () => void handleCreateChapter() },
       { id: 'new-doc', group: '动作', label: '新建资料文档', keywords: 'xinjian file', run: () => void handleCreateFile() },
       { id: 'open-settings', group: '动作', label: '打开设置', keywords: 'shezhi settings', run: () => setModal('settings') },
-      { id: 'open-tools', group: '动作', label: '工具箱（搜索/导出/风险审阅）', keywords: 'gongju tools search', run: () => setModal('tools') },
+      { id: 'open-tools', group: '动作', label: '工具箱（搜索/体检/导入/导出/审阅）', keywords: 'gongju tools search', run: () => setModalWithTools('search') },
+      { id: 'open-lint', group: '动作', label: '正文体检（AI 味/密度铁律）', keywords: 'tijian lint jiancha check', run: () => setModalWithTools('lint') },
+      { id: 'open-import', group: '动作', label: '导入切章（存量作品）', keywords: 'daoru import importchapters', run: () => setModalWithTools('import') },
       { id: 'open-book', group: '动作', label: '拆书分析', keywords: 'chaishu analyze', run: () => setModal('book') },
       { id: 'back-shelf', group: '动作', label: '返回书架', keywords: 'shujia bookshelf exit', run: onExit },
       { id: 'ai-continue', group: 'AI 写作', label: 'AI 续写本章', keywords: 'xuxie continue', run: () => runAiMode('continue') },
@@ -546,6 +553,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
             onOpenFile={openFileAtLine}
             activePath={activePath}
             onRefresh={() => void refreshAll()}
+            initialTab={toolsInitialTab}
           />
         ) : null}
 
