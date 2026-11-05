@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { listWorkspaceTree, readText, riskScanContent, type FsEntry, type RiskScanResult } from '../../api/backend'
 import { LintTab } from './LintTab'
 import { ImportTab } from './ImportTab'
+import { ConsistencyTab } from './ConsistencyTab'
 import './ToolsModal.css'
 
 type Props = {
@@ -17,7 +18,7 @@ type Props = {
   initialTab?: Tab
 }
 
-type Tab = 'search' | 'export' | 'risk' | 'lint' | 'import'
+type Tab = 'search' | 'export' | 'risk' | 'lint' | 'import' | 'consistency'
 
 type SearchHit = { path: string; line: number; text: string }
 
@@ -184,7 +185,7 @@ export function ToolsModal({ onClose, onError, onOpenFile, activePath, onRefresh
       <div className="modal-box tools-box" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <nav className="settings-tabs">
-            {([['search', '全局搜索'], ['lint', '正文体检'], ['import', '导入切章'], ['export', '全书导出'], ['risk', '风险审阅']] as const).map(([id, label]) => (
+            {([['search', '全局搜索'], ['consistency', '一致性'], ['lint', '正文体检'], ['import', '导入切章'], ['export', '全书导出'], ['risk', '风险审阅']] as const).map(([id, label]) => (
               <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
             ))}
           </nav>
@@ -272,6 +273,10 @@ export function ToolsModal({ onClose, onError, onOpenFile, activePath, onRefresh
 
           {tab === 'lint' ? (
             <LintTab activePath={activePath} onError={onError} onOpenFile={onOpenFile} />
+          ) : null}
+
+          {tab === 'consistency' ? (
+            <ConsistencyTab onError={onError} onOpenFile={onOpenFile} />
           ) : null}
 
           {tab === 'import' ? (
