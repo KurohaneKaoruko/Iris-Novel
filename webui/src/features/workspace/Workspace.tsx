@@ -25,6 +25,7 @@ import { HistoryPanel } from './HistoryPanel'
 import { BookAnalyzerPanel } from './BookAnalyzerPanel'
 import { PlannerPanel } from './PlannerPanel'
 import { ProgressPanel } from './ProgressPanel'
+import { SprintTimer } from './SprintTimer'
 import { CommandPalette, type CommandDef } from './CommandPalette'
 import './Workspace.css'
 
@@ -59,6 +60,11 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [characters, setCharacters] = useState<Character[]>([])
   const [codex, setCodex] = useState<CodexEntry[]>([])
+  /** 当前活动章节字数（冲刺计时用，随保存更新） */
+  const activeChapterWords = useMemo(
+    () => chapters.find((c) => c.filePath === activePath)?.wordCount ?? 0,
+    [chapters, activePath],
+  )
   const [plotLines, setPlotLines] = useState<PlotLine[]>([])
   const [memory, setMemory] = useState<MemoryIndex[]>([])
   const [docs, setDocs] = useState<DocFile[]>([])
@@ -485,6 +491,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
             ) : null}
           </div>
 
+          <SprintTimer chapterWords={activeChapterWords} activePath={activePath} />
           {stats ? <StatsPanel stats={stats} /> : null}
         </aside>
 
