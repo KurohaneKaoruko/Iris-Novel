@@ -5,8 +5,8 @@ import { subscribeEvent } from '../../api/rpc'
 import { readDeepLink } from '../../api/deeplink'
 import {
   computeWorkStats, createChapterFile, listChapters, listCharacters, listConceptFiles, listPlotLines,
-  loadMemoryIndices, markChapterStatus, recordTodayWords, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
-  type Chapter, type Character, type DocFile, type MemoryIndex, type PlotLine, type WorkStats,
+  loadMemoryIndices, loadWritingHistory, markChapterStatus, recordTodayWords, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
+  type Chapter, type Character, type DocFile, type MemoryIndex, type PlotLine, type WorkStats, type WritingHistoryEntry,
 } from '../../api/novel'
 import { useWork } from '../../state/WorkContext'
 import { useChat } from '../../hooks/useChat'
@@ -22,13 +22,15 @@ import { ToolsModal } from './ToolsModal'
 import { HistoryPanel } from './HistoryPanel'
 import { BookAnalyzerPanel } from './BookAnalyzerPanel'
 import { PlannerPanel } from './PlannerPanel'
+import { ProgressPanel } from './ProgressPanel'
 import { CommandPalette, type CommandDef } from './CommandPalette'
 import './Workspace.css'
 
-type SideTab = 'chapters' | 'characters' | 'plotlines' | 'docs' | 'memory' | 'history' | 'planner'
+type SideTab = 'chapters' | 'progress' | 'characters' | 'plotlines' | 'docs' | 'memory' | 'history' | 'planner'
 
 const SIDE_TABS: Array<{ id: SideTab; label: string }> = [
   { id: 'chapters', label: '章节' },
+  { id: 'progress', label: '进度' },
   { id: 'characters', label: '人物' },
   { id: 'plotlines', label: '情节线' },
   { id: 'docs', label: '资料' },
@@ -57,6 +59,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [memory, setMemory] = useState<MemoryIndex[]>([])
   const [docs, setDocs] = useState<DocFile[]>([])
   const [stats, setStats] = useState<WorkStats | null>(null)
+  const [writingHistory, setWritingHistory] = useState<{ entries: WritingHistoryEntry[]; dailyGoal: number }>({ entries: [], dailyGoal: 0 })
   const [dirty, setDirty] = useState(false)
   const [assistantId, setAssistantId] = useState<string | null>(null)
   const [modal, setModal] = useState<'settings' | 'tools' | 'book' | null>(null)
@@ -82,6 +85,8 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       setMemory(mem)
       setDocs(await listConceptFiles())
       setStats(await computeWorkStats())
+      const wh = await loadWritingHistory()
+      setWritingHistory({ entries: wh.history, dailyGoal: wh.dailyGoal })
     } catch (e) {
       setError(`加载数据失败：${e instanceof Error ? e.message : String(e)}`)
     }
@@ -363,6 +368,16 @@ export function Workspace({ onExit }: { onExit: () => void }) {
                   </div>
                 ))}
               </div>
+            ) : null}
+
+            {sideTab === 'progress' ? (
+              <ProgressPanel
+                chapters={chapters}
+                history={writingHistory.entries}
+                dailyGoal={writingHistory.dailyGoal}
+                activePath={activePath}
+                onOpenChapter={setActivePath}
+              />
             ) : null}
 
             {sideTab === 'characters' ? (
