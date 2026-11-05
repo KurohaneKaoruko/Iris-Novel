@@ -1,0 +1,177 @@
+.planner-panel .planner-draft {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planner-draft input {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.planner-draft-row {
+  display: flex;
+  gap: 6px;
+}
+
+.planner-draft-row label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.planner-draft-row input {
+  width: 100%;
+  min-width: 0;
+}
+
+.planner-draft-btn {
+  font-size: 12px;
+  padding: 5px 12px;
+  background: var(--accent);
+  color: #10121a;
+  border-radius: var(--radius);
+  align-self: flex-start;
+}
+
+.planner-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(122, 162, 247, 0.08);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.planner-next-label {
+  color: var(--accent);
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.planner-next-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-next button {
+  padding: 3px 12px;
+  background: var(--accent);
+  color: #10121a;
+  border-radius: var(--radius);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.planner-next.all-done {
+  color: var(--success);
+  justify-content: center;
+}
+
+.planner-run {
+  border-bottom: 1px solid var(--border);
+  max-height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+.planner-run-head {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.planner-run-body {
+  margin: 0;
+  padding: 8px 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+}
+
+.planner-task {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.planner-task.status-done {
+  opacity: 0.55;
+}
+
+.planner-task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planner-status {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+.planner-status.status-todo {
+  background: rgba(122, 162, 247, 0.15);
+  color: var(--accent);
+}
+
+.planner-status.status-running {
+  background: rgba(224, 175, 104, 0.18);
+  color: #e0af68;
+}
+
+.planner-status.status-done {
+  background: rgba(158, 206, 106, 0.18);
+  color: var(--success);
+}
+
+.planner-status.status-retry,
+.planner-status.status-blocked {
+  background: rgba(247, 118, 142, 0.15);
+  color: var(--danger);
+}
+
+.planner-task-title {
+  flex: 1;
+  font-size: 13px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-task-title:hover {
+  color: var(--accent);
+}
+
+.planner-task-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.planner-task-error {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

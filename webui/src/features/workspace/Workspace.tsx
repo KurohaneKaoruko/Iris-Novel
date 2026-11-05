@@ -20,9 +20,10 @@ import { SettingsModal } from './SettingsModal'
 import { ToolsModal } from './ToolsModal'
 import { HistoryPanel } from './HistoryPanel'
 import { BookAnalyzerPanel } from './BookAnalyzerPanel'
+import { PlannerPanel } from './PlannerPanel'
 import './Workspace.css'
 
-type SideTab = 'chapters' | 'characters' | 'plotlines' | 'docs' | 'memory' | 'history'
+type SideTab = 'chapters' | 'characters' | 'plotlines' | 'docs' | 'memory' | 'history' | 'planner'
 
 const SIDE_TABS: Array<{ id: SideTab; label: string }> = [
   { id: 'chapters', label: '章节' },
@@ -31,6 +32,7 @@ const SIDE_TABS: Array<{ id: SideTab; label: string }> = [
   { id: 'docs', label: '资料' },
   { id: 'memory', label: '记忆' },
   { id: 'history', label: '历史' },
+  { id: 'planner', label: '规划' },
 ]
 
 function collectFiles(entry: FsEntry, test: (p: string) => boolean): FsEntry[] {
@@ -343,6 +345,15 @@ export function Workspace({ onExit }: { onExit: () => void }) {
 
             {sideTab === 'history' ? (
               <HistoryPanel activePath={activePath} onError={setError} onRestored={() => void refreshAll()} />
+            ) : null}
+
+            {sideTab === 'planner' ? (
+              <PlannerPanel
+                assistantId={assistantId}
+                onError={setError}
+                onOpenFile={(p) => setActivePath(p)}
+                onRefresh={() => void refreshAll()}
+              />
             ) : null}
           </div>
 
