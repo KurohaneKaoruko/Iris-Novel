@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { readText } from '../../api/backend'
+import { subscribeEvent } from '../../api/rpc'
 import './EditorPane.css'
 
 type EditorPaneProps = {
@@ -96,6 +97,23 @@ export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, on
     if (!editor || loading) return
     editor.commands.setContent(linesToDoc(initialContent))
   }, [editor, initialContent, loading])
+
+  // 外部修改同步：fs_changed 且变更路径是当前文件、本地无未保存修改时，重新加载
+  useEffect(() => {
+    const un = subscribeEvent('fs_changed', (raw) => {
+      const p = (raw ?? {}) as { path?: string }
+      const changed = typeof p.path === 'string' ? p.path : null
+      if (!changed || changed !== path) return
+      if (dirtyRef.current) return // 有未保存修改时不覆盖，交由用户保存决策
+      readText(path)
+        .then((text) => {
+          if (text === lastSyncedRef.current) return
+          setInitialContent(text)
+        })
+        .catch(() => {})
+    })
+    return () => un()
+  }, [path])
 
   const doSave = useCallback(async () => {
     if (!editor) return
