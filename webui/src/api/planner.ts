@@ -134,6 +134,92 @@ export function newTaskId(chapterIndex: number): string {
   return `ch${String(chapterIndex).padStart(3, '0')}-${Date.now().toString(36)}-${seq}`
 }
 
+/** 从 AI 回复中提取 JSON 数组（容忍 ```json 围栏与前后杂text） */
+export function extractJsonArray(raw: string): unknown[] | null {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+  const text = fenced ? fenced[1] : raw
+  // 杂文本里可能混入无关的 [，从每个 [ 起尝试解析，取第一个成功的
+  let from = text.indexOf('[')
+  while (from >= 0) {
+    const end = text.lastIndexOf(']')
+    if (end > from) {
+      try {
+        const parsed: unknown = JSON.parse(text.slice(from, end + 1))
+        if (Array.isArray(parsed)) return parsed
+      } catch {
+        /* 尝试下一个 [ */
+      }
+    }
+    from = text.indexOf('[', from + 1)
+  }
+  return null
+}
+
+/**
+ * AI 拆解写作目标为任务链。输出经 sanitizeTask 严格清洗（与 run-queue 持久化同一防线）；
+ * id/依赖链按顺序重建（AI 生成的依赖不可信），解析失败或空结果返回 null（调用方回退模板）。
+ */
+export function parseAiTasks(
+  raw: string,
+  startChapter: number,
+  count: number,
+  targetWords: number,
+  goal: string,
+): NovelTask[] | null {
+  const arr = extractJsonArray(raw)
+  if (!arr || arr.length === 0) return null
+  const slice = arr.slice(0, Math.max(1, Math.min(20, count)))
+  const tasks: NovelTask[] = []
+  for (let i = 0; i < slice.length; i++) {
+    const idx = startChapter + i
+    // AI 输出无 id 字段：注入占位 id 以通过 sanitizeTask 的持久化格式防线（随后被重建覆盖）
+    const raw0 = slice[i]
+    const item = isRecord(raw0) ? { id: `tmp-${i}`, ...raw0 } : null
+    const sanitized = item ? sanitizeTask(item) : null
+    if (!sanitized) continue
+    // id 与依赖链按顺序重建：AI 的 id/depends_on 不作为持久化依据
+    const id = `ch${String(idx).padStart(3, '0')}`
+    tasks.push({
+      ...sanitized,
+      id,
+      status: 'todo',
+      priority: i === 0 ? 'high' : 'medium',
+      depends_on: i === 0 ? [] : [tasks[i - 1].id],
+      target_words: sanitized.target_words || targetWords,
+      scope: `stories/chapter-${String(idx).padStart(4, '0')}.md`,
+      volume: 1,
+      chapter_index: idx,
+      retries: 0,
+    })
+  }
+  if (tasks.length === 0) return null
+  // 保证每条任务有可用的提示词
+  for (const t of tasks) {
+    if (!t.task_prompt) t.task_prompt = goal ? `围绕「${goal}」写第 ${t.chapter_index} 章。` : ''
+  }
+  return tasks
+}
+
+/** AI 任务链拆解提示词：要求严格 JSON 输出，字段与 run-queue 任务对齐 */
+export function buildTaskDraftPrompt(goal: string, startChapter: number, count: number, targetWords: number): string {
+  return [
+    `你是小说项目的任务规划器。请把以下写作目标拆解为 ${count} 个连续章节的写作任务链。`,
+    ``,
+    `【写作目标】${goal || '推进主线剧情'}`,
+    `【起始章节】第 ${startChapter} 章`,
+    `【每章目标字数】约 ${targetWords} 字`,
+    ``,
+    `只输出 JSON 数组（不要任何解释或围栏），每个元素包含：`,
+    `- "title": 章节任务标题（如「第 ${startChapter} 章 · 雨夜追击」，含冲突与钩子）`,
+    `- "chapter_index": 章节序号（从 ${startChapter} 递增）`,
+    `- "task_prompt": 该章写作提示词，一句话说明本章要完成的剧情推进、出场人物、章末钩子`,
+    `- "acceptance_checks": 2-3 条验收标准（字数、承接前章、人物一致性等）`,
+    `- "arc_targets": 本章推进的情节线名称数组（可为空）`,
+    `- "foreshadow_refs": 本章埋设/回收的伏笔名称数组（可为空）`,
+    `- "timeline_window": 时间窗（如「第 3 日夜」或「global」）`,
+  ].join('\n')
+}
+
 /** 用 AI 从一句写作目标生成任务队列草稿（规则模板，无需 API Key；后续可换 AI 生成） */
 export function draftTasksFromGoal(goal: string, startChapter: number, count: number, targetWords: number): NovelTask[] {
   const tasks: NovelTask[] = []

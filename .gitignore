@@ -32,10 +32,8 @@ output/
 gen/
 data/
 
-# Tests
+# Tests（webui 单测纳入版本管理）
 __tests__/
 *.test.ts
 *.test.tsx
-!src-react/__tests__/
-!src-react/__tests__/*.test.ts
-!src-react/__tests__/*.test.tsx
+!webui/src/**/*.test.ts

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   loadRunQueue, saveRunQueue, nextExecutableTask, draftTasksFromGoal, newTaskId,
+  parseAiTasks, buildTaskDraftPrompt,
   type NovelTask, type RunQueueState, type TaskStatus,
 } from '../../api/planner'
 import { readText, writeText } from '../../api/backend'
-import { generateStream } from '../../api/writing'
+import { generateStream, streamChat, type GenerateHandle } from '../../api/writing'
 import './PlannerPanel.css'
 
 type Props = {
@@ -35,6 +36,8 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
   const [targetWords, setTargetWords] = useState(2000)
   const [runningTask, setRunningTask] = useState<string | null>(null)
   const [runOutput, setRunOutput] = useState('')
+  const [aiDrafting, setAiDrafting] = useState(false)
+  const aiDraftRef = useRef<GenerateHandle | null>(null)
 
   const reload = useCallback(async () => {
     setQueue(await loadRunQueue().catch(() => null))
@@ -55,6 +58,37 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
   const draft = async () => {
     const tasks = draftTasksFromGoal(goal.trim(), startChapter, Math.min(20, Math.max(1, count)), targetWords)
     await persist('plan', tasks)
+  }
+
+  /** AI 拆解：流式生成任务链 JSON，解析失败回退规则模板并提示 */
+  const draftWithAi = async () => {
+    const n = Math.min(20, Math.max(1, count))
+    const g = goal.trim()
+    setAiDrafting(true)
+    setRunOutput('')
+    try {
+      const handle = streamChat({
+        prompt: buildTaskDraftPrompt(g || '推进主线剧情', startChapter, n, targetWords),
+        assistantId,
+        onToken: (full) => setRunOutput(full.slice(-600)),
+      })
+      aiDraftRef.current = handle
+      const raw = await handle.promise
+      const tasks = parseAiTasks(raw, startChapter, n, targetWords, g)
+      if (tasks && tasks.length > 0) {
+        await persist('plan', tasks)
+        onError(null)
+      } else {
+        onError('AI 输出无法解析为任务链，已回退规则模板')
+        await draft()
+      }
+    } catch (e) {
+      onError(`AI 拆解失败（${e instanceof Error ? e.message : String(e)}），已回退规则模板`)
+      await draft()
+    } finally {
+      setAiDrafting(false)
+      setRunOutput('')
+    }
   }
 
   const addTask = async () => {
@@ -197,12 +231,28 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
           <label>章数 <input type="number" min={1} max={20} value={count} onChange={(e) => setCount(Number(e.target.value) || 1)} /></label>
           <label>每章字数 <input type="number" min={500} step={500} value={targetWords} onChange={(e) => setTargetWords(Number(e.target.value) || 2000)} /></label>
         </div>
-        <button className="planner-draft-btn" onClick={() => {
-          if (queue.tasks.length > 0 && !window.confirm('将覆盖现有队列，确认？')) return
-          void draft()
-        }}>
-          生成任务链
-        </button>
+        <div className="planner-draft-actions">
+          <button className="planner-draft-btn" onClick={() => {
+            if (queue.tasks.length > 0 && !window.confirm('将覆盖现有队列，确认？')) return
+            void draft()
+          }}>
+            模板生成
+          </button>
+          <button
+            className="planner-draft-btn planner-draft-btn-ai"
+            disabled={aiDrafting}
+            onClick={() => {
+              if (queue.tasks.length > 0 && !window.confirm('AI 将覆盖现有队列，确认？')) return
+              void draftWithAi()
+            }}
+          >
+            {aiDrafting ? 'AI 拆解中…' : 'AI 拆解'}
+          </button>
+          {aiDrafting && (
+            <button className="planner-draft-btn" onClick={() => aiDraftRef.current?.cancel()}>取消</button>
+          )}
+        </div>
+        {aiDrafting && runOutput && <pre className="planner-run-output">{runOutput}</pre>}
       </div>
 
       {/* 下一个可执行 */}

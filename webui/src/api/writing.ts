@@ -60,6 +60,24 @@ export function generateStream(args: {
   providerId?: string | null
   onToken?: (fullText: string) => void
 }): GenerateHandle {
+  return streamChat({
+    prompt: buildPrompt(args.mode, args.promptInput),
+    assistantId: args.assistantId,
+    providerId: args.providerId,
+    onToken: args.onToken,
+  })
+}
+
+/**
+ * 通用流式对话：任意 prompt → 完整文本。
+ * generateStream（四写作模式）与 AI 任务链拆解共用此通道。
+ */
+export function streamChat(args: {
+  prompt: string
+  assistantId?: string | null
+  providerId?: string | null
+  onToken?: (fullText: string) => void
+}): GenerateHandle {
   const streamId = `wf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   let output = ''
   let cancelled = false
@@ -100,7 +118,7 @@ export function generateStream(args: {
 
     chatGenerateStream({
       streamId,
-      messages: [{ role: 'user', content: buildPrompt(args.mode, args.promptInput) }],
+      messages: [{ role: 'user', content: args.prompt }],
       assistantId: args.assistantId ?? null,
       providerId: args.providerId ?? null,
     }).catch((e) => finish(() => reject(e instanceof Error ? e : new Error(String(e)))))
