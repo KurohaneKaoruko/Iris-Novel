@@ -21,6 +21,7 @@ import { ToolsModal } from './ToolsModal'
 import { HistoryPanel } from './HistoryPanel'
 import { BookAnalyzerPanel } from './BookAnalyzerPanel'
 import { PlannerPanel } from './PlannerPanel'
+import { CommandPalette, type CommandDef } from './CommandPalette'
 import './Workspace.css'
 
 type SideTab = 'chapters' | 'characters' | 'plotlines' | 'docs' | 'memory' | 'history' | 'planner'
@@ -59,6 +60,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [assistantId, setAssistantId] = useState<string | null>(null)
   const [modal, setModal] = useState<'settings' | 'tools' | 'book' | null>(null)
   const [selection, setSelection] = useState<{ has: boolean; text: string } | null>(null)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const chat = useChat()
   const contentRef = useRef<Map<string, string>>(new Map())
 
@@ -226,6 +228,66 @@ export function Workspace({ onExit }: { onExit: () => void }) {
 
   const workName = workRoot?.split(/[/\\]/).filter(Boolean).pop() ?? ''
   const activeIsOpenable = activePath ? openableMap.has(activePath) : false
+
+  // ---- 命令面板 ----
+  const gotoSide = (tab: SideTab) => {
+    setSideTab(tab)
+  }
+  const runAiMode = (mode: 'continue' | 'outline' | 'chapter-outline' | 'polish') => {
+    gotoSide('chapters')
+    // 直接把模式派发给 AiWriteBar：通过共享 contentRef 之外的轻量事件（自定义 DOM 事件最简）
+    window.dispatchEvent(new CustomEvent('webui-ai-mode', { detail: mode }))
+  }
+
+  const commands = useMemo<CommandDef[]>(() => {
+    const cmds: CommandDef[] = [
+      { id: 'nav-chapters', group: '面板', label: '章节面板', keywords: 'zhangjie chapter', hint: '左侧', run: () => gotoSide('chapters') },
+      { id: 'nav-characters', group: '面板', label: '人物面板', keywords: 'renwu character', run: () => gotoSide('characters') },
+      { id: 'nav-plotlines', group: '面板', label: '情节线面板', keywords: 'qingxian plot', run: () => gotoSide('plotlines') },
+      { id: 'nav-docs', group: '面板', label: '资料文档', keywords: 'ziliao docs', run: () => gotoSide('docs') },
+      { id: 'nav-memory', group: '面板', label: '记忆索引', keywords: 'jiyi memory', run: () => gotoSide('memory') },
+      { id: 'nav-history', group: '面板', label: '版本历史', keywords: 'lishi history', run: () => gotoSide('history') },
+      { id: 'nav-planner', group: '面板', label: '规划队列', keywords: 'guihua planner', run: () => gotoSide('planner') },
+      { id: 'new-chapter', group: '动作', label: '新建章节', keywords: 'xinjian create', run: () => void handleCreateChapter() },
+      { id: 'new-doc', group: '动作', label: '新建资料文档', keywords: 'xinjian file', run: () => void handleCreateFile() },
+      { id: 'open-settings', group: '动作', label: '打开设置', keywords: 'shezhi settings', run: () => setModal('settings') },
+      { id: 'open-tools', group: '动作', label: '工具箱（搜索/导出/风险审阅）', keywords: 'gongju tools search', run: () => setModal('tools') },
+      { id: 'open-book', group: '动作', label: '拆书分析', keywords: 'chaishu analyze', run: () => setModal('book') },
+      { id: 'back-shelf', group: '动作', label: '返回书架', keywords: 'shujia bookshelf exit', run: onExit },
+      { id: 'ai-continue', group: 'AI 写作', label: 'AI 续写本章', keywords: 'xuxie continue', run: () => runAiMode('continue') },
+      { id: 'ai-outline', group: 'AI 写作', label: 'AI 生成大纲', keywords: 'dagang outline', run: () => runAiMode('outline') },
+      { id: 'ai-chapter-outline', group: 'AI 写作', label: 'AI 章节细纲', keywords: 'xigang', run: () => runAiMode('chapter-outline') },
+      { id: 'ai-polish', group: 'AI 写作', label: 'AI 润色本章', keywords: 'runse polish', run: () => runAiMode('polish') },
+    ]
+    // 文件跳转命令（前 40 个文件，避免列表过长）
+    for (const f of allOpenable.slice(0, 40)) {
+      cmds.push({
+        id: `file-${f.path}`,
+        group: '跳转文件',
+        label: f.name,
+        hint: f.path,
+        keywords: f.path,
+        run: () => setActivePath(f.path),
+      })
+    }
+    return cmds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allOpenable, handleCreateChapter, handleCreateFile, onExit])
+
+  // Ctrl+K / Ctrl+P 打开
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        setPaletteOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <div className="workspace">
@@ -419,6 +481,12 @@ export function Workspace({ onExit }: { onExit: () => void }) {
             activePath={activePath}
           />
         ) : null}
+
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          commands={commands}
+        />
       </div>
     </div>
   )

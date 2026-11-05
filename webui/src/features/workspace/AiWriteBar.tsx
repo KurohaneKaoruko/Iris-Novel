@@ -42,6 +42,18 @@ export function AiWriteBar({ activePath, assistantId, targetWords, contentRef, o
     if (selection?.has && selection.text.trim()) selTextRef.current = selection.text
   }, [selection])
 
+  // 命令面板派发的模式切换
+  useEffect(() => {
+    const onMode = (e: Event) => {
+      const mode = (e as CustomEvent).detail as WriteMode
+      if (!WRITE_MODES.some((m) => m.id === mode)) return
+      setMode(mode)
+      setShowOutput(true)
+    }
+    window.addEventListener('webui-ai-mode', onMode)
+    return () => window.removeEventListener('webui-ai-mode', onMode)
+  }, [])
+
   const selPrompt = useCallback((m: SelMode, text: string, extra?: string): string => {
     const req = extra ? `\n\n【要求】${extra}` : ''
     if (m === 'sel-expand') return `【原文】\n${text}${req}\n\n请扩写以上片段：丰富细节、感官与心理描写，篇幅约为原文 2-3 倍。只输出扩写后的文字。`
