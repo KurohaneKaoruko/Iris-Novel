@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { listWorkspaceTree, readText, riskScanContent, type FsEntry, type RiskScanResult } from '../../api/backend'
+import { LintTab } from './LintTab'
+import { ImportTab } from './ImportTab'
 import './ToolsModal.css'
 
 type Props = {
@@ -9,9 +11,11 @@ type Props = {
   onOpenFile: (path: string) => void
   /** 当前活动章节（风险审阅默认目标） */
   activePath: string | null
+  /** 导入/体检等操作后外部刷新 */
+  onRefresh?: () => void
 }
 
-type Tab = 'search' | 'export' | 'risk'
+type Tab = 'search' | 'export' | 'risk' | 'lint' | 'import'
 
 type SearchHit = { path: string; line: number; text: string }
 
@@ -33,7 +37,7 @@ function collectFiles(entry: FsEntry, test: (p: string) => boolean): FsEntry[] {
 
 const stripMd = (t: string) => t.replace(/^#{1,6}\s+/gm, '').replace(/[*_`>]/g, '')
 
-export function ToolsModal({ onClose, onError, onOpenFile, activePath }: Props) {
+export function ToolsModal({ onClose, onError, onOpenFile, activePath, onRefresh }: Props) {
   const [tab, setTab] = useState<Tab>('search')
 
   // ---- 搜索 ----
@@ -178,7 +182,7 @@ export function ToolsModal({ onClose, onError, onOpenFile, activePath }: Props) 
       <div className="modal-box tools-box" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <nav className="settings-tabs">
-            {([['search', '全局搜索'], ['export', '全书导出'], ['risk', '风险审阅']] as const).map(([id, label]) => (
+            {([['search', '全局搜索'], ['lint', '正文体检'], ['import', '导入切章'], ['export', '全书导出'], ['risk', '风险审阅']] as const).map(([id, label]) => (
               <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
             ))}
           </nav>
@@ -262,6 +266,18 @@ export function ToolsModal({ onClose, onError, onOpenFile, activePath }: Props) 
                 </div>
               ) : null}
             </div>
+          ) : null}
+
+          {tab === 'lint' ? (
+            <LintTab activePath={activePath} onError={onError} onOpenFile={onOpenFile} />
+          ) : null}
+
+          {tab === 'import' ? (
+            <ImportTab
+              onError={onError}
+              onOpenFile={onOpenFile}
+              onImported={() => onRefresh?.()}
+            />
           ) : null}
         </div>
       </div>

@@ -15,6 +15,8 @@ type EditorPaneProps = {
   onError: (msg: string | null) => void
   /** AI 写入信号：'ai-replace' 整体替换 / 'ai-append' 追加末尾 / 'ai-selection' 替换当前选区，消费后删除 key */
   aiReplaceSignal?: React.MutableRefObject<Map<string, string>>
+  /** 跳行信号：值为目标行号（1-based），消费后置空。用于 lint/搜索结果定位 */
+  goToLineSignal?: React.MutableRefObject<number | null>
   /** 选区变化上报（供 AiWriteBar 判断有无选中文字） */
   onSelectionChange?: (hasSelection: boolean, selectedText: string) => void
 }
@@ -24,7 +26,7 @@ type EditorPaneProps = {
  * 内容为纯文本行；保存时以 \n 连接段落。
  * Ctrl+S 由本组件捕获并走 onSave。
  */
-export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, onError, aiReplaceSignal, onSelectionChange }: EditorPaneProps) {
+export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, onError, aiReplaceSignal, goToLineSignal, onSelectionChange }: EditorPaneProps) {
   const [loading, setLoading] = useState(true)
   const [initialContent, setInitialContent] = useState('')
   const lastSyncedRef = useRef<string>('')
@@ -163,9 +165,52 @@ export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, on
           applyAndSave()
         }
       }
+      // lint/搜索定位：跳到目标行。编辑器被 modal 遮住时不消费，等可见再跳（滚动才有效）
+      const signal = goToLineSignal
+      const line = signal?.current
+      const editorVisible = editor.view.dom.offsetParent !== null && !document.querySelector('.modal-overlay')
+      if (line !== undefined && line !== null && line >= 1 && !editorVisible) {
+      }
+      if (signal && line !== undefined && line !== null && line >= 1 && editorVisible) {
+        signal.current = null
+        const doc = editor.state.doc
+        let targetPos: { from: number; to: number } | null = null
+        let idx = 0
+        doc.descendants((node, pos) => {
+          if (targetPos) return false
+          if (node.isTextblock) {
+            idx += 1
+            if (idx === line) {
+              targetPos = { from: pos + 1, to: pos + node.content.size + 1 }
+              return false
+            }
+          }
+          return true
+        })
+        const tp = targetPos as { from: number; to: number } | null
+        if (tp) {
+          editor.commands.setTextSelection(tp)
+          editor.commands.focus()
+          // 同步滚动（rAF 在后台/无合成器环境会被无限节流）：用目标段落 DOM 几何对滚动容器做中心对齐
+          try {
+            const domAt = editor.view.domAtPos(tp.from)
+            const el = domAt.node instanceof Element ? domAt.node : domAt.node.parentElement
+            const block = (el?.closest('p, h1, h2, h3') ?? el) as HTMLElement | null
+            const scroller = editor.view.dom.closest('.editor-content') as HTMLElement | null
+            if (block && scroller) {
+              const bRect = block.getBoundingClientRect()
+              const sRect = scroller.getBoundingClientRect()
+              const delta = bRect.top - (sRect.top + sRect.height / 2)
+              scroller.scrollTop += delta
+            } else {
+              block?.scrollIntoView({ block: 'center' })
+            }
+          } catch { /* pos 可能因文档变化失效，忽略 */ }
+        }
+      }
     }, 300)
     return () => window.clearInterval(iv)
-  }, [aiReplaceSignal, editor, onContentChanged, onSaved, onSave])
+  }, [aiReplaceSignal, goToLineSignal, editor, onContentChanged, onSaved, onSave])
 
   // 卸载前提示未保存（简单兜底；后续可加 beforeunload）
   useEffect(() => {

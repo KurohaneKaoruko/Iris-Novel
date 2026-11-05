@@ -67,6 +67,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const chat = useChat()
   const contentRef = useRef<Map<string, string>>(new Map())
+  const goToLineRef = useRef<number | null>(null)
 
   const refreshAll = useCallback(async () => {
     if (!workRoot) return
@@ -165,6 +166,12 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       setError(`创建章节失败：${e instanceof Error ? e.message : String(e)}`)
     }
   }, [chapters.length, refreshAll, setActivePath, setError])
+
+  /** 打开文件并定位到行（lint/搜索跳转用；line 为空则只打开） */
+  const openFileAtLine = useCallback((path: string, line?: number) => {
+    setActivePath(path)
+    goToLineRef.current = line && line >= 1 ? line : null
+  }, [setActivePath])
 
   const handleCreateFile = useCallback(async () => {
     const name = window.prompt('新文件相对路径（如 concept/世界观.md）')
@@ -467,6 +474,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
                 onSaved={() => setDirty(false)}
                 onError={setError}
                 aiReplaceSignal={contentRef}
+                goToLineSignal={goToLineRef}
                 onSelectionChange={(has, text) => setSelection({ has, text })}
               />
             </>
@@ -499,8 +507,9 @@ export function Workspace({ onExit }: { onExit: () => void }) {
           <ToolsModal
             onClose={() => setModal(null)}
             onError={setError}
-            onOpenFile={(p) => setActivePath(p)}
+            onOpenFile={openFileAtLine}
             activePath={activePath}
+            onRefresh={() => void refreshAll()}
           />
         ) : null}
 

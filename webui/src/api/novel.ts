@@ -110,6 +110,33 @@ export async function createChapterFile(title: string, order?: number): Promise<
   return path
 }
 
+/** 批量导入章节（存量作品切章后调用）：从 startOrder 起逐章写文件+元数据，返回落盘路径列表 */
+export async function importChapters(
+  items: Array<{ title: string; content: string }>,
+  startOrder: number,
+): Promise<string[]> {
+  const paths: string[] = []
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    const order = startOrder + i
+    const num = String(order).padStart(4, '0')
+    const path = `stories/chapter-${num}.md`
+    const body = `# ${item.title}\n\n${item.content.trim()}\n`
+    await writeText(path, body)
+    await saveChapterMeta({
+      id: path,
+      filePath: path,
+      title: item.title,
+      wordCount: words(body),
+      status: 'draft',
+      lastModified: Date.now(),
+      order,
+    })
+    paths.push(path)
+  }
+  return paths
+}
+
 // ============ 人物卡（concept/characters.md） ============
 
 export type CharacterData = {
