@@ -44,13 +44,15 @@ export async function listChapters(): Promise<Chapter[]> {
     /* 无元数据视为首次 */
   }
 
+  // 字数从文件内容实时重算，自愈旧桌面端遗留的陈旧元数据
+  const contents = await Promise.all(files.map((f) => readText(f.path).catch(() => '')))
   return files.map((f, i) => {
     const known = meta.chapters.find((m) => m.filePath === f.path)
     return {
       id: known?.id ?? f.path,
       filePath: f.path,
       title: known?.title ?? f.name.replace(/\.(md|txt)$/i, ''),
-      wordCount: known?.wordCount ?? 0,
+      wordCount: words(contents[i]),
       status: known?.status ?? 'draft',
       lastModified: known?.lastModified ?? 0,
       order: known?.order ?? i + 1,
