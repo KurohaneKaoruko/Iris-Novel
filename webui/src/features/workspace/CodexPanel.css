@@ -1,0 +1,185 @@
+.codex-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.codex-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.codex-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.codex-filters button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.codex-filters button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.codex-add {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.codex-add:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.codex-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--bg-elev, #1a1a24) 60%, transparent);
+}
+
+.codex-editor-row {
+  display: flex;
+  gap: 8px;
+}
+
+.codex-editor input,
+.codex-editor textarea,
+.codex-editor select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.codex-editor input:first-child {
+  flex: 1;
+}
+
+.codex-editor textarea {
+  resize: vertical;
+}
+
+.codex-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.codex-editor-actions button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.codex-editor-actions button:first-child {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.codex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.codex-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--bg-elev, #1a1a24) 40%, transparent);
+}
+
+.codex-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.codex-badge {
+  font-size: 11px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.codex-name {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-card-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.codex-card:hover .codex-card-actions {
+  opacity: 1;
+}
+
+.codex-card-actions button {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.codex-card-actions button:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.codex-summary {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.codex-details {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

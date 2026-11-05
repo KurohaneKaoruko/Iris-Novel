@@ -228,6 +228,114 @@ export async function saveCharacters(characters: Character[]): Promise<void> {
   await writeText(CHAR_FILE, serializeCharacters(characters))
 }
 
+// ============ 设定集 Codex（concept/codex.md） ============
+
+export type CodexType = 'location' | 'faction' | 'item' | 'term' | 'setting'
+
+export const CODEX_TYPES: Array<{ id: CodexType; zh: string; icon: string }> = [
+  { id: 'location', zh: '地点', icon: '🏔' },
+  { id: 'faction', zh: '组织', icon: '⚑' },
+  { id: 'item', zh: '物品', icon: '🗡' },
+  { id: 'term', zh: '术语', icon: '📖' },
+  { id: 'setting', zh: '设定', icon: '✨' },
+]
+
+export type CodexEntry = {
+  id: string
+  name: string
+  type: CodexType
+  /** 一句话简介 */
+  summary: string
+  /** 多行详情 */
+  details: string
+}
+
+const CODEX_FILE = 'concept/codex.md'
+const CODEX_TYPE_ZH: Record<CodexType, string> = { location: '地点', faction: '组织', item: '物品', term: '术语', setting: '设定' }
+
+/** 解析设定集 markdown（与人物卡同构：`## 名称 <!-- id -->` + 类型/简介/详情字段） */
+export function parseCodex(content: string): CodexEntry[] {
+  const entries: CodexEntry[] = []
+  const sections = content.split(/^## /m).slice(1)
+  for (const section of sections) {
+    const lines = section.split('\n')
+    const head = lines[0]?.trim() ?? ''
+    if (!head) continue
+    const idMatch = head.match(/<!--\s*id:\s*([^\s]+)\s*-->/)
+    const name = head.replace(/<!--.*?-->/, '').trim()
+    if (!name) continue
+    let type: CodexType = 'setting'
+    let summary = ''
+    const detailBuf: string[] = []
+    let inDetails = false
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i]
+      const typeMatch = line.match(/^- \*\*类型\*\*[::]\s*(.*)$/)
+      if (typeMatch) {
+        const zh = typeMatch[1].trim()
+        type = CODEX_TYPES.find((t) => t.zh === zh)?.id ?? 'setting'
+        continue
+      }
+      const summaryMatch = line.match(/^- \*\*简介\*\*[::]\s*(.*)$/)
+      if (summaryMatch) {
+        summary = summaryMatch[1].trim()
+        continue
+      }
+      if (/^- \*\*详情\*\*[::]/.test(line)) {
+        inDetails = true
+        const inline = line.replace(/^- \*\*详情\*\*[::]\s*/, '').trim()
+        if (inline) detailBuf.push(inline)
+        continue
+      }
+      if (inDetails) detailBuf.push(line)
+    }
+    entries.push({
+      id: idMatch?.[1] ?? `codex-${name}`,
+      name,
+      type,
+      summary,
+      details: detailBuf.join('\n').trim(),
+    })
+  }
+  return entries
+}
+
+export function serializeCodex(entries: CodexEntry[]): string {
+  const lines: string[] = ['# 设定集', '']
+  for (const e of entries) {
+    lines.push(`## ${e.name} <!-- id: ${e.id} -->`, '')
+    lines.push(`- **类型**: ${CODEX_TYPE_ZH[e.type] ?? '设定'}`)
+    if (e.summary.trim()) lines.push(`- **简介**: ${e.summary.trim()}`)
+    if (e.details.trim()) lines.push(`- **详情**: ${e.details.trim()}`)
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
+export async function listCodex(): Promise<CodexEntry[]> {
+  let content = ''
+  try {
+    content = await readText(CODEX_FILE)
+  } catch {
+    return []
+  }
+  return parseCodex(content)
+}
+
+export async function saveCodex(entries: CodexEntry[]): Promise<void> {
+  await writeText(CODEX_FILE, serializeCodex(entries))
+}
+
+/** 编辑器选中文本 → 查设定集：名称完全匹配或被长名称包含 */
+export function queryCodex(entries: CodexEntry[], selected: string): CodexEntry | null {
+  const q = selected.trim()
+  if (!q) return null
+  const exact = entries.find((e) => e.name === q)
+  if (exact) return exact
+  const contained = entries.filter((e) => q.includes(e.name) || e.name.includes(q)).sort((a, b) => a.name.length - b.name.length)
+  return contained[0] ?? null
+}
+
 // ============ 情节线（outline/plotlines.md） ============
 
 export type PlotLineStatus = 'ongoing' | 'completed' | 'paused'

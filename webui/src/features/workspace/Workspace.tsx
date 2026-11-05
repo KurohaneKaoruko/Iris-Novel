@@ -4,15 +4,17 @@ import { createFile, createDir, deleteEntry, listWorkspaceTree, renameEntry, wri
 import { subscribeEvent } from '../../api/rpc'
 import { readDeepLink } from '../../api/deeplink'
 import {
-  computeWorkStats, createChapterFile, listChapters, listCharacters, listConceptFiles, listPlotLines,
+  computeWorkStats, createChapterFile, listChapters, listCodex, listCharacters, listConceptFiles, listPlotLines,
   loadMemoryIndices, loadWritingHistory, markChapterStatus, recordTodayWords, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
-  type Chapter, type Character, type DocFile, type MemoryIndex, type PlotLine, type WorkStats, type WritingHistoryEntry,
+  type Chapter, type Character, type CodexEntry, type DocFile, type MemoryIndex, type PlotLine, type WorkStats, type WritingHistoryEntry,
 } from '../../api/novel'
 import { useWork } from '../../state/WorkContext'
 import { useChat } from '../../hooks/useChat'
 import { EditorPane } from './EditorPane'
 import { ChatPanel } from './ChatPanel'
 import { CharactersPanel } from './CharactersPanel'
+import { CodexPanel } from './CodexPanel'
+import { CodexPeek } from './CodexPeek'
 import { PlotLinesPanel } from './PlotLinesPanel'
 import { MemoryPanel } from './MemoryPanel'
 import { StatsPanel } from './StatsPanel'
@@ -26,13 +28,14 @@ import { ProgressPanel } from './ProgressPanel'
 import { CommandPalette, type CommandDef } from './CommandPalette'
 import './Workspace.css'
 
-type SideTab = 'chapters' | 'progress' | 'characters' | 'plotlines' | 'docs' | 'memory' | 'history' | 'planner'
+type SideTab = 'chapters' | 'progress' | 'characters' | 'plotlines' | 'codex' | 'docs' | 'memory' | 'history' | 'planner'
 
 const SIDE_TABS: Array<{ id: SideTab; label: string }> = [
   { id: 'chapters', label: '章节' },
   { id: 'progress', label: '进度' },
   { id: 'characters', label: '人物' },
   { id: 'plotlines', label: '情节线' },
+  { id: 'codex', label: '设定集' },
   { id: 'docs', label: '资料' },
   { id: 'memory', label: '记忆' },
   { id: 'history', label: '历史' },
@@ -55,6 +58,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [tree, setTree] = useState<FsEntry | null>(null)
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [characters, setCharacters] = useState<Character[]>([])
+  const [codex, setCodex] = useState<CodexEntry[]>([])
   const [plotLines, setPlotLines] = useState<PlotLine[]>([])
   const [memory, setMemory] = useState<MemoryIndex[]>([])
   const [docs, setDocs] = useState<DocFile[]>([])
@@ -72,18 +76,20 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const refreshAll = useCallback(async () => {
     if (!workRoot) return
     try {
-      const [t, ch, chars, plots, mem] = await Promise.all([
+      const [t, ch, chars, plots, mem, cdx] = await Promise.all([
         listWorkspaceTree(6),
         listChapters(),
         listCharacters(),
         listPlotLines(),
         loadMemoryIndices(),
+        listCodex(),
       ])
       setTree(t)
       setChapters(ch)
       setCharacters(chars)
       setPlotLines(plots)
       setMemory(mem)
+      setCodex(cdx)
       setDocs(await listConceptFiles())
       setStats(await computeWorkStats())
       const wh = await loadWritingHistory()
@@ -262,6 +268,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       { id: 'nav-chapters', group: '面板', label: '章节面板', keywords: 'zhangjie chapter', hint: '左侧', run: () => gotoSide('chapters') },
       { id: 'nav-characters', group: '面板', label: '人物面板', keywords: 'renwu character', run: () => gotoSide('characters') },
       { id: 'nav-plotlines', group: '面板', label: '情节线面板', keywords: 'qingxian plot', run: () => gotoSide('plotlines') },
+      { id: 'nav-codex', group: '面板', label: '设定集', keywords: 'sheding codex worldbuilding', run: () => gotoSide('codex') },
       { id: 'nav-docs', group: '面板', label: '资料文档', keywords: 'ziliao docs', run: () => gotoSide('docs') },
       { id: 'nav-memory', group: '面板', label: '记忆索引', keywords: 'jiyi memory', run: () => gotoSide('memory') },
       { id: 'nav-history', group: '面板', label: '版本历史', keywords: 'lishi history', run: () => gotoSide('history') },
@@ -403,6 +410,10 @@ export function Workspace({ onExit }: { onExit: () => void }) {
               />
             ) : null}
 
+            {sideTab === 'codex' ? (
+              <CodexPanel onError={setError} />
+            ) : null}
+
             {sideTab === 'docs' ? (
               <div className="panel-section">
                 <div className="panel-head">
@@ -476,6 +487,12 @@ export function Workspace({ onExit }: { onExit: () => void }) {
                 aiReplaceSignal={contentRef}
                 goToLineSignal={goToLineRef}
                 onSelectionChange={(has, text) => setSelection({ has, text })}
+              />
+              <CodexPeek
+                selectedText={selection?.text ?? ''}
+                codex={codex}
+                characters={characters}
+                onOpenCodex={() => gotoSide('codex')}
               />
             </>
           ) : (
