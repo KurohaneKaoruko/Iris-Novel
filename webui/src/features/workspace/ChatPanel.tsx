@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { useChat, ChatItem } from '../../hooks/useChat'
 import type { AppSettings, Skill } from '../../api/backend'
 import { getAppSettings, getSkills, saveChatSession, listChatSessions, getChatSession } from '../../api/backend'
+import { listCharacters, type Character } from '../../api/novel'
 import { useWork } from '../../state/WorkContext'
 import './ChatPanel.css'
 
@@ -25,6 +26,8 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [skills, setSkills] = useState<Skill[]>([])
   const [skillId, setSkillId] = useState<string>('')
+  const [characters, setCharacters] = useState<Character[]>([])
+  const [roleId, setRoleId] = useState<string>('')
   const [showHistory, setShowHistory] = useState(false)
   const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([])
   const listRef = useRef<HTMLDivElement>(null)
@@ -38,6 +41,18 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
       .then(setSkills)
       .catch(() => setSkills([]))
   }, [])
+
+  // 作品人物卡（角色扮演选择器）
+  useEffect(() => {
+    setRoleId('')
+    if (!workRoot) {
+      setCharacters([])
+      return
+    }
+    void listCharacters()
+      .then(setCharacters)
+      .catch(() => setCharacters([]))
+  }, [workRoot])
 
   // 自动滚动
   useEffect(() => {
@@ -110,8 +125,49 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
       void chat.send(prompt, { assistantId, systemPrompt: skill.prompt })
       return
     }
-    void chat.send(text, { assistantId, systemPrompt: skillId ? skills.find((s) => s.id === skillId)?.prompt : undefined })
-  }, [assistantId, chat, input, onError, skillId, skills])
+    // /role <名> 指令：切换角色扮演（/role off 退出）
+    const rm = text.match(/^\/role\s+(.+)$/)
+    if (rm) {
+      const name = rm[1].trim()
+      if (name === 'off' || name === '退出') {
+        setRoleId('')
+        onError?.('已退出角色扮演')
+        return
+      }
+      const role = characters.find((c) => c.name === name || c.id === name)
+      if (!role) {
+        onError?.(`人物卡里没有「${name}」`)
+        return
+      }
+      setRoleId(role.id)
+      onError?.(`已进入角色扮演「${role.name}」，对话将以该角色身份回应`)
+      return
+    }
+    void chat.send(text, { assistantId, systemPrompt: buildSystemPrompt() })
+  }, [assistantId, chat, input, onError, skillId, skills, roleId, characters])
+
+  /** 组装 system prompt：技能规范 + 角色扮演人设 */
+  const buildSystemPrompt = useCallback((): string | undefined => {
+    const parts: string[] = []
+    const skill = skillId ? skills.find((s) => s.id === skillId) : null
+    if (skill?.prompt) parts.push(skill.prompt)
+    const role = roleId ? characters.find((c) => c.id === roleId) : null
+    if (role) {
+      const d = role.data
+      const traits = [d.appearance && `外貌：${d.appearance}`, d.personality && `性格：${d.personality}`, d.background && `背景：${d.background}`, d.relationships && `关系：${d.relationships}`]
+        .filter(Boolean)
+        .join('；')
+      parts.push(
+        `你现在扮演小说角色「${role.name}」，以第一人称与用户对话，始终保持在角色内，不跳出设定、不承认自己是 AI。` +
+        (traits ? `人设：${traits}。` : '') +
+        (d.notes ? `备注：${d.notes}。` : '') +
+        '说话风格贴合人物性格与背景；遇到角色不可能知道的信息，用角色的方式回避或追问。',
+      )
+    }
+    return parts.length > 0 ? parts.join('\n\n') : undefined
+  }, [skillId, skills, roleId, characters])
+
+  // /role 指令在 handleSend 内处理
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -197,6 +253,18 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
               </option>
             ))}
           </select>
+          {characters.length > 0 ? (
+            <select
+              value={roleId}
+              onChange={(e) => setRoleId(e.target.value)}
+              title="角色扮演：以人物卡身份对话（测声线）"
+            >
+              <option value="">不扮演</option>
+              {characters.map((c) => (
+                <option key={c.id} value={c.id}>🎭 {c.name}</option>
+              ))}
+            </select>
+          ) : null}
           {activePath ? <span className="chat-file-chip">{activePath.split('/').pop()}</span> : null}
         </div>
         <div className="chat-input-row">
@@ -204,7 +272,7 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+            placeholder={roleId ? `以「${characters.find((c) => c.id === roleId)?.name ?? ''}」的身份对话中…` : '输入消息，Enter 发送，Shift+Enter 换行'}
             rows={3}
             disabled={chat.busy}
           />
