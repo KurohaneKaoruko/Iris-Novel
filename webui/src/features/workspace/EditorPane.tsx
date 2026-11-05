@@ -12,8 +12,10 @@ type EditorPaneProps = {
   onContentChanged: () => void
   onSaved: () => void
   onError: (msg: string | null) => void
-  /** AI 写入信号：'ai-replace' 整体替换 / 'ai-append' 追加末尾，消费后删除 key */
+  /** AI 写入信号：'ai-replace' 整体替换 / 'ai-append' 追加末尾 / 'ai-selection' 替换当前选区，消费后删除 key */
   aiReplaceSignal?: React.MutableRefObject<Map<string, string>>
+  /** 选区变化上报（供 AiWriteBar 判断有无选中文字） */
+  onSelectionChange?: (hasSelection: boolean, selectedText: string) => void
 }
 
 /**
@@ -21,7 +23,7 @@ type EditorPaneProps = {
  * 内容为纯文本行；保存时以 \n 连接段落。
  * Ctrl+S 由本组件捕获并走 onSave。
  */
-export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, onError, aiReplaceSignal }: EditorPaneProps) {
+export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, onError, aiReplaceSignal, onSelectionChange }: EditorPaneProps) {
   const [loading, setLoading] = useState(true)
   const [initialContent, setInitialContent] = useState('')
   const lastSyncedRef = useRef<string>('')
@@ -61,6 +63,10 @@ export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, on
         }
         return false
       },
+    },
+    onSelectionUpdate: ({ editor: ed }) => {
+      const { from, to, empty } = ed.state.selection
+      onSelectionChange?.(!empty, ed.state.doc.textBetween(from, to, '\n'))
     },
   })
 
@@ -104,37 +110,40 @@ export function EditorPane({ path, saving, onSave, onContentChanged, onSaved, on
     }
   }, [editor, onSaved, onSave])
 
-  // AI 写入信号：整体替换 / 追加
+  // AI 写入信号：整体替换 / 追加 / 替换选区（统一走「改完即存」）
   useEffect(() => {
     if (!editor || !aiReplaceSignal) return
+    const applyAndSave = () => {
+      const text = editorText(editor)
+      lastSyncedRef.current = text
+      dirtyRef.current = true
+      onContentChanged()
+      void onSave(text).then(() => {
+        lastSyncedRef.current = text
+        dirtyRef.current = false
+        onSaved()
+      })
+    }
     const iv = window.setInterval(() => {
       const replace = aiReplaceSignal.current.get('ai-replace')
       const append = aiReplaceSignal.current.get('ai-append')
+      const selection = aiReplaceSignal.current.get('ai-selection')
       if (replace !== undefined) {
         aiReplaceSignal.current.delete('ai-replace')
         editor.commands.setContent(linesToDoc(replace))
-        const text = editorText(editor)
-        lastSyncedRef.current = text
-        dirtyRef.current = true
-        onContentChanged()
-        void onSave(text).then(() => {
-          lastSyncedRef.current = text
-          dirtyRef.current = false
-          onSaved()
-        })
+        applyAndSave()
       } else if (append !== undefined) {
         aiReplaceSignal.current.delete('ai-append')
         editor.commands.setTextSelection(editor.state.doc.content.size)
         editor.commands.insertContent('\n\n' + append.trim())
-        const text = editorText(editor)
-        lastSyncedRef.current = text
-        dirtyRef.current = true
-        onContentChanged()
-        void onSave(text).then(() => {
-          lastSyncedRef.current = text
-          dirtyRef.current = false
-          onSaved()
-        })
+        applyAndSave()
+      } else if (selection !== undefined) {
+        aiReplaceSignal.current.delete('ai-selection')
+        const { from, to } = editor.state.selection
+        if (from !== to) {
+          editor.chain().insertContentAt({ from, to }, selection.trim()).run()
+          applyAndSave()
+        }
       }
     }, 300)
     return () => window.clearInterval(iv)

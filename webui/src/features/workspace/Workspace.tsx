@@ -56,6 +56,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [dirty, setDirty] = useState(false)
   const [assistantId, setAssistantId] = useState<string | null>(null)
   const [modal, setModal] = useState<'settings' | 'tools' | 'book' | null>(null)
+  const [selection, setSelection] = useState<{ has: boolean; text: string } | null>(null)
   const chat = useChat()
   const contentRef = useRef<Map<string, string>>(new Map())
 
@@ -357,6 +358,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
                 targetWords={writingSettings?.chapter_word_target}
                 contentRef={contentRef}
                 onError={setError}
+                selection={selection}
               />
               <EditorPane
                 key={activePath}
@@ -370,6 +372,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
                 onSaved={() => setDirty(false)}
                 onError={setError}
                 aiReplaceSignal={contentRef}
+                onSelectionChange={(has, text) => setSelection({ has, text })}
               />
             </>
           ) : (
