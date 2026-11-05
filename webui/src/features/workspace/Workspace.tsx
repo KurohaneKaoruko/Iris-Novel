@@ -5,7 +5,7 @@ import { subscribeEvent } from '../../api/rpc'
 import { readDeepLink } from '../../api/deeplink'
 import {
   computeWorkStats, createChapterFile, listChapters, listCodex, listCharacters, listConceptFiles, listPlotLines,
-  loadMemoryIndices, loadWritingHistory, markChapterStatus, recordTodayWords, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
+  loadMemoryIndices, loadWritingHistory, markChapterStatus, recordTodayWords, reorderChapters, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
   type Chapter, type Character, type CodexEntry, type DocFile, type MemoryIndex, type PlotLine, type WorkStats, type WritingHistoryEntry,
 } from '../../api/novel'
 import { useWork } from '../../state/WorkContext'
@@ -58,6 +58,8 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [sideTab, setSideTab] = useState<SideTab>('chapters')
   const [tree, setTree] = useState<FsEntry | null>(null)
   const [chapters, setChapters] = useState<Chapter[]>([])
+  /** 章节按 order 排序后的列表（拖拽排序/进度/冲刺共用） */
+  const sortedChapters = useMemo(() => [...chapters].sort((a, b) => a.order - b.order), [chapters])
   const [characters, setCharacters] = useState<Character[]>([])
   const [codex, setCodex] = useState<CodexEntry[]>([])
   /** 当前活动章节字数（冲刺计时用，随保存更新） */
@@ -192,7 +194,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   )
 
   const handleCreateChapter = useCallback(async () => {
-    const title = window.prompt('章节标题', `第 ${chapters.length + 1} 章`)
+    const title = window.prompt('章节标题', `第 ${sortedChapters.length + 1} 章`)
     if (title === null) return
     try {
       const path = await createChapterFile(title.trim())
@@ -201,7 +203,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
     } catch (e) {
       setError(`创建章节失败：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [chapters.length, refreshAll, setActivePath, setError])
+  }, [sortedChapters.length, refreshAll, setActivePath, setError])
 
   /** 打开文件并定位到行（lint/搜索跳转用；line 为空则只打开） */
   const openFileAtLine = useCallback((path: string, line?: number) => {
@@ -263,6 +265,23 @@ export function Workspace({ onExit }: { onExit: () => void }) {
         await refreshAll()
       } catch (e) {
         setError(`更新状态失败：${e instanceof Error ? e.message : String(e)}`)
+      }
+    },
+    [refreshAll, setError],
+  )
+
+  /** 章节拖拽排序 */
+  const dragFromRef = useRef<string | null>(null)
+  const handleDropChapter = useCallback(
+    async (toPath: string) => {
+      const fromPath = dragFromRef.current
+      dragFromRef.current = null
+      if (!fromPath || fromPath === toPath) return
+      try {
+        await reorderChapters(fromPath, toPath)
+        await refreshAll()
+      } catch (e) {
+        setError(`排序失败：${e instanceof Error ? e.message : String(e)}`)
       }
     },
     [refreshAll, setError],
@@ -391,11 +410,16 @@ export function Workspace({ onExit }: { onExit: () => void }) {
                   <span>章节（{chapters.length}）</span>
                   <button onClick={() => void handleCreateChapter()} title="新建章节">＋</button>
                 </div>
-                {chapters.map((c) => (
+                {sortedChapters.map((c) => (
                   <div
                     key={c.filePath}
                     className={`file-item ${activePath === c.filePath ? 'active' : ''}`}
                     onClick={() => setActivePath(c.filePath)}
+                    draggable
+                    title="拖拽调整顺序"
+                    onDragStart={(e) => { dragFromRef.current = c.filePath; e.dataTransfer.effectAllowed = 'move' }}
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+                    onDrop={(e) => { e.preventDefault(); void handleDropChapter(c.filePath) }}
                   >
                     <span className="file-main">
                       <span className="file-name">{c.title}</span>
@@ -418,7 +442,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
 
             {sideTab === 'progress' ? (
               <ProgressPanel
-                chapters={chapters}
+                chapters={sortedChapters}
                 history={writingHistory.entries}
                 dailyGoal={writingHistory.dailyGoal}
                 activePath={activePath}

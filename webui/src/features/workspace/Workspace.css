@@ -157,6 +157,10 @@
   color: var(--accent);
 }
 
+.file-item[draggable='true']:active {
+  opacity: 0.5;
+}
+
 .file-main {
   display: flex;
   flex-direction: column;

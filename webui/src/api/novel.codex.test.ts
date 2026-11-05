@@ -59,3 +59,25 @@ describe('queryCodex（选词查询）', () => {
     expect(queryCodex(entries, '')).toBeNull()
   })
 })
+
+import { reorderList } from './novel'
+
+describe('reorderList（章节拖拽排序）', () => {
+  const mk = (p: string) => ({ filePath: p })
+  it('向下移动：移除后插入目标位置', () => {
+    const list = [mk('a'), mk('b'), mk('c'), mk('d')]
+    const next = reorderList(list, 'a', 'c')
+    expect(next.map((x) => x.filePath)).toEqual(['b', 'a', 'c', 'd'])
+    // 注：splice(toIdx) 语义 —— 移除 a 后 c 在 index 1，插入到 index 2 → b,a,c,d（a 在 c 前）
+  })
+  it('向上移动', () => {
+    const list = [mk('a'), mk('b'), mk('c'), mk('d')]
+    const next = reorderList(list, 'd', 'a')
+    expect(next.map((x) => x.filePath)).toEqual(['d', 'a', 'b', 'c'])
+  })
+  it('路径不存在或相同返回原数组', () => {
+    const list = [mk('a'), mk('b')]
+    expect(reorderList(list, 'x', 'b')).toBe(list)
+    expect(reorderList(list, 'a', 'a')).toBe(list)
+  })
+})

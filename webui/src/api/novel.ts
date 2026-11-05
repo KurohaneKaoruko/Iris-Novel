@@ -90,6 +90,31 @@ export async function markChapterStatus(filePath: string, status: ChapterStatus)
   await saveChapterMeta({ ...ch, status })
 }
 
+/** 纯排序：把 fromPath 移到 toPath 原位置（drop 占位，目标后移；供 reorderChapters 与测试共用） */
+export function reorderList<T extends { filePath: string }>(items: T[], fromPath: string, toPath: string): T[] {
+  const fromIdx = items.findIndex((c) => c.filePath === fromPath)
+  const toIdx = items.findIndex((c) => c.filePath === toPath)
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return items
+  const next = [...items]
+  const [moved] = next.splice(fromIdx, 1)
+  // 移除后若目标在来源之后，其索引左移一位，插入即占据原位置
+  next.splice(fromIdx < toIdx ? toIdx - 1 : toIdx, 0, moved)
+  return next
+}
+
+/** 重排章节顺序：把 fromPath 移动到 toPath 当前位置，其余章节按原相对顺序补位 */
+export async function reorderChapters(fromPath: string, toPath: string): Promise<void> {
+  const chapters = await listChapters()
+  const sorted = [...chapters].sort((a, b) => a.order - b.order)
+  const next = reorderList(sorted, fromPath, toPath)
+  if (next === sorted) return
+  for (let i = 0; i < next.length; i++) {
+    if (next[i].order !== i + 1) {
+      await saveChapterMeta({ ...next[i], order: i + 1 })
+    }
+  }
+}
+
 export async function createChapterFile(title: string, order?: number): Promise<string> {
   const chapters = await listChapters()
   const nextOrder = order ?? chapters.length + 1
