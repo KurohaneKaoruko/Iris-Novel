@@ -37,6 +37,8 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
   const [runningTask, setRunningTask] = useState<string | null>(null)
   const [runOutput, setRunOutput] = useState('')
   const [aiDrafting, setAiDrafting] = useState(false)
+  const [autoRunning, setAutoRunning] = useState(false)
+  const autoStopRef = useRef(false)
   const [outlineImporting, setOutlineImporting] = useState(false)
   const aiDraftRef = useRef<GenerateHandle | null>(null)
 
@@ -230,6 +232,25 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
     [assistantId, onError, onRefresh, persist, queue, runningTask],
   )
 
+  /** 连续执行：按依赖顺序跑完队列里所有 todo 任务（失败即停）。queue 为 null 时静默不跑 */
+  const runAll = useCallback(async () => {
+    if (runningTask || !queue) return
+    autoStopRef.current = false
+    setAutoRunning(true)
+    try {
+      for (;;) {
+        if (autoStopRef.current) break
+        const q = await loadRunQueue().catch(() => null)
+        const t = q ? nextExecutableTask(q.tasks) : null
+        if (!t) break
+        setQueue(q) // 让 UI 显示当前执行中的任务
+        await runTask(t)
+      }
+    } finally {
+      setAutoRunning(false)
+    }
+  }, [runningTask, runTask, queue])
+
   if (!queue) {
     return <div className="panel-empty">规划队列加载失败或尚未初始化</div>
   }
@@ -293,7 +314,16 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
         <div className="planner-next">
           <span className="planner-next-label">下一可执行</span>
           <span className="planner-next-title">{next.title}</span>
-          <button disabled={!!runningTask} onClick={() => void runTask(next)}>▶ 执行</button>
+          {autoRunning ? (
+            <button onClick={() => { autoStopRef.current = true }}>⏹ 停止队列</button>
+          ) : (
+            <>
+              <button disabled={!!runningTask} onClick={() => void runTask(next)}>▶ 执行</button>
+              <button disabled={!!runningTask} title="按依赖顺序连续执行全部待办任务（失败即停）" onClick={() => void runAll()}>
+                ⏩ 连续执行
+              </button>
+            </>
+          )}
         </div>
       ) : queue.tasks.length > 0 ? (
         <div className="planner-next all-done">全部任务已完成</div>
