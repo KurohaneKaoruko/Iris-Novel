@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
-import { createFile, createDir, deleteEntry, listWorkspaceTree, renameEntry, writeText } from '../../api/backend'
+import { createFile, createDir, deleteEntry, listWorkspaceTree, renameEntry, writeText, listHistoryEntries, createHistorySnapshot } from '../../api/backend'
 import { subscribeEvent } from '../../api/rpc'
 import { readDeepLink } from '../../api/deeplink'
 import {
@@ -139,6 +139,23 @@ export function Workspace({ onExit }: { onExit: () => void }) {
     setActivePath([...chapterFiles].sort((a, b) => a.path.localeCompare(b.path))[0].path)
   }, [activePath, chapterFiles, setActivePath])
 
+  /** 距上次快照超过 10 分钟自动建一条（静默失败，不打扰写作） */
+  const maybeAutoSnapshot = useCallback(
+    async (path: string) => {
+      try {
+        const AUTO_INTERVAL_MS = 10 * 60 * 1000
+        const now = Date.now()
+        const last = await listHistoryEntries(30)
+        const fileLast = last.find((e) => e.file_path === path)
+        if (fileLast && now - fileLast.created_at < AUTO_INTERVAL_MS) return
+        await createHistorySnapshot(path, 'auto')
+      } catch {
+        /* 快照失败不影响保存 */
+      }
+    },
+    [],
+  )
+
   const handleSaved = useCallback(
     async (path: string, content: string) => {
       setDirty(false)
@@ -156,6 +173,8 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       } catch {
         /* 元数据同步失败不影响主流程 */
       }
+      // 自动快照：距本文件上次快照 ≥10 分钟才建，避免高频保存刷爆历史
+      void maybeAutoSnapshot(path)
       void refreshAll()
     },
     [chapters, refreshAll, writingSettings],

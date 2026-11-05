@@ -250,3 +250,117 @@ export function draftTasksFromGoal(goal: string, startChapter: number, count: nu
   }
   return tasks
 }
+
+// ============ 大纲 → 任务链导入 ============
+
+export type OutlineChapter = {
+  /** 章节序号（中文数字已转阿拉伯；解析不出时为 0） */
+  chapterIndex: number
+  /** 标题（含「第X章」前缀原文） */
+  heading: string
+  /** 标题下的细纲正文 */
+  body: string
+}
+
+const OUTLINE_HEADING_RE = /^\s*(?:#+\s*)?第\s*([0-9一二三四五六七八九十百千零壹贰叁肆伍陆柒捌玖]+)\s*(章|回|节)\s*[:：]?\s*(.*)$/
+
+/** 从大纲文本抽取章节条目：`第X章 标题` 行 + 后续正文直到下一个标题 */
+export function parseOutlineChapters(text: string): OutlineChapter[] {
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const out: OutlineChapter[] = []
+  let cur: OutlineChapter | null = null
+  const flush = () => {
+    if (cur) {
+      cur.body = cur.body.trim()
+      out.push(cur)
+    }
+  }
+  for (const line of lines) {
+    const m = line.match(OUTLINE_HEADING_RE)
+    if (m && line.trim().length <= 80) {
+      flush()
+      cur = { chapterIndex: cnNum(m[1]), heading: line.trim(), body: '' }
+      continue
+    }
+    if (cur && line.trim()) {
+      cur.body += (cur.body ? '\n' : '') + line.trim()
+    }
+  }
+  flush()
+  return out
+}
+
+function cnNum(s: string): number {
+  if (/^\d+$/.test(s)) return Number(s)
+  const norm = s.replace(/[壹贰叁肆伍陆柒捌玖]/g, (c) => '一二三四五六七八九'['壹贰叁肆伍陆柒捌玖'.indexOf(c)]).replace(/[佰仟拾]/g, (c) => ({ 佰: '百', 仟: '千', 拾: '十' })[c] ?? c)
+  const D: Record<string, number> = { 零: 0, 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 }
+  let total = 0
+  let current = 0
+  let has = false
+  for (const ch of norm) {
+    const d = D[ch]
+    if (d !== undefined) { current = current * 10 + d; has = true }
+    else if (ch === '十') { total += (current || 1) * 10; current = 0; has = true }
+    else if (ch === '百') { total += (current || 1) * 100; current = 0; has = true }
+    else if (ch === '千') { total += (current || 1) * 1000; current = 0; has = true }
+    else return 0
+  }
+  return has ? total + current : 0
+}
+
+/**
+ * 大纲章节 → 规划任务。已有 queue 任务时按 chapter_index 去重（跳过已存在的章）。
+ */
+export function outlineToTasks(chapters: OutlineChapter[], existing: NovelTask[], targetWords: number): NovelTask[] {
+  const have = new Set(existing.map((t) => t.chapter_index))
+  const fresh = chapters.filter((c) => c.chapterIndex > 0 && !have.has(c.chapterIndex))
+  fresh.sort((a, b) => a.chapterIndex - b.chapterIndex)
+  const titleOf = (c: OutlineChapter): string => {
+    const m = c.heading.replace(/^#+\s*/, '').replace(/^第\s*[0-9一二三四五六七八九十百千零壹贰叁肆伍陆柒捌玖]+\s*[章回节卷]\s*[:：]?\s*/, '').trim()
+    return m || c.heading
+  }
+  return fresh.map((c, i) => {
+    const idx = c.chapterIndex
+    return {
+      id: `ch${String(idx).padStart(3, '0')}`,
+      title: `第 ${idx} 章 · ${titleOf(c)}`,
+      status: 'todo' as const,
+      priority: i === 0 ? ('high' as const) : ('medium' as const),
+      depends_on: i === 0 ? [] : [`ch${String(fresh[i - 1].chapterIndex).padStart(3, '0')}`],
+      target_words: targetWords,
+      scope: `stories/chapter-${String(idx).padStart(4, '0')}.md`,
+      volume: 1,
+      chapter_index: idx,
+      acceptance_checks: [
+        `字数 ≥ ${targetWords}`,
+        '按细纲推进情节点，不与人物状态索引冲突',
+        '章末有钩子',
+      ],
+      arc_targets: [],
+      foreshadow_refs: [],
+      timeline_window: 'global',
+      task_prompt: c.body ? `细纲：\n${c.body}` : '',
+      retries: 0,
+    }
+  })
+}
+
+/** 读 outline/ 下所有 md 并抽取章节条目（按文件名排序拼接） */
+export async function loadOutlineChapters(): Promise<OutlineChapter[]> {
+  const { listWorkspaceTree } = await import('./backend')
+  const tree = await listWorkspaceTree(6)
+  const files: string[] = []
+  const walk = (e: { kind: string; path: string; children?: Array<{ kind: string; path: string; children?: unknown[] }> }) => {
+    if (e.kind === 'file' && /^outline\/.*\.md$/i.test(e.path)) files.push(e.path)
+    for (const c of e.children ?? []) walk(c as typeof e)
+  }
+  walk(tree as never)
+  files.sort()
+  let text = ''
+  for (const f of files) {
+    try {
+      text += `\n${await readText(f)}`
+    } catch { /* skip */ }
+  }
+  return parseOutlineChapters(text)
+}

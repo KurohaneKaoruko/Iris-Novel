@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   loadRunQueue, saveRunQueue, nextExecutableTask, draftTasksFromGoal, newTaskId,
-  parseAiTasks, buildTaskDraftPrompt,
+  parseAiTasks, buildTaskDraftPrompt, loadOutlineChapters, outlineToTasks,
   type NovelTask, type RunQueueState, type TaskStatus,
 } from '../../api/planner'
 import { readText, writeText } from '../../api/backend'
@@ -37,6 +37,7 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
   const [runningTask, setRunningTask] = useState<string | null>(null)
   const [runOutput, setRunOutput] = useState('')
   const [aiDrafting, setAiDrafting] = useState(false)
+  const [outlineImporting, setOutlineImporting] = useState(false)
   const aiDraftRef = useRef<GenerateHandle | null>(null)
 
   const reload = useCallback(async () => {
@@ -88,6 +89,30 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
     } finally {
       setAiDrafting(false)
       setRunOutput('')
+    }
+  }
+
+  /** 从 outline/ 大纲导入章节任务（按 chapter_index 去重，只补新章） */
+  const importFromOutline = async () => {
+    setOutlineImporting(true)
+    try {
+      const chapters = await loadOutlineChapters()
+      if (chapters.length === 0) {
+        onError('outline/ 目录下没有识别到「第X章」标题')
+        return
+      }
+      const existing = (await loadRunQueue().catch(() => null))?.tasks ?? []
+      const fresh = outlineToTasks(chapters, existing, targetWords)
+      if (fresh.length === 0) {
+        onError(`识别到 ${chapters.length} 章大纲，但都已在任务队列中`)
+        return
+      }
+      await persist('plan', [...existing, ...fresh])
+      onError(null)
+    } catch (e) {
+      onError(`大纲导入失败：${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setOutlineImporting(false)
     }
   }
 
@@ -251,6 +276,14 @@ export function PlannerPanel({ assistantId, onError, onOpenFile, onRefresh }: Pr
           {aiDrafting && (
             <button className="planner-draft-btn" onClick={() => aiDraftRef.current?.cancel()}>取消</button>
           )}
+          <button
+            className="planner-draft-btn"
+            disabled={outlineImporting}
+            title="扫描 outline/ 下的「第X章」标题，把细纲转成任务追加到队列（已有章节自动跳过）"
+            onClick={() => void importFromOutline()}
+          >
+            {outlineImporting ? '导入中…' : '从大纲导入'}
+          </button>
         </div>
         {aiDrafting && runOutput && <pre className="planner-run-output">{runOutput}</pre>}
       </div>
