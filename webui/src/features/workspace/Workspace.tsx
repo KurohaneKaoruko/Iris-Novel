@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
 import { createFile, createDir, deleteEntry, listWorkspaceTree, readText, renameEntry, writeText } from '../../api/backend'
+import { subscribeEvent } from '../../api/rpc'
 import {
   computeWorkStats, createChapterFile, listChapters, listCharacters, listConceptFiles, listPlotLines,
-  loadMemoryIndices, markChapterStatus, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
+  loadMemoryIndices, markChapterStatus, recordTodayWords, saveMemoryIndex, saveCharacters, savePlotLines, syncChapterContent,
   type Chapter, type Character, type DocFile, type MemoryIndex, type PlotLine, type WorkStats,
 } from '../../api/novel'
 import { useWork } from '../../state/WorkContext'
@@ -81,6 +82,19 @@ export function Workspace({ onExit }: { onExit: () => void }) {
     void refreshAll()
   }, [refreshAll])
 
+  // 外部文件变更（fs_changed 事件）时自动刷新（防抖 1s）
+  useEffect(() => {
+    let timer = 0
+    const un = subscribeEvent('fs_changed', () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => void refreshAll(), 1000)
+    })
+    return () => {
+      window.clearTimeout(timer)
+      un()
+    }
+  }, [refreshAll])
+
   const chapterFiles = useMemo(
     () => (tree ? collectFiles(tree, (p) => /^stories\/.*\.(md|txt)$/i.test(p)) : []),
     [tree],
@@ -107,13 +121,18 @@ export function Workspace({ onExit }: { onExit: () => void }) {
         const updated = await syncChapterContent(path, content)
         if (updated) {
           setChapters((prev) => prev.map((c) => (c.filePath === path ? updated : c)))
+          // 今日字数按本次保存的净增字数累计（AI 整段替换也会计入）
+          const prevWords = chapters.find((c) => c.filePath === path)?.wordCount ?? 0
+          const delta = Math.max(0, updated.wordCount - prevWords)
+          const target = writingSettings?.chapter_word_target ?? 0
+          if (delta > 0) await recordTodayWords(delta, target)
         }
       } catch {
         /* 元数据同步失败不影响主流程 */
       }
       void refreshAll()
     },
-    [refreshAll],
+    [chapters, refreshAll, writingSettings],
   )
 
   const handleCreateChapter = useCallback(async () => {
