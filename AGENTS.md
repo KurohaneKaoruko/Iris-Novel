@@ -118,6 +118,23 @@ Rust 后端包含 AI 代理运行时：
 
 所有 Tauri 命令在 `src-react/src/tauri.ts` 中有类型定义。 使用 `@tauri-apps/api/core` 的 `invoke` 函数调用后端命令。
 
+### 新版 Web UI（`webui/`）
+
+`webui/` 是正在开发的全新 Web 前端（React 18 + Vite + TipTap 2 + TS strict），由 `iris-creation-server` 托管静态资源并暴露 RPC/WS，最终将替代 `src-react/`：
+
+```bash
+cd webui
+pnpm exec vite build      # 构建到 webui/dist（生产由 iris-creation-server 托管）
+npx tsc -b tsconfig.json --noEmit   # 类型检查
+pnpm exec vite            # dev 服务器端口 1421，/api /ws 代理到 8765
+```
+
+- 运行方式：`./src-tauri/target/debug/iris-creation-server --port 8765 --static-dir webui/dist --data-dir <data>`
+- RPC：`POST /api/rpc/{cmd}` 返回 `{ok}|{err}`，全部命令绑定在 `webui/src/api/backend.ts`（新增命令改 `src-tauri/src/server/rpc_dispatch.rs` 后在此扩展）
+- WS：帧格式 `{"event","payload"}`，事件 `ai_stream_start/token/done/status`、`fs_changed`；取消流发 `{"type":"cancel","streamId"}`
+- 作品内数据（人物卡/情节线/章节元数据/记忆索引/写作历史）在 `webui/src/api/novel.ts`，直读直写 Markdown/JSON，与旧桌面端格式双向兼容
+- vite **不要**手动分包（manualChunks 会破坏 Prism 全局初始化契约，导致白屏）
+
 ## 代码约定
 
 - React 组件使用 `.tsx` 扩展名

@@ -7,9 +7,8 @@ type Props = {
   activePath: string
   assistantId: string | null
   targetWords?: number
-  /** 与 EditorPane 共享：ai-replace 信号由 EditorPane 消费 */
+  /** 与 EditorPane 共享：ai-replace/ai-append 信号由 EditorPane 消费 */
   contentRef: React.MutableRefObject<Map<string, string>>
-  onApply: (content: string) => void
   onError: (msg: string | null) => void
 }
 

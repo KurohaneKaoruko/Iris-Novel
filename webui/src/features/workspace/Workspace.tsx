@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
-import { createFile, createDir, deleteEntry, listWorkspaceTree, readText, renameEntry, writeText } from '../../api/backend'
+import { createFile, createDir, deleteEntry, listWorkspaceTree, renameEntry, writeText } from '../../api/backend'
 import { subscribeEvent } from '../../api/rpc'
 import {
   computeWorkStats, createChapterFile, listChapters, listCharacters, listConceptFiles, listPlotLines,
@@ -348,9 +348,6 @@ export function Workspace({ onExit }: { onExit: () => void }) {
                 assistantId={assistantId}
                 targetWords={writingSettings?.chapter_word_target}
                 contentRef={contentRef}
-                onApply={(content) => {
-                  contentRef.current.set('ai-replace', content)
-                }}
                 onError={setError}
               />
               <EditorPane
@@ -401,5 +398,3 @@ export function Workspace({ onExit }: { onExit: () => void }) {
     </div>
   )
 }
-
-export { readText }
