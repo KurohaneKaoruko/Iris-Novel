@@ -388,6 +388,127 @@ export async function computeWorkStats(): Promise<WorkStats> {
   }
 }
 
+// ============ 记忆索引自动生成（规则抽取，无需 API Key） ============
+
+/** 单章人物提及统计 */
+export type CharacterMention = { name: string; chapter: string; chapterPath: string; mentions: number; dialogueLines: number }
+
+/**
+ * 从章节正文统计人物提及：出现次数 + 对话行数（行内含「名字：」或「名字说/道/问」等引导）。
+ * 名单来自人物卡，避免把「他/她」等误算。
+ */
+export function scanCharacterMentions(
+  chapters: Array<{ title: string; path: string; content: string }>,
+  names: string[],
+): CharacterMention[] {
+  if (names.length === 0) return []
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const nameRe = new RegExp(`(${escaped.join('|')})`, 'g')
+  const dialogueRe = new RegExp(`^\\s*(?:「|『|"|“)?(${escaped.join('|')})(?:」|』|"|”)?(?:：|:|说|道|问|答|喊|叫|叹|笑|低声道|开口)`, 'm')
+  const out: CharacterMention[] = []
+  for (const ch of chapters) {
+    const counts = new Map<string, number>()
+    const dialogues = new Map<string, number>()
+    let total = 0
+    for (const m of ch.content.matchAll(nameRe)) {
+      counts.set(m[1], (counts.get(m[1]) ?? 0) + 1)
+      total += 1
+    }
+    if (total === 0) continue
+    for (const line of ch.content.split('\n')) {
+      const m = line.match(dialogueRe)
+      if (m) dialogues.set(m[1], (dialogues.get(m[1]) ?? 0) + 1)
+    }
+    for (const [name, mentions] of counts) {
+      out.push({ name, chapter: ch.title, chapterPath: ch.path, mentions, dialogueLines: dialogues.get(name) ?? 0 })
+    }
+  }
+  return out
+}
+
+/** 生成人物状态索引 markdown（source: auto；与旧桌面端索引格式约定一致） */
+export function buildCharacterStateIndex(mentions: CharacterMention[], chapters: Array<{ title: string }>): string {
+  const lines: string[] = ['# Character State Index', '', '<!-- source: auto -->', '']
+  if (mentions.length === 0) {
+    lines.push('（暂无人物出场记录。写完章节后可重新生成。）', '')
+    return lines.join('\n')
+  }
+  // 按人物聚合：出场章节列表 + 最近出场 + 总提及
+  const byName = new Map<string, CharacterMention[]>()
+  for (const m of mentions) {
+    const arr = byName.get(m.name) ?? []
+    arr.push(m)
+    byName.set(m.name, arr)
+  }
+  const lastChapter = chapters.length > 0 ? chapters[chapters.length - 1].title : ''
+  lines.push(`最新章节：${lastChapter}`, '')
+  for (const [name, arr] of [...byName.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const total = arr.reduce((s, m) => s + m.mentions, 0)
+    const dialogues = arr.reduce((s, m) => s + m.dialogueLines, 0)
+    const chapterList = arr.map((m) => `${m.chapter}(×${m.mentions})`).join('、')
+    lines.push(`## ${name}`, '', `- 出场：${chapterList}`, `- 合计提及 ${total} 次 / 对话 ${dialogues} 行`, '')
+  }
+  return lines.join('\n')
+}
+
+/** 伏笔线索条目（从章节正文抽取「伏笔/悬念」标记句） */
+export type ForeshadowHit = { chapter: string; chapterPath: string; text: string }
+
+/**
+ * 从章节正文抽取疑似伏笔句：含「伏笔/悬念/暗示/似乎/隐约/奇怪的是/没人注意到」等
+ * 提示词的句子。纯启发式，结果供作者人工确认。
+ */
+export function scanForeshadows(chapters: Array<{ title: string; path: string; content: string }>): ForeshadowHit[] {
+  const HINTS = ['伏笔', '悬念', '暗示', '没人注意到', '没有人发现', '奇怪的是', '隐约', '似乎没人', '暗自', '埋下']
+  const out: ForeshadowHit[] = []
+  for (const ch of chapters) {
+    for (const raw of ch.content.split(/[。！？\n]/)) {
+      const line = raw.trim()
+      if (line.length < 8 || line.length > 120) continue
+      if (HINTS.some((h) => line.includes(h))) {
+        out.push({ chapter: ch.title, chapterPath: ch.path, text: line.slice(0, 100) })
+      }
+    }
+  }
+  return out
+}
+
+/** 生成伏笔线索索引 markdown（编号 F001 起递增，与旧桌面端格式一致） */
+export function buildForeshadowIndex(existing: string, hits: ForeshadowHit[]): string {
+  const lines: string[] = ['# 伏笔线索', '', '<!-- source: auto -->', '']
+  // 保留已有未回收条目（人工整理的资产不丢）：解析现有 ## Fxxx 标题
+  const kept = existing.split('\n').filter((l) => /^## F\d+/.test(l))
+  let seq = kept.length
+  const seen = new Set(kept)
+  if (kept.length > 0) {
+    lines.push('<!-- 以下为已有条目，自动生成的补充条目追加在后 -->', '')
+    for (const k of kept) lines.push(k, '- 状态：未回收', '')
+  }
+  for (const h of hits) {
+    seq += 1
+    const id = `F${String(seq).padStart(3, '0')}`
+    if (seen.has(id)) continue
+    lines.push(`## ${id} ${h.text.slice(0, 24)}${h.text.length > 24 ? '…' : ''}`, `- 埋设：${h.chapter}`, `- 原文：${h.text}`, '- 状态：未回收', '')
+  }
+  if (hits.length === 0 && kept.length === 0) lines.push('（暂未发现疑似伏笔。可写正文后重新生成，或手动登记。）', '')
+  return lines.join('\n')
+}
+
+/** 组装生成所需的章节正文（顺 plot 顺序） */
+export async function loadChapterContents(): Promise<Array<{ title: string; path: string; content: string }>> {
+  const chapters = await listChapters()
+  const sorted = [...chapters].sort((a, b) => a.order - b.order)
+  const out: Array<{ title: string; path: string; content: string }> = []
+  for (const c of sorted) {
+    try {
+      out.push({ title: c.title, path: c.filePath, content: await readText(c.filePath) })
+    } catch {
+      out.push({ title: c.title, path: c.filePath, content: '' })
+    }
+  }
+  return out
+}
+
 // ============ 大纲 / 设定 文件浏览（outline/ concept/ 通用 md 编辑） ============
 
 export type DocFile = { path: string; name: string }

@@ -424,6 +424,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
 
             {sideTab === 'memory' ? (
               <MemoryPanel memory={memory} onSave={handleSaveMemory} onError={setError} />
+
             ) : null}
 
             {sideTab === 'history' ? (

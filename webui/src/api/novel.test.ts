@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseCharacters, serializeCharacters } from './novel'
-import { parsePlotLines, serializePlotLines } from './novel'
+import { parseCharacters, serializeCharacters, parsePlotLines, serializePlotLines } from './novel'
+import {
+  scanCharacterMentions,
+  buildCharacterStateIndex,
+  scanForeshadows,
+  buildForeshadowIndex,
+} from './novel'
 import {
   draftTasksFromGoal,
   extractJsonArray,
@@ -196,5 +201,87 @@ describe('parseAiTasks（AI 任务链清洗）', () => {
     expect(tasks).toHaveLength(3)
     expect(tasks[0].depends_on).toEqual([])
     expect(tasks[1].depends_on).toEqual([tasks[0].id])
+  })
+})
+
+describe('scanCharacterMentions（人物提及统计）', () => {
+  const names = ['林越', '苏晚']
+  it('统计出现次数与对话行数', () => {
+    const content = [
+      '林越拔剑出鞘。',
+      '林越：跟我来。',
+      '苏晚说道：「小心身后。」',
+      '他看向苏晚。',
+    ].join('\n')
+    const hits = scanCharacterMentions([{ title: '第 1 章', path: 'stories/c1.md', content }], names)
+    const linyue = hits.find((h) => h.name === '林越')
+    const suwan = hits.find((h) => h.name === '苏晚')
+    expect(linyue).toMatchObject({ mentions: 2, chapter: '第 1 章' })
+    expect(linyue?.dialogueLines).toBe(1)
+    expect(suwan?.mentions).toBe(2) // 「苏晚说道」+「看向苏晚」
+  })
+
+  it('无名单匹配时返回空', () => {
+    const hits = scanCharacterMentions([{ title: '第 1 章', path: 'c1.md', content: '王五走在路上。' }], names)
+    expect(hits).toEqual([])
+  })
+
+  it('空名单返回空', () => {
+    expect(scanCharacterMentions([{ title: 'a', path: 'a.md', content: '林越' }], [])).toEqual([])
+  })
+
+  it('正则特殊字符名字不炸', () => {
+    const hits = scanCharacterMentions([{ title: 'a', path: 'a.md', content: 'A.B 出现了。' }], ['A.B'])
+    expect(hits[0].mentions).toBe(1)
+  })
+})
+
+describe('buildCharacterStateIndex（人物状态索引生成）', () => {
+  it('按人物聚合出场与对话统计', () => {
+    const md = buildCharacterStateIndex(
+      [
+        { name: '林越', chapter: '第 1 章', chapterPath: 'c1.md', mentions: 5, dialogueLines: 2 },
+        { name: '林越', chapter: '第 2 章', chapterPath: 'c2.md', mentions: 3, dialogueLines: 4 },
+        { name: '苏晚', chapter: '第 2 章', chapterPath: 'c2.md', mentions: 1, dialogueLines: 0 },
+      ],
+      [{ title: '第 2 章' }],
+    )
+    expect(md).toContain('<!-- source: auto -->')
+    expect(md).toContain('最新章节：第 2 章')
+    expect(md).toContain('## 林越')
+    expect(md).toContain('合计提及 8 次 / 对话 6 行')
+    expect(md).toContain('第 1 章(×5)、第 2 章(×3)')
+  })
+
+  it('无出场时输出占位说明', () => {
+    const md = buildCharacterStateIndex([], [])
+    expect(md).toContain('暂无人物出场记录')
+  })
+})
+
+describe('scanForeshadows + buildForeshadowIndex（伏笔抽取）', () => {
+  it('抽取含提示词的句子（按句切分）', () => {
+    const hits = scanForeshadows([
+      { title: '第 1 章', path: 'c1.md', content: '剑冢深处传来异响。奇怪的是没有人注意到这道裂缝。正常叙述句子不该被抓。' },
+    ])
+    expect(hits).toHaveLength(1)
+    expect(hits[0].text).toContain('没有人注意到')
+  })
+
+  it('过滤过短与超长句', () => {
+    const hits = scanForeshadows([{ title: 'a', path: 'a.md', content: '暗示。' + '很'.repeat(200) + '悬念' }])
+    expect(hits).toHaveLength(0)
+  })
+
+  it('buildForeshadowIndex 保留已有条目并续编号', () => {
+    const existing = '# 伏笔线索\n\n## F001 剑冢异变\n- 埋设：第 1 章\n- 状态：未回收\n'
+    const md = buildForeshadowIndex(existing, [{ chapter: '第 2 章', chapterPath: 'c2.md', text: '他暗自记下了那串数字' }])
+    expect(md).toContain('## F001 剑冢异变')
+    expect(md).toContain('## F002 他暗自记下了那串数字')
+    expect(md).toContain('- 埋设：第 2 章')
+  })
+
+  it('空输入输出占位说明', () => {
+    expect(buildForeshadowIndex('', [])).toContain('暂未发现疑似伏笔')
   })
 })
