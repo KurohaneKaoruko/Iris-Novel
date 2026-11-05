@@ -49,7 +49,7 @@ pnpm run tauri:ios:dev
 ### 后端 (`src-tauri/src/`)
 
 - **`lib.rs`** - 共享库：桌面（Tauri）与 `iris-creation-server` 共用的服务层
-- **`main.rs`** - Tauri 桌面壳入口（注册命令；当前主产品形态为 iris-creation-server + webui）
+- **`main.rs`** - Tauri 桌面壳入口：setup 内嵌 `iris_creation::server::run`（127.0.0.1:8765），窗口直接加载该地址，与独立 iris-creation-server 形态行为一致；invoke 通道保留但 webui 不使用
 - **`bin/iris-creation-server.rs`** - 本地 Web 服务端入口：托管 webui 静态资源 + RPC + WS
 - **`server/`** - HTTP/WS 服务：`rpc_dispatch.rs`（67 命令分发）、WS 升级与 cancel 指令
 - **`commands.rs`** - 命令实现（`*_impl` 共用函数供 Tauri/RPC 双通道调用）

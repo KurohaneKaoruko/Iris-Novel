@@ -110,38 +110,6 @@ pub mod global {
   }
 }
 
-/// 可延迟绑定 Tauri AppHandle 的 sink：main 先装上占位，setup 回调里再绑定真实 handle。
-pub struct LateTauriEventSink {
-  handle: std::sync::Mutex<Option<tauri::AppHandle>>,
-}
-
-impl Default for LateTauriEventSink {
-  fn default() -> Self {
-    Self {
-      handle: std::sync::Mutex::new(None),
-    }
-  }
-}
-
-impl LateTauriEventSink {
-  pub fn bind(&self, app: tauri::AppHandle) {
-    if let Ok(mut slot) = self.handle.lock() {
-      *slot = Some(app);
-    }
-  }
-}
-
-impl EventSink for LateTauriEventSink {
-  fn emit(&self, event: &str, payload: Value) {
-    use tauri::Emitter;
-    if let Ok(slot) = self.handle.lock() {
-      if let Some(app) = slot.as_ref() {
-        let _ = app.emit(event, payload);
-      }
-    }
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;

@@ -6,7 +6,6 @@
   "build": {
     "beforeDevCommand": "pnpm --dir webui dev",
     "beforeBuildCommand": "pnpm --dir webui build",
-    "devUrl": "http://127.0.0.1:1421",
     "frontendDist": "../webui/dist"
   },
   "app": {
@@ -17,7 +16,8 @@
         "height": 800,
         "resizable": true,
         "decorations": false,
-        "transparent": false
+        "transparent": false,
+        "url": "http://127.0.0.1:8765/"
       }
     ]
   },

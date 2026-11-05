@@ -1,14 +1,34 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+//! 桌面壳：内嵌 iris-creation-server（HTTP RPC + WS + webui 静态资源），
+//! 窗口直接加载 http://127.0.0.1:8765。前端与后端同源通信，
+//! 与 iris-creation-server 独立部署形态行为完全一致。
+
 use iris_creation::commands;
 
 fn main() {
-  let late_sink = std::sync::Arc::new(iris_creation::event_sink::LateTauriEventSink::default());
-  iris_creation::event_sink::global::init(late_sink.clone());
-  let late_for_setup = late_sink.clone();
   tauri::Builder::default()
-    .setup(move |app| {
-      late_for_setup.bind(app.handle().clone());
+    .setup(|_app| {
+      // 内嵌本地 Web 服务：托管 webui 静态资源 + RPC + WS。
+      // static_dir 相对当前工作目录解析；也可用 IRIS_CREATION_STATIC_DIR /
+      // IRIS_CREATION_DATA_DIR 环境变量覆盖。
+      tauri::async_runtime::spawn(async move {
+        let static_dir = std::env::var("IRIS_CREATION_STATIC_DIR")
+          .ok()
+          .map(std::path::PathBuf::from)
+          .unwrap_or_else(|| std::path::PathBuf::from("webui/dist"));
+        let config = iris_creation::server::ServerConfig {
+          host: "127.0.0.1".to_string(),
+          port: 8765,
+          static_dir: Some(static_dir),
+          data_dir: std::env::var("IRIS_CREATION_DATA_DIR")
+            .ok()
+            .map(std::path::PathBuf::from),
+        };
+        if let Err(e) = iris_creation::server::run(config).await {
+          eprintln!("[iris] embedded server failed: {e}");
+        }
+      });
       Ok(())
     })
     .plugin(tauri_plugin_dialog::init())
