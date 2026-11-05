@@ -162,6 +162,22 @@
   white-space: nowrap;
 }
 
+button.chat-file-chip {
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+button.chat-file-chip:hover {
+  color: var(--text-primary);
+}
+
+button.chat-file-chip.attached {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 .chat-input-row {
   display: flex;
   gap: 8px;

@@ -26,6 +26,7 @@ import { BookAnalyzerPanel } from './BookAnalyzerPanel'
 import { PlannerPanel } from './PlannerPanel'
 import { ProgressPanel } from './ProgressPanel'
 import { SprintTimer } from './SprintTimer'
+import { ShortcutsModal } from './ShortcutsModal'
 import { CommandPalette, type CommandDef } from './CommandPalette'
 import './Workspace.css'
 
@@ -74,7 +75,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
   const [writingHistory, setWritingHistory] = useState<{ entries: WritingHistoryEntry[]; dailyGoal: number }>({ entries: [], dailyGoal: 0 })
   const [dirty, setDirty] = useState(false)
   const [assistantId, setAssistantId] = useState<string | null>(null)
-  const [modal, setModal] = useState<'settings' | 'tools' | 'book' | null>(null)
+  const [modal, setModal] = useState<'settings' | 'tools' | 'book' | 'shortcuts' | null>(null)
   const [toolsInitialTab, setToolsInitialTab] = useState<'search' | 'lint' | 'import'>('search')
   const setModalWithTools = (tab: 'search' | 'lint' | 'import') => {
     setToolsInitialTab(tab)
@@ -329,6 +330,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       { id: 'open-lint', group: '动作', label: '正文体检（AI 味/密度铁律）', keywords: 'tijian lint jiancha check', run: () => setModalWithTools('lint') },
       { id: 'open-import', group: '动作', label: '导入切章（存量作品）', keywords: 'daoru import importchapters', run: () => setModalWithTools('import') },
       { id: 'open-book', group: '动作', label: '拆书分析', keywords: 'chaishu analyze', run: () => setModal('book') },
+      { id: 'open-shortcuts', group: '动作', label: '快捷键与指令帮助', keywords: 'kuaijie shortcuts help bangzhu', run: () => setModal('shortcuts') },
       { id: 'back-shelf', group: '动作', label: '返回书架', keywords: 'shujia bookshelf exit', run: onExit },
       { id: 'ai-continue', group: 'AI 写作', label: 'AI 续写本章', keywords: 'xuxie continue', run: () => runAiMode('continue') },
       { id: 'ai-outline', group: 'AI 写作', label: 'AI 生成大纲', keywords: 'dagang outline', run: () => runAiMode('outline') },
@@ -359,6 +361,12 @@ export function Workspace({ onExit }: { onExit: () => void }) {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault()
         setPaletteOpen(true)
+      } else if (
+        ((e.ctrlKey || e.metaKey) && e.key === '/') ||
+        (e.key === '?' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement))
+      ) {
+        e.preventDefault()
+        setModal((m) => (m === 'shortcuts' ? null : 'shortcuts'))
       }
     }
     window.addEventListener('keydown', onKey)
@@ -577,6 +585,7 @@ export function Workspace({ onExit }: { onExit: () => void }) {
         {modal === 'book' ? (
           <BookAnalyzerPanel onError={setError} />
         ) : null}
+        {modal === 'shortcuts' ? <ShortcutsModal onClose={() => setModal(null)} /> : null}
         {modal === 'tools' ? (
           <ToolsModal
             onClose={() => setModal(null)}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { useChat, ChatItem } from '../../hooks/useChat'
 import type { AppSettings, Skill } from '../../api/backend'
-import { getAppSettings, getSkills, saveChatSession, listChatSessions, getChatSession } from '../../api/backend'
+import { getAppSettings, getSkills, saveChatSession, listChatSessions, getChatSession, readText } from '../../api/backend'
 import { listCharacters, type Character } from '../../api/novel'
 import { useWork } from '../../state/WorkContext'
 import './ChatPanel.css'
@@ -28,6 +28,9 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
   const [skillId, setSkillId] = useState<string>('')
   const [characters, setCharacters] = useState<Character[]>([])
   const [roleId, setRoleId] = useState<string>('')
+  /** 附上本章正文：聊天时把当前章节内容注入 system prompt */
+  const [attachChapter, setAttachChapter] = useState(false)
+  const [chapterContent, setChapterContent] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([])
   const listRef = useRef<HTMLDivElement>(null)
@@ -103,6 +106,19 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
     [chat],
   )
 
+  // 激活「附上本章」时随 activePath 变化重读正文
+  useEffect(() => {
+    if (!attachChapter || !activePath) {
+      setChapterContent('')
+      return
+    }
+    let alive = true
+    void readText(activePath)
+      .then((c) => { if (alive) setChapterContent(c) })
+      .catch(() => { if (alive) setChapterContent('') })
+    return () => { alive = false }
+  }, [attachChapter, activePath])
+
   const handleSend = useCallback(() => {
     const text = input.trim()
     if (!text || chat.busy) return
@@ -144,13 +160,16 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
       return
     }
     void chat.send(text, { assistantId, systemPrompt: buildSystemPrompt() })
-  }, [assistantId, chat, input, onError, skillId, skills, roleId, characters])
+  }, [assistantId, chat, input, onError, skillId, skills, roleId, characters, attachChapter, chapterContent])
 
-  /** 组装 system prompt：技能规范 + 角色扮演人设 */
+  /** 组装 system prompt：技能规范 + 角色扮演人设 + 本章正文 */
   const buildSystemPrompt = useCallback((): string | undefined => {
     const parts: string[] = []
     const skill = skillId ? skills.find((s) => s.id === skillId) : null
     if (skill?.prompt) parts.push(skill.prompt)
+    if (attachChapter && chapterContent.trim()) {
+      parts.push(`<本章正文（${activePath?.split('/').pop()}）>\n${chapterContent.trim()}\n</本章正文>\n用户的问题基于以上正文内容时，直接引用正文回答。`)
+    }
     const role = roleId ? characters.find((c) => c.id === roleId) : null
     if (role) {
       const d = role.data
@@ -165,7 +184,7 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
       )
     }
     return parts.length > 0 ? parts.join('\n\n') : undefined
-  }, [skillId, skills, roleId, characters])
+  }, [skillId, skills, roleId, characters, attachChapter, chapterContent, activePath])
 
   // /role 指令在 handleSend 内处理
 
@@ -265,7 +284,15 @@ export function ChatPanel({ chat, assistantId, onAssistantChange, activePath, on
               ))}
             </select>
           ) : null}
-          {activePath ? <span className="chat-file-chip">{activePath.split('/').pop()}</span> : null}
+          {activePath ? (
+            <button
+              className={`chat-file-chip ${attachChapter ? 'attached' : ''}`}
+              title={attachChapter ? '聊天时附上本章正文（点击取消）' : '点击附上本章正文作为对话上下文'}
+              onClick={() => setAttachChapter((v) => !v)}
+            >
+              {attachChapter ? '📄 已附本章' : '📄 附本章'}
+            </button>
+          ) : null}
         </div>
         <div className="chat-input-row">
           <textarea
