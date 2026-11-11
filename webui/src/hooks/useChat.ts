@@ -2,6 +2,29 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { subscribeEvent, wsSend, type Unlisten } from '../api/rpc'
 import { chatCancelStream, chatGenerateStream, type ChatMessagePayload } from '../api/backend'
 
+/** 常见后端错误 → 中文用户话术；未命中时原样透传 */
+const ERROR_I18N: Array<[RegExp, string]> = [
+  [/no api key/i, '未配置 API Key——点击右上角「设置」添加密钥'],
+  [/api key.*(invalid|incorrect|unauthorized)|401/i, 'API Key 无效或已过期——请到「设置」检查密钥'],
+  [/workspace not set/i, '尚未打开作品目录'],
+  [/insufficient (quota|balance)|quota exceeded|billing/i, 'Provider 额度或余额不足'],
+  [/rate limit|429/i, '请求过于频繁（触发限速），稍后重试'],
+  [/timed? out|timeout/i, '连接超时——检查网络或 Provider 地址'],
+  [/request failed|network/i, '网络请求失败——检查网络连接或 Provider 地址'],
+  [/http 4\d\d/i, '请求被拒绝（4xx）——检查模型名 / 参数 / 密钥'],
+  [/http 5\d\d/i, 'Provider 服务端错误（5xx），稍后重试'],
+  [/missing choices/i, 'Provider 返回格式异常——确认 base_url 指向 OpenAI 兼容接口'],
+  [/decode failed/i, '响应解析失败——Provider 可能不支持流式返回'],
+]
+
+/** 错误中文化：命中映射输出中文话术并附原文摘录，未命中原样透传 */
+export function localizeError(raw: string): string {
+  for (const [re, msg] of ERROR_I18N) {
+    if (re.test(raw)) return `${msg}（${raw.slice(0, 120)}）`
+  }
+  return raw
+}
+
 export type ChatRole = 'user' | 'assistant'
 
 /** 一次工具调用步骤（Cline 式步骤卡数据） */
@@ -149,7 +172,7 @@ export function useChat() {
         const id = sid(p)
         if (!id || id !== activeStreamIdRef.current) return
         const msg = typeof p.message === 'string' && p.message ? p.message : '生成失败（Provider 未配置或网络错误）'
-        finishStream(id, { failed: msg })
+        finishStream(id, { failed: localizeError(msg) })
       }),
     )
 
@@ -193,7 +216,7 @@ export function useChat() {
         providerId: opts?.providerId ?? null,
       }).catch((e) => {
         const msg = e instanceof Error ? e.message : String(e)
-        finishStream(streamId, { failed: msg })
+        finishStream(streamId, { failed: localizeError(msg) })
       })
     },
     [finishStream],

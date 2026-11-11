@@ -101,7 +101,7 @@ describe('useChat 事件协议', () => {
     const sid = h.api.messages.at(-1)?.streamId
     act(() => emit('ai_error', { streamId: sid, message: 'no API key configured' }))
     expect(h.api.busy).toBe(false)
-    expect(h.api.messages.at(-1)?.failed).toBe('no API key configured')
+    expect(h.api.messages.at(-1)?.failed).toContain('未配置 API Key')
     h.unmount()
   })
 
@@ -127,7 +127,7 @@ describe('useChat 事件协议', () => {
       await new Promise((r) => setTimeout(r, 0))
     })
     expect(h.api.busy).toBe(false)
-    expect(h.api.messages.at(-1)?.failed).toBe('network down')
+    expect(h.api.messages.at(-1)?.failed).toContain('网络请求失败')
     h.unmount()
   })
 
@@ -164,5 +164,20 @@ describe('useChat 事件协议', () => {
     expect(h.api.messages.map((m) => m.role)).toEqual(['user', 'assistant'])
     expect(h.api.messages[0].content).toBe('旧问题')
     h.unmount()
+  })
+})
+
+describe('localizeError 错误中文化', () => {
+  it('常见后端错误映射中文话术并保留原文', async () => {
+    const { localizeError } = await import('./useChat')
+    expect(localizeError('request failed: no API key configured')).toContain('未配置 API Key')
+    expect(localizeError('http 401: unauthorized')).toContain('无效或已过期')
+    expect(localizeError('workspace not set')).toContain('尚未打开')
+    expect(localizeError('http 502 bad gateway')).toContain('服务端错误')
+  })
+
+  it('未知错误原样透传', async () => {
+    const { localizeError } = await import('./useChat')
+    expect(localizeError('something totally custom')).toBe('something totally custom')
   })
 })
