@@ -431,6 +431,8 @@ impl AgentRuntime {
     let tool_list = self.tools();
     let memory_text = self.memory.render(50);
     let prompts = prompt_config::agent_prompts();
+    // 工程概况注入：让 Agent 开局即知作品名/简介/结构/章数，减少盲目 fs_list_dir
+    let work_context = crate::services::bookshelf::render_work_context(&self.ctx.workspace_root);
     let mode_instruction = match edit_apply_mode {
       AiEditApplyMode::AutoApply => prompts.mode_auto_apply.trim(),
       AiEditApplyMode::Review => prompts.mode_review.trim(),
@@ -441,6 +443,11 @@ impl AgentRuntime {
       .runtime_prompt_template
       .replace("{{SYS}}", agent_system_prompt.trim())
       .replace("{{TOOLS}}", tool_list_text.as_str());
+    let react_prompt = if work_context.is_empty() {
+      react_prompt
+    } else {
+      format!("{react_prompt}\n\n<work-context>\n{work_context}\n</work-context>")
+    };
     let react_prompt = format!("{react_prompt}\n\n{mode_instruction}");
     messages.push(ChatMessage {
       role: "system".to_string(),

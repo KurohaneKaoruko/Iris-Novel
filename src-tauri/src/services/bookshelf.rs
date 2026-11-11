@@ -417,3 +417,100 @@ pub fn update_work_description(path: &str, description: Option<String>) -> Resul
     .filter(|d| !d.is_empty());
   write_work_description(&root, clean)
 }
+
+/// 渲染工程概况（注入 Agent system prompt）：
+/// 作品名 / 简介 / 目录约定 / 章节统计 / 设定与大纲文件清单（浅层，各取前若干项）。
+/// 纯只读；任何读取失败都静默降级为空，绝不阻塞对话。
+pub fn render_work_context(root: &std::path::Path) -> String {
+  let name = root
+    .file_name()
+    .map(|v| v.to_string_lossy().to_string())
+    .unwrap_or_else(|| root.to_string_lossy().to_string());
+  let mut lines = vec![format!("当前作品：{}", name)];
+
+  if let Some(desc) = read_work_description(root) {
+    lines.push(format!("作品简介：{}", desc));
+  }
+
+  // 浅层目录清单（最多 2 层，每目录最多 12 项）
+  fn list_children(dir: &std::path::Path, depth: usize, out: &mut Vec<String>, prefix: &str) {
+    if depth > 2 || out.len() > 60 {
+      return;
+    }
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    let mut items: Vec<_> = entries.flatten().collect();
+    items.sort_by_key(|e| e.file_name());
+    let mut shown = 0usize;
+    for entry in items {
+      if shown >= 12 {
+        out.push(format!("{prefix}…（更多未列出）"));
+        break;
+      }
+      let name = entry.file_name().to_string_lossy().to_string();
+      if name.starts_with('.') || name == "node_modules" || name == "target" {
+        continue;
+      }
+      let is_dir = entry.path().is_dir();
+      let rel = format!("{prefix}{}", name);
+      if is_dir {
+        out.push(format!("{rel}/"));
+        list_children(&entry.path(), depth + 1, out, &format!("{rel}/"));
+      } else {
+        out.push(rel);
+      }
+      shown += 1;
+    }
+  }
+  let mut tree: Vec<String> = Vec::new();
+  list_children(root, 0, &mut tree, "");
+
+  // 章节统计
+  let stats = scan_work_stats(root);
+  if stats.chapters_count > 0 {
+    lines.push(format!(
+      "正文：{} 章，约 {} 字",
+      stats.chapters_count,
+      stats.total_words
+    ));
+  }
+
+  lines.push("目录结构：".to_string());
+  lines.extend(tree.iter().map(|l| format!("  {l}")));
+  lines.push("以上为只读概况；写文件前仍应先用 fs_read_text 核对相关文件。".to_string());
+  lines.join("\n")
+}
+
+#[cfg(test)]
+mod work_context_tests {
+  use super::*;
+
+  #[test]
+  fn render_work_context_lists_structure_and_stats() {
+    let dir = std::env::temp_dir().join(format!("iris-creation-wctx-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("stories")).unwrap();
+    fs::create_dir_all(dir.join("concept")).unwrap();
+    fs::write(dir.join("stories/ch-0001.md"), "第一章 正文大约二十个字的内容。").unwrap();
+    fs::write(dir.join("concept/主角.md"), "# 主角").unwrap();
+    fs::write(dir.join(".hidden.md"), "x").unwrap();
+
+    let ctx = render_work_context(&dir);
+    assert!(ctx.contains("当前作品"), "must name the work");
+    assert!(ctx.contains("stories/ch-0001.md"), "must list chapter file");
+    assert!(ctx.contains("concept/主角.md"), "must list concept file");
+    assert!(!ctx.contains(".hidden.md"), "must skip hidden files");
+    assert!(ctx.contains("正文：1 章"), "must count chapters");
+
+    let _ = fs::remove_dir_all(&dir);
+  }
+
+  #[test]
+  fn render_work_context_empty_dir_is_safe() {
+    let dir = std::env::temp_dir().join(format!("iris-creation-wctx-empty-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let ctx = render_work_context(&dir);
+    assert!(ctx.contains("当前作品"));
+    let _ = fs::remove_dir_all(&dir);
+  }
+}
