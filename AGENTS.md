@@ -44,10 +44,18 @@ pnpm run tauri:ios:dev
 - **`api/import.ts`** - 存量作品导入：智能切章（第X章/Chapter X/数字序号，中文数字转阿拉伯）
 - **`api/consistency.ts`** - 一致性检查：人物断档/情节线推进/伏笔回收/章节健康四维交叉核对
 - **`api/writing.ts`** - AI 写作工作流：续写/大纲/细纲/润色提示词构建 + 流式生成
-- **`features/bookshelf/`** - 书架页
-- **`features/workspace/`** - 工作台：TipTap 编辑器（TTS 听稿、lint 定位跳转）、聊天面板（技能/角色扮演/附本章上下文）、人物/设定集 Codex/情节线/记忆/历史/规划面板、命令面板（Ctrl+K）、快捷键帮助（?）、设置中心、工具箱（搜索/一致性检查/正文铁律体检/导入切章/导出/风险审阅）、拆书、写作冲刺计时、章节拖拽排序
-- **`hooks/useChat.ts`** - 流式聊天（WS token 过滤/取消/会话恢复）
-- **`state/WorkContext.tsx`** - workRoot/activePath/写作设置全局状态
+- **`features/launch/`** - 启动页：继续上次工程（last_workspace + 书架统计）、点选式目录选择器（`browse_dir`/`quick_locations`，拒绝手输路径）、新建标准工程
+- **`features/agent/`** - Agent 工作台（2026-11 重构，主流 Agent 布局）：
+  - `AgentWorkspace.tsx` - 三栏主体：会话侧栏 | 中央对话流 | Artifacts 文件面板
+  - `SessionSidebar.tsx` - 历史会话（`list/get/save_chat_session`，按工程过滤，标题自动取首条用户消息）
+  - `Markdown.tsx` - 零依赖 Markdown 渲染器（围栏代码块/表格/列表/行内格式，有单测）
+  - `StepCard.tsx` - 工具步骤卡（订阅 `ai_agent_step` WS 事件，Cline 式可折叠）
+  - `SettingsDialog.tsx` - 模型 Provider 管理（Key 走 secrets 通道、测试连接、单选激活）
+  - `FileTree.tsx` - 递归文件树（重命名/删除/新建，`fs_changed` 事件驱动刷新）
+- **`workspace/Dialogs`** - 全局 Prompt/Confirm 对话框（唯一从旧工作台保留的组件）
+- **`hooks/useChat.ts`** - 流式聊天（WS 事件协议：挂载时订阅一次 + activeStreamId ref 过滤消除竞态；`ai_error` 即终止；token 累积/done 收尾/会话恢复，有协议单测）
+- **`state/ProjectContext.tsx`** - workRoot/activePath/书架状态；`openDir` 自动登记 external_projects
+- **`state/ThemeContext.tsx`** - dark/light 主题（`data-theme` 写入 documentElement，localStorage 持久）
 
 ### 后端 (`src-tauri/src/`)
 
@@ -101,10 +109,13 @@ pnpm run tauri:ios:dev
 
 ### 代理系统
 
-Rust 后端包含 AI 代理运行时：
-- 工具注册表用于文件操作（`fs_read_text`、`fs_write_text`、`fs_list_dir` 等)
-- 记忆存储用于长期上下文
-- 写作技能通过聊天面板 `/skill <id>` 指令或控制项里的技能下拉选用，发送时注入技能写作规范
+Rust 后端包含 AI 代理运行时（ReAct 循环）：
+- 工具注册表用于文件操作（`fs_read_text`、`fs_write_text`、`fs_list_dir` 等）
+- 每次工具调用发 `ai_agent_step` WS 事件（actionId/tool/phase/ok/durationMs/输入输出预览），前端渲染为步骤卡
+- **工程上下文注入**：`bookshelf::render_work_context` 每轮对话自动把作品名/简介/章节统计/两层目录树注入 system prompt（`<work-context>` 块）
+- ReAct 产物清理：`strip_react_artifacts` 剥 `FINAL:` 前缀、丢 `TASK_DONE:` 行；`LiveEmitGate` 在流式输出中抑制 `ACTION:` 段、剥 `FINAL:` 前缀
+- 写作技能通过 composer 技能下拉选用，发送时作为 system 消息注入技能写作规范（与 work-context 合流）
+- 记忆存储用于长期上下文（`memory_search`/`memory_upsert`）
 
 ### 技能库（Novelist-Skills 子模块）
 
@@ -129,11 +140,13 @@ npx tsc -b tsconfig.json --noEmit   # 类型检查
 pnpm exec vite            # dev 服务器端口 1421，/api /ws 代理到 8765
 ```
 
-- 运行方式：`./src-tauri/target/debug/iris-creation-server --port 8765 --static-dir webui/dist --data-dir <data>`
+- 运行方式：`./src-tauri/target/debug/iris-creation-server --port 8765 --static-dir webui/dist --data-dir <data>`（Rust 改动后需 `CARGO_HTTP_PROXY='' cargo build --bin iris-creation-server` 并重启）
 - RPC：`POST /api/rpc/{cmd}` 返回 `{ok}|{err}`，全部命令绑定在 `webui/src/api/backend.ts`（新增命令改 `src-tauri/src/server/rpc_dispatch.rs` 后在此扩展）
-- WS：帧格式 `{"event","payload"}`，事件 `ai_stream_start/token/done/status`、`fs_changed`；取消流发 `{"type":"cancel","streamId"}`
+- WS：帧格式 `{"event","payload"}`，事件 `ai_stream_start/token/done/status`、`ai_agent_step`（工具步骤）、`ai_perf`（性能）、`ai_error`（后端发 ai_error 后**不一定**跟 done，前端必须自行终止流）、`fs_changed`；取消流发 `{"type":"cancel","streamId"}`
+- useChat 竞态教训：事件订阅必须在组件挂载时建立一次（ref 过滤 streamId），**不能**按 streamId 动态挂订阅——RPC 先于订阅到达会丢事件
 - 作品内数据（人物卡/情节线/章节元数据/记忆索引/写作历史）在 `webui/src/api/novel.ts`，直读直写 Markdown/JSON，与旧桌面端格式双向兼容
 - vite **不要**手动分包（manualChunks 会破坏 Prism 全局初始化契约，导致白屏）
+- 测试：`pnpm exec vitest run`（include `src/**/*.test.ts(x)`；`.gitignore` 白名单已放开 `.test.tsx`）
 
 ## 代码约定
 
