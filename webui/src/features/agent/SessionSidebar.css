@@ -103,7 +103,7 @@
 }
 
 .sss-item-row.active {
-  background: var(--active, var(--hover));
+  background: var(--accent-weak);
 }
 
 .sss-item-row.active .sss-item-title {
@@ -161,7 +161,7 @@
 
 .sss-item-del:hover {
   background: var(--hover);
-  color: var(--danger, #e5534b);
+  color: var(--danger);
 }
 
 .sss-item-confirm {
@@ -172,7 +172,7 @@
   display: flex;
   gap: 4px;
   background: var(--bg-secondary, var(--hover));
-  border: 1px solid var(--border-primary);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 2px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
@@ -189,7 +189,7 @@
 }
 
 .sss-item-confirm button.danger {
-  color: var(--danger, #e5534b);
+  color: var(--danger);
   font-weight: 600;
 }
 

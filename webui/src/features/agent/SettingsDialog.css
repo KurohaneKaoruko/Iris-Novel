@@ -34,7 +34,7 @@
 
 .set-saved {
   font-size: 12px;
-  color: var(--ok, #34a853);
+  color: var(--success);
 }
 
 .set-save {
@@ -119,8 +119,8 @@
 }
 
 .set-keyok {
-  color: var(--ok, #34a853);
-  background: color-mix(in srgb, var(--ok, #34a853) 12%, transparent);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
 }
 
 .set-keynone {
@@ -175,8 +175,8 @@
 }
 
 .set-result.good {
-  color: var(--ok, #34a853);
-  background: color-mix(in srgb, var(--ok, #34a853) 10%, transparent);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
 }
 
 .set-result.bad {
