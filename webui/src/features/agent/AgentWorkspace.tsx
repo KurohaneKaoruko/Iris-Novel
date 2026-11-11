@@ -28,6 +28,7 @@ import { SettingsDialog } from './SettingsDialog'
 import { ToolsDialog } from './ToolsDialog'
 import { ChaptersPanel } from './ChaptersPanel'
 import { LorePanel } from './LorePanel'
+import { DiffView } from './DiffView'
 import './AgentWorkspace.css'
 
 /**
@@ -44,6 +45,7 @@ export function AgentWorkspace() {
   const [editing, setEditing] = useState(false)
   const [editDraft, setEditDraft] = useState('')
   const [externalChange, setExternalChange] = useState<{ path: string; at: number } | null>(null)
+  const [previewMode, setPreviewMode] = useState<'content' | 'history'>('content')
   const [skills, setSkills] = useState<Skill[]>([])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   // 窄屏（<1100px）面板是覆盖抽屉，默认收起，避免遮挡输入区
@@ -125,6 +127,7 @@ export function AgentWorkspace() {
 
   useEffect(() => {
     setEditing(false)
+    setPreviewMode('content')
     if (!activePath) {
       setFileContent('')
       return
@@ -433,6 +436,7 @@ export function AgentWorkspace() {
                           <>
                             <button className="agw-btn" onClick={() => { setEditDraft(fileContent); setEditing(true) }}>编辑</button>
                             <button className="agw-btn" onClick={() => window.dispatchEvent(new CustomEvent('agent-attach-file', { detail: activePath }))} title="作为 Agent 上下文">给 Agent</button>
+                            <button className="agw-btn" onClick={() => setPreviewMode('history')} title="变更历史与版本恢复">历史</button>
                           </>
                         )}
                       </span>
@@ -444,7 +448,17 @@ export function AgentWorkspace() {
                       </div>
                     ) : null}
                     <div className="agw-file-body">
-                      {fileLoading ? (
+                      {previewMode === 'history' && activePath ? (
+                        <DiffView
+                          path={activePath}
+                          currentContent={fileContent}
+                          onClose={() => setPreviewMode('content')}
+                          onRestored={() => {
+                            void readText(activePath).then(setFileContent).catch(() => {})
+                            void refreshTree()
+                          }}
+                        />
+                      ) : fileLoading ? (
                         <div className="agw-empty">加载中…</div>
                       ) : editing ? (
                         <textarea
