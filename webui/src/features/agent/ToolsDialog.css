@@ -422,3 +422,11 @@
   .import-row { flex-direction: column; }
   .import-side { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; }
 }
+
+.stats-export {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}

@@ -151,6 +151,15 @@ pub async fn dispatch(ctx: &ServerContext, command: &str, args: Value) -> Result
       let path = arg_str(&args, &["relative_path", "relativePath", "path"])?;
       crate::services::fs::read_text(state, &path).map(|v| json!(v))
     }
+    "export_work" => {
+      let format = args
+        .get("format")
+        .and_then(|v| v.as_str())
+        .unwrap_or("md")
+        .to_string();
+      let (filename, content) = crate::services::fs::export_work(state, &format)?;
+      Ok(json!({ "filename": filename, "content": content }))
+    }
     "write_text" => {
       let path = arg_str(&args, &["relative_path", "relativePath", "path"])?;
       let content = arg_str(&args, &["content"])?;

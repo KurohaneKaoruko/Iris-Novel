@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useProject } from '../../state/ProjectContext'
 import { useTheme } from '../../state/ThemeContext'
-import { createNovelWork } from '../../api/backend'
+import { createNovelWork, forgetWork } from '../../api/backend'
 import { DirPickerDialog } from './DirPickerDialog'
 import './LaunchScreen.css'
 
@@ -9,7 +9,7 @@ import './LaunchScreen.css'
  * 启动页：继续上次工程 / 打开目录（服务端目录浏览器点选）/ 最近工程 / 新建标准工程。
  */
 export function LaunchScreen() {
-  const { state, openDir } = useProject()
+  const { state, openDir, refresh } = useProject()
   const { theme, toggleTheme } = useTheme()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -110,13 +110,22 @@ export function LaunchScreen() {
                 .filter((p, i, arr) => arr.findIndex((x) => x.path === p.path) === i)
                 .slice(0, 8)
                 .map((p) => (
-                  <button key={p.path} className="launch-recent-item glass-panel" onClick={() => void openDir(p.path)}>
-                    <span className="lr-name">{p.name}</span>
-                    <span className="lr-meta">
-                      {p.chapters_count} 章 · {p.total_words.toLocaleString()} 字
-                    </span>
-                    <span className="lr-path">{p.path}</span>
-                  </button>
+                  <div key={p.path} className="launch-recent-item glass-panel">
+                    <button className="lr-open" onClick={() => void openDir(p.path)}>
+                      <span className="lr-name">{p.name}</span>
+                      <span className="lr-meta">
+                        {p.chapters_count} 章 · {p.total_words.toLocaleString()} 字
+                      </span>
+                      <span className="lr-path">{p.path}</span>
+                    </button>
+                    <button
+                      className="lr-remove"
+                      title="从最近列表移除（不删除文件）"
+                      onClick={() => void forgetWork(p.path).then(() => refresh())}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ))}
             </div>
           </section>

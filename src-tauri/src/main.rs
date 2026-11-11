@@ -61,6 +61,7 @@ fn main() {
       commands::resolve_inline_references,
       commands::validate_novel_task_quality,
       commands::read_text,
+      commands::export_work,
       commands::write_text,
       commands::create_file,
       commands::create_dir,

@@ -126,6 +126,11 @@ pub fn read_text(state: State<'_, AppState>, relative_path: String) -> Result<St
 }
 
 #[tauri::command]
+pub fn export_work(state: State<'_, AppState>, format: String) -> Result<(String, String), String> {
+  crate::services::fs::export_work(&state, &format)
+}
+
+#[tauri::command]
 pub fn write_text(
   state: State<'_, AppState>,
   relative_path: String,

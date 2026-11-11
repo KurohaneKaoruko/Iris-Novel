@@ -150,6 +150,9 @@ export const getLastWorkspace = () => rpc<string | null>('get_last_workspace')
 
 export const listWorkspaceTree = (maxDepth = 6) => rpc<FsEntry>('list_workspace_tree', { maxDepth })
 export const readText = (relativePath: string) => rpc<string>('read_text', { relativePath })
+/** 导出整本：合并 stories/ 全部章节，返回 (文件名, 内容) */
+export const exportWork = (format: 'md' | 'txt' = 'md') =>
+  rpc<{ filename: string; content: string }>('export_work', { format })
 export const writeText = (relativePath: string, content: string) =>
   rpc<void>('write_text', { relativePath, content })
 export const createFile = (relativePath: string) => rpc<void>('create_file', { relativePath })

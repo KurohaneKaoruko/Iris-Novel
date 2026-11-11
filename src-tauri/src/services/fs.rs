@@ -494,6 +494,149 @@ pub fn read_text(state: &AppState, relative_path: &str) -> Result<String, String
   fs::read_to_string(target).map_err(|e| format!("read failed: {e}"))
 }
 
+/// 导出整本：按章序合并 stories/ 下全部 .md 为单文档（元数据 title 优先，缺元数据用文件名）。
+/// 返回 (文件名, 内容)。frontmatter 剥除，`# 标题` 行去重（避免与合并标题重复）。
+pub fn export_work(state: &AppState, format: &str) -> Result<(String, String), String> {
+  let root = get_workspace_root(state)?;
+  let work_name = root
+    .file_name()
+    .map(|s| s.to_string_lossy().to_string())
+    .unwrap_or_else(|| "work".to_string());
+
+  // 章节元数据（可选）
+  let meta: serde_json::Value =
+    serde_json::from_str(&fs::read_to_string(root.join(".novel/.settings/chapters.json")).unwrap_or_default())
+      .unwrap_or(serde_json::Value::Null);
+
+  // 收集 stories/*.md，按文件名排序兜底
+  let mut files: Vec<String> = Vec::new();
+  let stories = root.join("stories");
+  if stories.is_dir() {
+    let mut entries: Vec<_> = fs::read_dir(&stories)
+      .map_err(|e| format!("read stories failed: {e}"))?
+      .filter_map(|e| e.ok())
+      .map(|e| e.file_name().to_string_lossy().to_string())
+      .filter(|n| n.to_lowercase().ends_with(".md") || n.to_lowercase().ends_with(".markdown"))
+      .collect();
+    entries.sort();
+    for n in entries {
+      files.push(format!("stories/{n}"));
+    }
+  }
+  if files.is_empty() {
+    return Err("stories/ 下没有可导出的章节".to_string());
+  }
+
+  // 元数据里按 filePath 查 title/order
+  let meta_arr = meta.get("chapters").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+  let find_meta = |path: &str| -> Option<(String, i64)> {
+    meta_arr
+      .iter()
+      .find(|c| c.get("filePath").and_then(|v| v.as_str()) == Some(path))
+      .map(|c| {
+        (
+          c.get("title").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+          c.get("order").and_then(|v| v.as_i64()).unwrap_or(0),
+        )
+      })
+  };
+
+  let mut indexed: Vec<(i64, String, String)> = Vec::new(); // (order, path, content)
+  for path in &files {
+    let content = fs::read_to_string(root.join(path)).map_err(|e| format!("read {path} failed: {e}"))?;
+    let order = find_meta(path).map(|(_, o)| o).unwrap_or(i64::MAX);
+    indexed.push((order, path.clone(), content));
+  }
+  indexed.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+
+  let ext = if format == "txt" { "txt" } else { "md" };
+  let mut out = String::new();
+  if ext == "txt" {
+    out.push_str(&work_name);
+    out.push_str("\n\n");
+  }
+  let total = indexed.len();
+  for (idx, (_, path, raw)) in indexed.iter().enumerate() {
+    let title = find_meta(path).map(|(t, _)| t).unwrap_or_default();
+    let body = strip_frontmatter_and_heading(raw);
+    if ext == "md" {
+      let heading = if title.is_empty() {
+        path.split('/').next_back().unwrap_or(path).to_string()
+      } else {
+        title
+      };
+      out.push_str(&format!("# {}\n\n", heading));
+    } else {
+      let heading = if title.is_empty() {
+        format!("第 {} 章", idx + 1)
+      } else {
+        title.clone()
+      };
+      out.push_str(&format!("{}\n\n", heading));
+    }
+    out.push_str(body.trim());
+    out.push_str("\n\n");
+    let _ = total;
+  }
+
+  Ok((format!("{}.{}", sanitize_filename(&work_name), ext), out))
+}
+
+/// 剥 YAML frontmatter 与首个 `# 标题` 行（合并时统一重排标题）
+fn strip_frontmatter_and_heading(text: &str) -> String {
+  let mut rest = text;
+  if rest.trim_start().starts_with("---") {
+    if let Some(end) = rest[3..].find("\n---") {
+      rest = rest[3 + end + 4..].trim_start_matches('\n');
+    }
+  }
+  let mut out: Vec<&str> = Vec::new();
+  let mut heading_skipped = false;
+  for line in rest.lines() {
+    if !heading_skipped && line.trim_start().starts_with("# ") {
+      heading_skipped = true;
+      continue;
+    }
+    out.push(line);
+  }
+  out.join("\n")
+}
+
+fn sanitize_filename(name: &str) -> String {
+  let cleaned: String = name
+    .chars()
+    .map(|c| {
+      if c.is_alphanumeric() || c == ' ' || c == '_' || c == '-' {
+        c
+      } else {
+        '_'
+      }
+    })
+    .collect();
+  cleaned.trim().to_string()
+}
+
+#[cfg(test)]
+mod export_tests {
+  use super::{sanitize_filename, strip_frontmatter_and_heading};
+
+  #[test]
+  fn strips_frontmatter_and_first_heading() {
+    let a = strip_frontmatter_and_heading("---\ntitle: x\n---\n# 第一章\n\n正文");
+    assert_eq!(a.trim_start(), "正文");
+    let b = strip_frontmatter_and_heading("# 已有标题\n\n内容");
+    assert_eq!(b.trim_start(), "内容");
+    let c = strip_frontmatter_and_heading("无标题正文\n第二行");
+    assert_eq!(c, "无标题正文\n第二行");
+  }
+
+  #[test]
+  fn sanitizes_filename() {
+    assert_eq!(sanitize_filename("我的 小说/v1?"), "我的 小说_v1_");
+    assert_eq!(sanitize_filename("clean-name_2"), "clean-name_2");
+  }
+}
+
 pub fn write_text(
   state: &AppState,
   relative_path: &str,

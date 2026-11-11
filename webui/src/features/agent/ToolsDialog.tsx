@@ -59,6 +59,7 @@ export function ToolsDialog({ initialTab = 'stats', onClose, onOpenFile }: Props
 function StatsTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
   const [stats, setStats] = useState<WorkStats | null>(null)
   const [chapters, setChapters] = useState<Chapter[]>([])
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -67,10 +68,37 @@ function StatsTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
     })()
   }, [])
 
+  const doExport = useCallback(async (format: 'md' | 'txt') => {
+    setExporting(true)
+    try {
+      const { exportWork } = await import('../../api/backend')
+      const { filename, content } = await exportWork(format)
+      // 浏览器下载
+      const blob = new Blob([content], { type: format === 'txt' ? 'text/plain' : 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setExporting(false)
+    }
+  }, [])
+
   if (!stats) return <div className="tools-loading">统计中…</div>
 
   return (
     <div className="stats-wrap">
+      <div className="stats-export">
+        <button className="tools-run" disabled={exporting || stats.chapterCount === 0} onClick={() => void doExport('md')}>
+          {exporting ? '导出中…' : '⬇ 导出 Markdown'}
+        </button>
+        <button className="tools-run" disabled={exporting || stats.chapterCount === 0} onClick={() => void doExport('txt')}>
+          {exporting ? '导出中…' : '⬇ 导出 TXT'}
+        </button>
+        <span className="tools-run-hint">按章序合并 stories/ 全部章节为单文件下载</span>
+      </div>
       <div className="stats-grid">
         <Stat big value={stats.totalWords.toLocaleString()} label="总字数" />
         <Stat value={`${stats.chapterCount}`} label="章节" sub={`${stats.completedChapters} 已完结`} />

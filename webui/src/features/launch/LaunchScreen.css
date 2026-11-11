@@ -199,6 +199,7 @@
 }
 
 .launch-recent-item {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -211,6 +212,48 @@
 .launch-recent-item:hover {
   border-color: var(--accent);
   transform: translateX(2px);
+}
+
+.lr-open {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  min-width: 0;
+}
+
+.lr-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease;
+}
+
+.launch-recent-item:hover .lr-remove {
+  opacity: 1;
+}
+
+.lr-remove:hover {
+  background: var(--hover);
+  color: var(--danger);
 }
 
 .lr-name {
