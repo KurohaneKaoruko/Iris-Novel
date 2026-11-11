@@ -56,6 +56,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         await setWorkspace(p)
         setWorkRoot(p)
         setActivePath(null)
+        // 登记到最近列表（外部工程），失败不影响打开
+        try {
+          await rememberExternalProject(p)
+        } catch { /* 已登记过或非目录等情况 */ }
         await refresh()
       } catch (e) {
         setError(`打开目录失败：${e instanceof Error ? e.message : String(e)}`)

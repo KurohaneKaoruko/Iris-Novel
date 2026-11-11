@@ -26,6 +26,7 @@ export type ProjectItem = {
   chapters_count: number
   total_words: number
   updated_at: number
+  last_opened_at?: number | null
   is_valid_workspace: boolean
   source: 'default' | 'external' | 'imported'
 }

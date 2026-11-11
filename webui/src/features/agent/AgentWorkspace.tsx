@@ -136,7 +136,7 @@ export function AgentWorkspace() {
       return
     }
     const msgs = chat.messages
-    const hasAssistant = msgs.some((m) => m.role === 'assistant' && !m.streaming && m.content.trim())
+    const hasAssistant = msgs.some((m) => m.role === 'assistant' && !m.streaming && (m.content.trim() || m.failed))
     if (!hasAssistant) return
     const sig = msgs.map((m) => `${m.role}:${m.content}`).join('\u0000')
     if (sig === savedSigRef.current) return

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useProject } from '../../state/ProjectContext'
 import { useTheme } from '../../state/ThemeContext'
 import { createNovelWork } from '../../api/backend'
@@ -6,7 +6,7 @@ import { DirPickerDialog } from './DirPickerDialog'
 import './LaunchScreen.css'
 
 /**
- * 启动页：一键打开目录（服务端目录浏览器点选）/ 最近工程 / 新建标准工程。
+ * 启动页：继续上次工程 / 打开目录（服务端目录浏览器点选）/ 最近工程 / 新建标准工程。
  */
 export function LaunchScreen() {
   const { state, openDir } = useProject()
@@ -19,7 +19,18 @@ export function LaunchScreen() {
   const recent = [
     ...(state?.external_projects ?? []),
     ...(state?.default_projects ?? []),
-  ].sort((a, b) => (b.updated_at ?? 0) - (a.updated_at ?? 0))
+  ].sort((a, b) => (b.last_opened_at ?? b.updated_at ?? 0) - (a.last_opened_at ?? a.updated_at ?? 0))
+
+  const lastPath = state?.last_workspace ?? null
+  const lastItem = lastPath ? recent.find((p) => p.path === lastPath) : undefined
+  const lastName = lastPath?.split(/[/\\]/).filter(Boolean).pop() ?? ''
+
+  // 「继续上次工程」卡片就绪动画
+  const [lastReady, setLastReady] = useState(false)
+  useEffect(() => {
+    const t = window.setTimeout(() => setLastReady(true), 60)
+    return () => window.clearTimeout(t)
+  }, [])
 
   const handleCreate = useCallback(async () => {
     const name = newName.trim()
@@ -48,6 +59,21 @@ export function LaunchScreen() {
       </header>
 
       <main className="launch-main">
+        {lastPath ? (
+          <button
+            className={`launch-resume glass-panel ${lastReady ? 'in' : ''}`}
+            onClick={() => void openDir(lastPath)}
+          >
+            <span className="launch-resume-label">继续上次</span>
+            <span className="launch-resume-name">{lastName}</span>
+            <span className="launch-resume-meta">
+              {lastItem ? `${lastItem.chapters_count} 章 · ${lastItem.total_words.toLocaleString()} 字 · ` : ''}
+              {lastPath}
+            </span>
+            <span className="launch-resume-go">→</span>
+          </button>
+        ) : null}
+
         <button className="launch-open glass-panel" onClick={() => setPickerOpen(true)}>
           <span className="launch-open-icon">📂</span>
           <span className="launch-open-title">打开目录…</span>
@@ -80,15 +106,18 @@ export function LaunchScreen() {
           <section className="launch-recent">
             <h3>最近打开</h3>
             <div className="launch-recent-list">
-              {recent.slice(0, 8).map((p) => (
-                <button key={p.path} className="launch-recent-item glass-panel" onClick={() => void openDir(p.path)}>
-                  <span className="lr-name">{p.name}</span>
-                  <span className="lr-meta">
-                    {p.chapters_count} 章 · {p.total_words.toLocaleString()} 字
-                  </span>
-                  <span className="lr-path">{p.path}</span>
-                </button>
-              ))}
+              {recent
+                .filter((p, i, arr) => arr.findIndex((x) => x.path === p.path) === i)
+                .slice(0, 8)
+                .map((p) => (
+                  <button key={p.path} className="launch-recent-item glass-panel" onClick={() => void openDir(p.path)}>
+                    <span className="lr-name">{p.name}</span>
+                    <span className="lr-meta">
+                      {p.chapters_count} 章 · {p.total_words.toLocaleString()} 字
+                    </span>
+                    <span className="lr-path">{p.path}</span>
+                  </button>
+                ))}
             </div>
           </section>
         ) : null}

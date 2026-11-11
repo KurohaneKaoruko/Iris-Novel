@@ -46,6 +46,68 @@
   gap: 14px;
 }
 
+/* 继续上次工程 */
+.launch-resume {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 22px 26px;
+  cursor: pointer;
+  text-align: left;
+  border-left: 3px solid var(--accent);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.launch-resume.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.launch-resume:hover {
+  box-shadow: var(--glass-highlight), var(--shadow-lg);
+  border-left-color: var(--accent-hover);
+}
+
+.launch-resume-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.launch-resume-name {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.launch-resume-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.launch-resume-go {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  color: var(--accent);
+  transition: transform var(--dur) var(--ease);
+}
+
+.launch-resume:hover .launch-resume-go {
+  transform: translateY(-50%) translateX(4px);
+}
+
 .launch-open {
   display: flex;
   flex-direction: column;
