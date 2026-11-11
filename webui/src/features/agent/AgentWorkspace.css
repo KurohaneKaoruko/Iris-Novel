@@ -565,10 +565,23 @@
   font-size: 14px;
   line-height: 1.6;
   resize: none;
+  overflow-y: auto;
+  max-height: 220px;
 }
 
 .composer textarea:focus {
   box-shadow: none;
+}
+
+.composer textarea:disabled {
+  opacity: 0.6;
+}
+
+.composer-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-right: 8px;
 }
 
 .composer-attach {

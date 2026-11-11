@@ -460,8 +460,11 @@ function ChatColumn({
 
   const send = useCallback(() => {
     const text = input.trim()
-    if (!text || chat.busy) return
+    if (!text) return
+    if (chat.busy) return
     setInput('')
+    // 重置自动增高高度
+    if (taRef.current) taRef.current.style.height = 'auto'
     const skill = skillId ? skills.find((s) => s.id === skillId) : null
     const parts: string[] = [
       `你是运行在用户本地作品目录中的写作 Agent（ReAct 循环，可调用 fs_list_dir / fs_read_text / fs_write_text 等工具）。所有产出都是 Markdown 文件，写入工程目录；先看再写；回复用 Markdown，提到文件路径用反引号。当前作品：${workName}。`,
@@ -519,16 +522,21 @@ function ChatColumn({
         <textarea
           ref={taRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value)
+            // 自动增高（上限 ~10 行）
+            const el = e.target
+            el.style.height = 'auto'
+            el.style.height = `${Math.min(el.scrollHeight, 220)}px`
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               send()
             }
           }}
           placeholder="给 Agent 下指令…（Enter 发送，Shift+Enter 换行）"
           rows={2}
-          disabled={chat.busy}
         />
         <div className="composer-tools">
           <select className="composer-skill" value={skillId} onChange={(e) => setSkillId(e.target.value)} title="写作技能">
@@ -538,6 +546,7 @@ function ChatColumn({
             ))}
           </select>
           <span className="composer-spacer" />
+          {input.length > 0 ? <span className="composer-count">{input.length} 字</span> : null}
           {chat.busy ? (
             <button className="composer-btn stop" onClick={chat.cancel}>停止</button>
           ) : (
