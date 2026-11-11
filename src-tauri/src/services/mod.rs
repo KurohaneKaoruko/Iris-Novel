@@ -7,6 +7,7 @@ pub mod agent_cli;
 pub mod ai_stream;
 pub mod bookshelf;
 pub mod chat;
+pub mod dir_browse;
 pub mod fs;
 pub mod settings;
 pub mod workspace;

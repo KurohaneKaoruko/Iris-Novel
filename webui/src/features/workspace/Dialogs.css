@@ -1,0 +1,68 @@
+.dialog-box {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: modal-in var(--dur-slow) var(--ease);
+}
+
+.dialog-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dialog-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.dialog-btn {
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.dialog-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.dialog-btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-contrast);
+  font-weight: 500;
+}
+
+.dialog-btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  color: var(--accent-contrast);
+}
+
+.dialog-btn.danger {
+  background: var(--danger);
+  border-color: transparent;
+  color: var(--accent-contrast);
+  font-weight: 500;
+}
+
+.dialog-btn.danger:hover:not(:disabled) {
+  filter: brightness(1.1);
+  color: var(--accent-contrast);
+}
+
+.dialog-box input {
+  font-size: 14px;
+  padding: 8px 12px;
+}

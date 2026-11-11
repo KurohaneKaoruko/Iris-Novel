@@ -1,67 +1,39 @@
-import { useCallback, useEffect, useState } from 'react'
-import { WorkProvider, useWork } from './state/WorkContext'
-import { Bookshelf } from './features/bookshelf/Bookshelf'
-import { Workspace } from './features/workspace/Workspace'
-import { readDeepLink, writeDeepLink } from './api/deeplink'
-import { setWorkspace } from './api/backend'
+import { useEffect, useState } from 'react'
+import { ProjectProvider, useProject } from './state/ProjectContext'
+import { ThemeProvider } from './state/ThemeContext'
+import { LaunchScreen } from './features/launch/LaunchScreen'
+import { AgentWorkspace } from './features/agent/AgentWorkspace'
 
 function Shell() {
-  const { workRoot, setWorkRoot } = useWork()
-  const [view, setView] = useState<'bookshelf' | 'studio'>(workRoot ? 'studio' : 'bookshelf')
-  const [restoring, setRestoring] = useState(() => readDeepLink().work !== null)
+  const { workRoot, error, setError, refresh } = useProject()
+  const [booted, setBooted] = useState(false)
 
-  // 启动时从 hash 深链恢复：后端 set_workspace → setWorkRoot（activePath 由 Workspace 恢复）
   useEffect(() => {
-    const link = readDeepLink()
-    if (!link.work) {
-      setRestoring(false)
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      try {
-        await setWorkspace(link.work!)
-        if (cancelled) return
-        setWorkRoot(link.work!)
-        setView('studio')
-      } catch {
-        // 深链失效（作品被移动/删除）：清 hash 回书架
-        writeDeepLink(null)
-        setView('bookshelf')
-      } finally {
-        if (!cancelled) setRestoring(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // last_workspace 不再自动进入：Agent 工作台强调「打开目录」的显式动作
+    setBooted(true)
+    void refresh()
+  }, [refresh])
 
-  const openStudio = useCallback(() => setView('studio'), [])
-  const exitToBookshelf = useCallback(() => {
-    setWorkRoot(null)
-    writeDeepLink(null)
-    setView('bookshelf')
-  }, [setWorkRoot])
+  if (!booted) return null
 
-  // workRoot 变化同步到 hash（进入/切换作品）
-  useEffect(() => {
-    if (workRoot) writeDeepLink(workRoot, null)
-  }, [workRoot])
-
-  if (restoring) return null
-  return view === 'bookshelf' ? (
-    <Bookshelf onOpen={openStudio} />
-  ) : (
-    <Workspace onExit={exitToBookshelf} />
+  return (
+    <>
+      {workRoot ? <AgentWorkspace /> : <LaunchScreen />}
+      {error ? (
+        <div className="toast-error glass-float" role="alert" onClick={() => setError(null)}>
+          {error}
+        </div>
+      ) : null}
+    </>
   )
 }
 
 export default function App() {
   return (
-    <WorkProvider>
-      <Shell />
-    </WorkProvider>
+    <ThemeProvider>
+      <ProjectProvider>
+        <Shell />
+      </ProjectProvider>
+    </ThemeProvider>
   )
 }

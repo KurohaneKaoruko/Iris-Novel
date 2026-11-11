@@ -130,6 +130,17 @@ pub async fn dispatch(ctx: &ServerContext, command: &str, args: Value) -> Result
       Ok(json!(null))
     }
 
+    // ---- 目录浏览（打开目录对话框） ----
+    "browse_dir" => {
+      let path = arg_opt_str(&args, &["path"]).unwrap_or_default();
+      let v = crate::services::dir_browse::list_dir(&path)?;
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+    "quick_locations" => {
+      let v = crate::services::dir_browse::quick_locations();
+      serde_json::to_value(v).map_err(|e| e.to_string())
+    }
+
     // ---- fs ----
     "list_workspace_tree" => {
       let depth = arg_usize(&args, &["max_depth", "maxDepth"])?;

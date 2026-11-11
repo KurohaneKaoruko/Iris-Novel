@@ -127,6 +127,22 @@ export const updateWorkDescription = (path: string, description: string) =>
   rpc<void>('update_work_description', { path, description })
 /** 从书架移除记录（不删盘上文件） */
 export const forgetWork = (path: string) => rpc<void>('forget_external_project', { path })
+export const rememberExternalProject = (path: string) => rpc<void>('remember_external_project', { path })
+export const browseDir = (path = '') => rpc<DirListing>('browse_dir', { path })
+export const quickLocations = () => rpc<DirEntryInfo[]>('quick_locations')
+
+export type DirEntryInfo = {
+  name: string
+  path: string
+  is_workspace: boolean
+}
+
+export type DirListing = {
+  path: string
+  parent: string | null
+  home: string
+  entries: DirEntryInfo[]
+}
 export const getLastWorkspace = () => rpc<string | null>('get_last_workspace')
 
 // ---- fs ----

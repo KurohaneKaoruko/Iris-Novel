@@ -23,6 +23,7 @@ impl Default for ChatHistoryMessage {
 #[serde(default)]
 pub struct ChatSession {
   pub id: String,
+  pub title: String,
   pub workspace_root: String,
   pub created_at: i64,
   pub updated_at: i64,
@@ -33,6 +34,7 @@ impl Default for ChatSession {
   fn default() -> Self {
     Self {
       id: String::new(),
+      title: String::new(),
       workspace_root: String::new(),
       created_at: 0,
       updated_at: 0,
@@ -44,6 +46,7 @@ impl Default for ChatSession {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatSessionSummary {
   pub id: String,
+  pub title: String,
   pub workspace_root: String,
   pub updated_at: i64,
   pub message_count: usize,

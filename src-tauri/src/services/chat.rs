@@ -18,6 +18,29 @@ pub fn save_chat_session(session: chat_history::ChatSession) -> Result<(), Strin
   if incoming.created_at <= 0 {
     incoming.created_at = now;
   }
+  // 未指定标题时，取首条用户消息截断为会话标题
+  if incoming.title.trim().is_empty() {
+    incoming.title = incoming
+      .messages
+      .iter()
+      .find(|m| m.role == "user")
+      .map(|m| {
+        let t = m.content.trim().replace(['\n', '\r'], " ");
+        let mut end = 0;
+        for (i, ch) in t.char_indices() {
+          if i >= 24 {
+            break;
+          }
+          end = i + ch.len_utf8();
+        }
+        if end < t.len() {
+          format!("{}…", &t[..end])
+        } else {
+          t
+        }
+      })
+      .unwrap_or_else(|| "未命名会话".to_string());
+  }
   incoming.updated_at = now;
 
   if let Some(pos) = sessions.iter().position(|s| s.id == incoming.id) {
@@ -45,6 +68,7 @@ pub fn list_chat_sessions(workspace_root: Option<String>) -> Result<Vec<chat_his
     }
     out.push(chat_history::ChatSessionSummary {
       id: s.id,
+      title: s.title,
       workspace_root: s.workspace_root,
       updated_at: s.updated_at,
       message_count: s.messages.len(),
