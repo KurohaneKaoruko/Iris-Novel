@@ -7,15 +7,17 @@ type SessionSidebarProps = {
   activeSessionId: string | null
   onNewSession: () => void
   onLoadSession: (id: string) => void
+  onDeleteSession: (id: string) => void
   collapsed: boolean
   onToggle: () => void
 }
 
 /** 左侧会话栏（ChatGPT 式）：新建会话 / 历史会话 / 工程信息 / 折叠 */
-export function SessionSidebar({ activeSessionId, onNewSession, onLoadSession, collapsed, onToggle }: SessionSidebarProps) {
+export function SessionSidebar({ activeSessionId, onNewSession, onLoadSession, onDeleteSession, collapsed, onToggle }: SessionSidebarProps) {
   const { workRoot, workName, closeWork } = useProject()
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([])
   const [loading, setLoading] = useState(false)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -59,16 +61,40 @@ export function SessionSidebar({ activeSessionId, onNewSession, onLoadSession, c
       <div className="sss-list">
         <div className="sss-section">历史会话{loading ? '…' : `（${sessions.length}）`}</div>
         {sessions.length === 0 && !loading ? <div className="sss-empty">暂无历史会话</div> : null}
-        {sessions.map((s) => (
-          <button
-            key={s.id}
-            className={`sss-item ${s.id === activeSessionId ? 'active' : ''}`}
-            onClick={() => onLoadSession(s.id)}
-          >
-            <span className="sss-item-title">{s.title || '会话'}</span>
-            {s.updated_at ? <span className="sss-item-time">{formatDay(s.updated_at)}</span> : null}
-          </button>
-        ))}
+        {sessions.map((s) => {
+          const confirming = confirmingId === s.id
+          return (
+            <div
+              key={s.id}
+              className={`sss-item-row ${s.id === activeSessionId ? 'active' : ''} ${confirming ? 'confirming' : ''}`}
+            >
+              <button className="sss-item" onClick={() => { setConfirmingId(null); onLoadSession(s.id) }}>
+                <span className="sss-item-title">{s.title || '会话'}</span>
+                {s.updated_at ? <span className="sss-item-time">{formatDay(s.updated_at)}</span> : null}
+              </button>
+              {confirming ? (
+                <span className="sss-item-confirm">
+                  <button
+                    className="danger"
+                    onClick={() => { setConfirmingId(null); onDeleteSession(s.id) }}
+                    title="确认删除"
+                  >
+                    删除
+                  </button>
+                  <button onClick={() => setConfirmingId(null)}>取消</button>
+                </span>
+              ) : (
+                <button
+                  className="sss-item-del"
+                  title="删除会话"
+                  onClick={() => setConfirmingId(s.id)}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <div className="sss-foot">

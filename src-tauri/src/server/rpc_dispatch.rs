@@ -296,6 +296,11 @@ pub async fn dispatch(ctx: &ServerContext, command: &str, args: Value) -> Result
       let v = crate::services::chat::get_chat_session(&id)?;
       serde_json::to_value(v).map_err(|e| e.to_string())
     }
+    "delete_chat_session" => {
+      let id = arg_str(&args, &["id"])?;
+      let v = crate::services::chat::delete_chat_session(&id)?;
+      Ok(json!(v))
+    }
 
     // ---- ai stream ----
     "chat_generate_stream" => {

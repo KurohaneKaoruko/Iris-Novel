@@ -94,6 +94,27 @@
   padding: 18px 0;
 }
 
+.sss-item-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.sss-item-row.active {
+  background: var(--active, var(--hover));
+}
+
+.sss-item-row.active .sss-item-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.sss-item-row.confirming .sss-item {
+  opacity: 0.55;
+}
+
 .sss-item {
   display: flex;
   align-items: center;
@@ -101,6 +122,8 @@
   width: 100%;
   text-align: left;
   padding: 8px 10px;
+  border: none;
+  background: transparent;
   border-radius: var(--radius-sm);
   font-size: 13px;
   color: var(--text-secondary);
@@ -111,6 +134,67 @@
 .sss-item:hover {
   background: var(--hover);
   color: var(--text-primary);
+}
+
+/* 删除按钮：hover 行时出现在时间戳右侧 */
+.sss-item-del {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.sss-item-row:hover .sss-item-del {
+  display: flex;
+}
+
+.sss-item-del:hover {
+  background: var(--hover);
+  color: var(--danger, #e5534b);
+}
+
+.sss-item-confirm {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary, var(--hover));
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 2px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.sss-item-confirm button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.sss-item-confirm button.danger {
+  color: var(--danger, #e5534b);
+  font-weight: 600;
+}
+
+.sss-item-confirm button:hover {
+  background: var(--hover);
 }
 
 .sss-item-title {

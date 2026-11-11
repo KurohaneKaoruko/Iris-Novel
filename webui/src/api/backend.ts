@@ -173,6 +173,7 @@ export const listChatSessions = (workspaceRoot?: string | null) =>
   rpc<ChatSessionSummary[]>('list_chat_sessions', { workspaceRoot: workspaceRoot ?? null })
 export const getChatSession = (id: string) => rpc<ChatSession>('get_chat_session', { id })
 export const saveChatSession = (session: ChatSession) => rpc<void>('save_chat_session', { session })
+export const deleteChatSession = (id: string) => rpc<boolean>('delete_chat_session', { id })
 
 /** 发起 AI 流式生成；token 经 WS ai_stream_token 事件到达。 */
 export const chatGenerateStream = (args: {

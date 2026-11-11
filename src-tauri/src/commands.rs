@@ -291,6 +291,11 @@ pub fn get_chat_session(_app: AppHandle, id: String) -> Result<chat_history::Cha
   crate::services::chat::get_chat_session(&id)
 }
 
+#[tauri::command]
+pub fn delete_chat_session(_app: AppHandle, id: String) -> Result<bool, String> {
+  crate::services::chat::delete_chat_session(&id)
+}
+
 #[allow(non_snake_case)]
 #[tauri::command]
 pub fn chat_generate_stream(

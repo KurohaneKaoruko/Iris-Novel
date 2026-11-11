@@ -82,6 +82,7 @@ fn main() {
       commands::save_chat_session,
       commands::list_chat_sessions,
       commands::get_chat_session,
+      commands::delete_chat_session,
       commands::list_history_entries,
       commands::create_history_snapshot,
       commands::read_history_snapshot,

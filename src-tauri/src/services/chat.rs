@@ -82,3 +82,14 @@ pub fn get_chat_session(id: &str) -> Result<chat_history::ChatSession, String> {
   sessions.into_iter().find(|s| s.id == id).ok_or_else(|| "session not found".to_string())
 }
 
+pub fn delete_chat_session(id: &str) -> Result<bool, String> {
+  let mut sessions = chat_history::load()?;
+  let before = sessions.len();
+  sessions.retain(|s| s.id != id);
+  let removed = sessions.len() < before;
+  if removed {
+    chat_history::save(&sessions)?;
+  }
+  Ok(removed)
+}
+

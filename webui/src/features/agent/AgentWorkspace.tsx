@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
-import { createDir, createFile, listWorkspaceTree, readText, renameEntry, deleteEntry as del, writeText, getSkills, getChatSession, saveChatSession, getAppSettings, getApiKeyStatus, type Skill, type ChatMessagePayload } from '../../api/backend'
+import { createDir, createFile, listWorkspaceTree, readText, renameEntry, deleteEntry as del, writeText, getSkills, getChatSession, saveChatSession, deleteChatSession, getAppSettings, getApiKeyStatus, type Skill, type ChatMessagePayload } from '../../api/backend'
 import { subscribeEvent } from '../../api/rpc'
 import { useProject } from '../../state/ProjectContext'
 import { useChat, type ChatItem } from '../../hooks/useChat'
@@ -180,6 +180,20 @@ export function AgentWorkspace() {
     chat.clear()
   }, [chat])
 
+  /** 删除历史会话；若删的是当前会话则同时清空对话区 */
+  const deleteSession = useCallback(
+    async (id: string) => {
+      await deleteChatSession(id)
+      if (sessionIdRef.current === id) {
+        sessionIdRef.current = null
+        setActiveSessionId(null)
+        savedSigRef.current = ''
+        chat.clear()
+      }
+    },
+    [chat],
+  )
+
   const mdFiles = useMemo(() => {
     const out: FsEntry[] = []
     const walk = (e: FsEntry) => {
@@ -267,6 +281,7 @@ export function AgentWorkspace() {
           activeSessionId={activeSessionId}
           onNewSession={newSession}
           onLoadSession={loadSession}
+          onDeleteSession={(id) => void deleteSession(id)}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed((v) => !v)}
         />
