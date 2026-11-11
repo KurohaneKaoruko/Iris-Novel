@@ -37,3 +37,4 @@ __tests__/
 *.test.ts
 *.test.tsx
 !webui/src/**/*.test.ts
+!webui/src/**/*.test.tsx
