@@ -126,19 +126,23 @@ struct LiveEmitGate {
   probe: String,
 }
 
-fn action_prefix_state(text: &str) -> (bool, bool) {
+/// 检测流式文本头部是否是 ReAct 协议标记（ACTION: = 抑制整段；FINAL: = 只剥前缀）。
+/// 返回 (是否可能是标记前缀, 是否完整命中 ACTION:)
+fn action_prefix_state(text: &str) -> (bool, bool, bool) {
   let trimmed = text.trim_start();
   if trimmed.is_empty() {
-    return (false, false);
+    return (false, false, false);
   }
   let mut head = String::new();
   for ch in trimmed.chars().take(7) {
     head.push(ch.to_ascii_uppercase());
   }
   let action = "ACTION:";
-  let is_possible_prefix = action.starts_with(head.as_str());
-  let is_full = head == action;
-  (is_possible_prefix, is_full)
+  let finalp = "FINAL: ";
+  let is_possible_prefix = action.starts_with(head.as_str()) || finalp.starts_with(head.as_str());
+  let is_full_action = head == action;
+  let is_full_final = head == finalp;
+  (is_possible_prefix, is_full_action, is_full_final)
 }
 
 fn compact_preview(text: &str, max_chars: usize) -> String {
@@ -216,9 +220,16 @@ impl LiveEmitGate {
       LiveEmitMode::Suppress => {}
       LiveEmitMode::Unknown => {
         self.probe.push_str(text);
-        let (action_prefix_possible, action_prefix_full) = action_prefix_state(&self.probe);
+        let (action_prefix_possible, action_prefix_full, final_prefix_full) =
+          action_prefix_state(&self.probe);
         if action_prefix_full {
           self.mode = LiveEmitMode::Suppress;
+          self.probe.clear();
+          return;
+        }
+        if final_prefix_full {
+          // FINAL: 前缀剥掉，正文继续流出
+          self.mode = LiveEmitMode::Emit;
           self.probe.clear();
           return;
         }
@@ -238,7 +249,7 @@ impl LiveEmitGate {
     if self.probe.is_empty() {
       return;
     }
-    let (_, action_prefix_full) = action_prefix_state(&self.probe);
+    let (_, action_prefix_full, _) = action_prefix_state(&self.probe);
     if self.mode != LiveEmitMode::Suppress && !action_prefix_full {
       if let Some(s) = session {
         s.emit_token(&self.probe);

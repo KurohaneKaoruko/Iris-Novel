@@ -555,9 +555,29 @@ impl AgentRuntime {
         });
         continue;
       }
-      return Ok((out, perf));
+      return Ok((strip_react_artifacts(&out), perf));
     }
   }
+}
+
+/// 剥离 ReAct 产物中不该呈现给用户的残留：
+/// 行首 FINAL:/TASK_DONE: 前缀、重复的 ODECLARATION 无关内容不做处理。
+fn strip_react_artifacts(text: &str) -> String {
+  let mut out_lines: Vec<&str> = Vec::new();
+  for line in text.lines() {
+    let upper = line.trim_start().to_ascii_uppercase();
+    if upper.starts_with("FINAL:") {
+      // 去掉前缀保留正文
+      let rest = line.trim_start()[6..].trim_start();
+      out_lines.push(rest);
+      continue;
+    }
+    if upper.starts_with("TASK_DONE:") {
+      continue;
+    }
+    out_lines.push(line);
+  }
+  out_lines.join("\n").trim().to_string()
 }
 
 #[derive(Clone)]
@@ -925,5 +945,20 @@ mod tests {
       .expect("read index should succeed even when files missing");
     assert_eq!(out2.get("characterState").and_then(|v| v.as_str()), Some(""));
     assert_eq!(out2.get("foreshadow").and_then(|v| v.as_str()), Some(""));
+  }
+}
+
+#[cfg(test)]
+mod react_strip_tests {
+  use super::strip_react_artifacts;
+
+  #[test]
+  fn strips_final_prefix_and_task_done() {
+    let a = strip_react_artifacts("FINAL: 已完成写作。");
+    assert_eq!(a, "已完成写作。");
+    let b = strip_react_artifacts("TASK_DONE: t1\n正文内容");
+    assert_eq!(b, "正文内容");
+    let c = strip_react_artifacts("普通 Markdown 正文\n\n第二段");
+    assert_eq!(c, "普通 Markdown 正文\n\n第二段");
   }
 }
