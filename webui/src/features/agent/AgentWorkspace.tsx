@@ -12,6 +12,7 @@ import { Markdown } from './Markdown'
 import { StepCard } from './StepCard'
 import { PromptDialog, ConfirmDialog } from '../workspace/Dialogs'
 import { SettingsDialog } from './SettingsDialog'
+import { ToolsDialog } from './ToolsDialog'
 import './AgentWorkspace.css'
 
 /**
@@ -41,6 +42,7 @@ export function AgentWorkspace() {
   >(null)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
   const sessionIdRef = useRef<string | null>(null)
@@ -250,6 +252,9 @@ export function AgentWorkspace() {
         <span className="agw-name">{workName}</span>
         <span className="agw-badge">Agent</span>
         <span className="agw-spacer" />
+        <button className="agw-btn" onClick={() => setToolsOpen(true)} title="统计 / 一致性检查 / 正文体检 / 导入切章">
+          工具
+        </button>
         <button className="agw-btn" onClick={() => setSettingsOpen(true)} title="模型与密钥设置">
           设置{keyMissing ? <span className="agw-dot" /> : null}
         </button>
@@ -359,6 +364,15 @@ export function AgentWorkspace() {
       ) : null}
 
       {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
+      {toolsOpen ? (
+        <ToolsDialog
+          onClose={() => setToolsOpen(false)}
+          onOpenFile={(p) => {
+            jumpToFile(p)
+            setToolsOpen(false)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
