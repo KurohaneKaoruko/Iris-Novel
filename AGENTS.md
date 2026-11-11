@@ -52,6 +52,11 @@ pnpm run tauri:ios:dev
   - `StepCard.tsx` - 工具步骤卡（订阅 `ai_agent_step` WS 事件，Cline 式可折叠）
   - `SettingsDialog.tsx` - 模型 Provider 管理（Key 走 secrets 通道、测试连接、单选激活）
   - `FileTree.tsx` - 递归文件树（重命名/删除/新建，`fs_changed` 事件驱动刷新）
+  - `ChaptersPanel.tsx` - 章节页签（字数/状态三态循环/拖拽排序/新建/导入直跳）
+  - `LorePanel.tsx` - 设定页签（人物卡/情节线/设定集三合一，直读 novel.ts 解析 concept|outline 下的 Markdown）
+  - `ToolsDialog.tsx` - 工具中心（统计/一致性/铁律/导入切章四页签 + 导出整本）
+  - `CommandPalette.tsx` - Ctrl+K 命令面板（模糊过滤/键盘导航）
+  - `MarkdownView.tsx` - 轻量只读渲染（标题锚点 + `extractToc` 纯函数 TOC，有单测）
 - **`workspace/Dialogs`** - 全局 Prompt/Confirm 对话框（唯一从旧工作台保留的组件）
 - **`hooks/useChat.ts`** - 流式聊天（WS 事件协议：挂载时订阅一次 + activeStreamId ref 过滤消除竞态；`ai_error` 即终止；token 累积/done 收尾/会话恢复，有协议单测）
 - **`state/ProjectContext.tsx`** - workRoot/activePath/书架状态；`openDir` 自动登记 external_projects
@@ -142,6 +147,9 @@ pnpm exec vite            # dev 服务器端口 1421，/api /ws 代理到 8765
 
 - 运行方式：`./src-tauri/target/debug/iris-creation-server --port 8765 --static-dir webui/dist --data-dir <data>`（Rust 改动后需 `CARGO_HTTP_PROXY='' cargo build --bin iris-creation-server` 并重启）
 - RPC：`POST /api/rpc/{cmd}` 返回 `{ok}|{err}`，全部命令绑定在 `webui/src/api/backend.ts`（新增命令改 `src-tauri/src/server/rpc_dispatch.rs` 后在此扩展）
+- `export_work`：合并 stories/ 全章导出 md/txt（剥 frontmatter 与首个标题防重复，元数据 title 优先）
+- `delete_chat_session`：保留式删除（四通道：service/Tauri/dispatch/backend.ts）
+- 前端错误中文化：`useChat.ts` 的 `localizeError`（11 类映射，未命中透传）
 - WS：帧格式 `{"event","payload"}`，事件 `ai_stream_start/token/done/status`、`ai_agent_step`（工具步骤）、`ai_perf`（性能）、`ai_error`（后端发 ai_error 后**不一定**跟 done，前端必须自行终止流）、`fs_changed`；取消流发 `{"type":"cancel","streamId"}`
 - useChat 竞态教训：事件订阅必须在组件挂载时建立一次（ref 过滤 streamId），**不能**按 streamId 动态挂订阅——RPC 先于订阅到达会丢事件
 - 作品内数据（人物卡/情节线/章节元数据/记忆索引/写作历史）在 `webui/src/api/novel.ts`，直读直写 Markdown/JSON，与旧桌面端格式双向兼容
