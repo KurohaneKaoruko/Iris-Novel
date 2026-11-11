@@ -57,6 +57,9 @@ pnpm run tauri:ios:dev
   - `ToolsDialog.tsx` - 工具中心（统计/一致性/铁律/导入切章四页签 + 导出整本）
   - `CommandPalette.tsx` - Ctrl+K 命令面板（模糊过滤/键盘导航）
   - `MarkdownView.tsx` - 轻量只读渲染（标题锚点 + `extractToc` 纯函数 TOC，有单测）
+  - `DiffView.tsx` - 文件变更历史 diff（覆盖写自动留快照；LCS 行级对比、±统计、上下文折叠、版本恢复）
+- **`api/diff.ts`** - 零依赖行级 diff（LCS/collapseDiff，有单测）
+- **`api/sessionExport.ts`** - 会话导出 Markdown 分享稿（工具步骤 details 折叠，有单测）
 - **`workspace/Dialogs`** - 全局 Prompt/Confirm 对话框（唯一从旧工作台保留的组件）
 - **`hooks/useChat.ts`** - 流式聊天（WS 事件协议：挂载时订阅一次 + activeStreamId ref 过滤消除竞态；`ai_error` 即终止；token 累积/done 收尾/会话恢复，有协议单测）
 - **`state/ProjectContext.tsx`** - workRoot/activePath/书架状态；`openDir` 自动登记 external_projects
