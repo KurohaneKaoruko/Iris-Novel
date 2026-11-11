@@ -1402,3 +1402,38 @@
   flex: 1;
   min-width: 0;
 }
+
+/* 会话工具条（流底部悬浮） */
+.chatcol-sessionbar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 148px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 11px;
+  color: var(--text-muted);
+  animation: jumpdown-in 0.15s ease;
+}
+
+.csb-export {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.csb-export:hover {
+  background: var(--hover);
+}

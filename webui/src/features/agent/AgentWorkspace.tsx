@@ -21,6 +21,7 @@ import { SessionSidebar } from './SessionSidebar'
 import { FileTree } from './FileTree'
 import { MarkdownView, extractToc } from './MarkdownView'
 import { CommandPalette, type Command } from './CommandPalette'
+import { sessionToMarkdown } from '../../api/sessionExport'
 import { Markdown } from './Markdown'
 import { StepCard } from './StepCard'
 import { PromptDialog, ConfirmDialog } from '../workspace/Dialogs'
@@ -623,6 +624,21 @@ function ChatColumn({
           ))}
         </div>
       </div>
+      {chat.messages.length > 0 ? (
+        <div className="chatcol-sessionbar">
+          <span className="csb-count">{chat.messages.filter((m) => m.role === 'user').length} 问 · {chat.messages.filter((m) => m.role === 'assistant').length} 答</span>
+          <button
+            className="csb-export"
+            title="导出会话为 Markdown 分享稿"
+            onClick={() => {
+              const md = sessionToMarkdown({ workName, messages: chat.messages })
+              downloadText(`${workName}-会话记录.md`, md)
+            }}
+          >
+            ⬇ 导出会话
+          </button>
+        </div>
+      ) : null}
       {!atBottom && chat.messages.length > 0 ? (
         <button
           className="chatcol-jumpdown"
