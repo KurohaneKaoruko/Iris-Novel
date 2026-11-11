@@ -93,10 +93,11 @@ export function AgentWorkspace() {
       timer = window.setTimeout(() => {
         void refreshTree()
         if (p.path && activePath && p.path === activePath) {
+          const changedPath = p.path
           void readText(activePath).then((c) => {
             setFileContent(c)
             // 非编辑态下文件被外部（Agent）修改时，给一条可关闭的提示
-            setExternalChange((prev) => (prev?.path === p.path ? prev : { path: p.path, at: Date.now() }))
+            setExternalChange((prev) => (prev?.path === changedPath ? prev : { path: changedPath, at: Date.now() }))
           }).catch(() => {})
         }
       }, 600)
