@@ -131,7 +131,7 @@ Web 前端与后端通过 **HTTP RPC + WebSocket** 通信（见下方「新版 W
 
 ### Web UI（`webui/`）
 
-`webui/` 是唯一 Web 前端（React 18 + Vite + TipTap 2 + TS strict），由 `iris-creation-server` 托管静态资源并暴露 RPC/WS：
+`webui/` 是唯一 Web 前端（React 18 + Vite + TS strict），由 `iris-creation-server` 托管静态资源并暴露 RPC/WS：
 
 ```bash
 cd webui
