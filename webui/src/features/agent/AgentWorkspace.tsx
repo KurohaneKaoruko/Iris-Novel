@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
 import { createDir, createFile, listWorkspaceTree, readText, renameEntry, deleteEntry as del, writeText, getSkills, getChatSession, saveChatSession, deleteChatSession, getAppSettings, getApiKeyStatus, type Skill, type ChatMessagePayload } from '../../api/backend'
+import { listChapters, createChapterFile } from '../../api/novel'
 import { subscribeEvent } from '../../api/rpc'
 import { useProject } from '../../state/ProjectContext'
 import { useChat, type ChatItem } from '../../hooks/useChat'
@@ -13,6 +14,7 @@ import { StepCard } from './StepCard'
 import { PromptDialog, ConfirmDialog } from '../workspace/Dialogs'
 import { SettingsDialog } from './SettingsDialog'
 import { ToolsDialog } from './ToolsDialog'
+import { ChaptersPanel } from './ChaptersPanel'
 import './AgentWorkspace.css'
 
 /**
@@ -32,10 +34,11 @@ export function AgentWorkspace() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   // 窄屏（<1100px）面板是覆盖抽屉，默认收起，避免遮挡输入区
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 1100)
-  const [panelTab, setPanelTab] = useState<'tree' | 'file'>('tree')
+  const [panelTab, setPanelTab] = useState<'tree' | 'chapters' | 'file'>('tree')
   const [dialog, setDialog] = useState<
     | { kind: 'new-file' }
     | { kind: 'new-dir' }
+    | { kind: 'new-chapter' }
     | { kind: 'rename'; path: string; name: string }
     | { kind: 'delete'; path: string }
     | null
@@ -225,6 +228,12 @@ export function AgentWorkspace() {
           await refreshTree()
           setActivePath(value)
           setPanelTab('file')
+        } else if (action.kind === 'new-chapter') {
+          const existing = await listChapters()
+          const p = await createChapterFile(value.trim() || `第${existing.length + 1}章`)
+          await refreshTree()
+          setActivePath(p)
+          setPanelTab('file')
         } else if (action.kind === 'new-dir') {
           await createDir(value)
           await refreshTree()
@@ -292,6 +301,7 @@ export function AgentWorkspace() {
           <aside className="agw-side glass-panel">
             <div className="agw-side-tabs">
               <button className={panelTab === 'tree' ? 'active' : ''} onClick={() => setPanelTab('tree')}>文件</button>
+              <button className={panelTab === 'chapters' ? 'active' : ''} onClick={() => setPanelTab('chapters')}>章节</button>
               <button className={panelTab === 'file' ? 'active' : ''} disabled={!activePath} onClick={() => setPanelTab('file')}>预览</button>
               <span className="agw-side-spacer" />
               <button className="agw-icon-btn" title="新建文件" onClick={() => setDialog({ kind: 'new-file' })}>＋</button>
@@ -315,6 +325,19 @@ export function AgentWorkspace() {
                   <div className="agw-empty">加载中…</div>
                 )}
               </div>
+            ) : panelTab === 'chapters' ? (
+              <ChaptersPanel
+                activePath={activePath}
+                onOpen={(p) => {
+                  setActivePath(p)
+                  setPanelTab('file')
+                }}
+                onNewChapter={() => setDialog({ kind: 'new-chapter' })}
+                onImport={() => {
+                  setToolsOpen(true)
+                  setPanelTab('tree')
+                }}
+              />
             ) : (
               <div className="agw-file">
                 {activePath ? (
@@ -370,6 +393,9 @@ export function AgentWorkspace() {
       ) : null}
       {dialog?.kind === 'new-dir' ? (
         <PromptDialog title="新建目录" placeholder="concept" onConfirm={(v: string) => void runDialog(dialog, v)} onCancel={() => setDialog(null)} />
+      ) : null}
+      {dialog?.kind === 'new-chapter' ? (
+        <PromptDialog title="新建章节" placeholder="第3章 灯塔（留空自动编号）" onConfirm={(v: string) => void runDialog(dialog, v)} onCancel={() => setDialog(null)} />
       ) : null}
       {dialog?.kind === 'rename' ? (
         <PromptDialog title="重命名" initialValue={dialog.name} onConfirm={(v: string) => void runDialog(dialog, v)} onCancel={() => setDialog(null)} />
