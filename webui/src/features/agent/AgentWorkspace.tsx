@@ -60,6 +60,7 @@ export function AgentWorkspace() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [toolsTab, setToolsTab] = useState<'stats' | 'consistency' | 'lint' | 'import'>('stats')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
@@ -234,7 +235,10 @@ export function AgentWorkspace() {
     { id: 'new-chapter', icon: '＋', label: '新建章节', keywords: 'chapter 写作', run: () => setDialog({ kind: 'new-chapter' }) },
     { id: 'new-file', icon: '＋', label: '新建 Markdown 文件', keywords: 'file create', run: () => setDialog({ kind: 'new-file' }) },
     { id: 'new-dir', icon: '＋', label: '新建目录', keywords: 'folder mkdir', run: () => setDialog({ kind: 'new-dir' }) },
-    { id: 'tools-stats', icon: '📊', label: '作品统计', keywords: '工具 stats 统计', run: () => setToolsOpen(true) },
+    { id: 'tools-stats', icon: '📊', label: '作品统计', keywords: '工具 stats 统计', run: () => { setToolsTab('stats'); setToolsOpen(true) } },
+    { id: 'tools-consistency', icon: '🧩', label: '一致性检查', keywords: '工具 检查 consistency 人物 伏笔 情节线', run: () => { setToolsTab('consistency'); setToolsOpen(true) } },
+    { id: 'tools-lint', icon: '⚖️', label: '正文铁律体检', keywords: '工具 lint 体检 套路', run: () => { setToolsTab('lint'); setToolsOpen(true) } },
+    { id: 'tools-import', icon: '📥', label: '导入切章', keywords: '工具 导入 import txt 切章', run: () => { setToolsTab('import'); setToolsOpen(true) } },
     { id: 'toggle-panel', icon: '📁', label: panelOpen ? '隐藏文件面板' : '显示文件面板', keywords: 'panel 文件', run: () => setPanelOpen((v) => !v) },
     { id: 'toggle-sidebar', icon: '☰', label: sidebarCollapsed ? '展开会话栏' : '折叠会话栏', keywords: 'sidebar 会话', run: () => setSidebarCollapsed((v) => !v) },
     { id: 'toggle-theme', icon: theme === 'dark' ? '☀️' : '🌙', label: '切换主题', keywords: 'theme dark light 主题', run: toggleTheme },
@@ -258,7 +262,7 @@ export function AgentWorkspace() {
       },
     },
     { id: 'close-work', icon: '⏏', label: '关闭工程（返回启动页）', keywords: 'close launch', run: closeWork },
-  ], [newSession, panelOpen, sidebarCollapsed, theme, toggleTheme, closeWork])
+  ], [newSession, panelOpen, sidebarCollapsed, theme, toggleTheme, closeWork, setToolsTab])
 
   const mdFiles = useMemo(() => {
     const out: FsEntry[] = []
@@ -409,8 +413,8 @@ export function AgentWorkspace() {
                 }}
                 onNewChapter={() => setDialog({ kind: 'new-chapter' })}
                 onImport={() => {
+                  setToolsTab('import')
                   setToolsOpen(true)
-                  setPanelTab('tree')
                 }}
               />
             ) : (
@@ -489,6 +493,7 @@ export function AgentWorkspace() {
       {paletteOpen ? <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} /> : null}
       {toolsOpen ? (
         <ToolsDialog
+          initialTab={toolsTab}
           onClose={() => setToolsOpen(false)}
           onOpenFile={(p) => {
             jumpToFile(p)
