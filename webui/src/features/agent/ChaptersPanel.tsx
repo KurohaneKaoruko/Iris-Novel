@@ -80,6 +80,7 @@ export function ChaptersPanel({ activePath, onOpen, onNewChapter, onImport }: Pr
   )
 
   const totalWords = chapters.reduce((s, c) => s + c.wordCount, 0)
+  const maxWords = Math.max(...chapters.map((c) => c.wordCount), 1)
 
   if (loading) return <div className="agw-empty">加载中…</div>
 
@@ -131,6 +132,11 @@ export function ChaptersPanel({ activePath, onOpen, onNewChapter, onImport }: Pr
                 <button className="chp-main" onClick={() => onOpen(c.filePath)}>
                   <span className="chp-order">#{c.order + 1}</span>
                   <span className="chp-title">{c.title}</span>
+                  <span className="chp-bars" title={`本章 ${c.wordCount} 字（最长章 ${maxWords} 字）`}>
+                    {chapters.length > 1 ? (
+                      <span className="chp-bar" style={{ width: `${Math.max(8, Math.round((c.wordCount / maxWords) * 100))}%` }} />
+                    ) : null}
+                  </span>
                   <span className="chp-words">{c.wordCount > 0 ? `${c.wordCount.toLocaleString()} 字` : ''}</span>
                 </button>
                 <button

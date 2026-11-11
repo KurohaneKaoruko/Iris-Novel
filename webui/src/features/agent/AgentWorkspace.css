@@ -1437,3 +1437,28 @@
 .csb-export:hover {
   background: var(--hover);
 }
+
+/* 章节字数占比条 */
+.chp-bars {
+  flex: 1;
+  min-width: 30px;
+  max-width: 90px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--hover);
+  overflow: hidden;
+  flex-shrink: 1;
+  margin-right: 8px;
+}
+
+.chp-bar {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+.chp-row.active .chp-bar {
+  opacity: 1;
+}
