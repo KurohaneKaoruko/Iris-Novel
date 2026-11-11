@@ -902,3 +902,34 @@
 .chp-status:hover {
   filter: brightness(1.15);
 }
+
+/* 滚动到底部悬浮按钮 */
+.chatcol-jumpdown {
+  position: absolute;
+  right: 24px;
+  bottom: 150px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  animation: jumpdown-in 0.15s ease;
+}
+
+.chatcol-jumpdown:hover {
+  color: var(--text-primary);
+  border-color: var(--accent, #5a8cff);
+}
+
+@keyframes jumpdown-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}

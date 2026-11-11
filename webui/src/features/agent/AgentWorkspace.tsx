@@ -435,6 +435,7 @@ function ChatColumn({
   const [input, setInput] = useState('')
   const [skillId, setSkillId] = useState('')
   const [attach, setAttach] = useState<{ path: string; content: string } | null>(null)
+  const [atBottom, setAtBottom] = useState(true)
   const listRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
 
@@ -455,8 +456,18 @@ function ChatColumn({
   }, [])
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
-  }, [chat.messages])
+    // 仅当用户在底部附近才自动跟随；往上翻阅时保持视口（流式时不打扰）
+    const el = listRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    if (near || atBottom) el.scrollTo({ top: el.scrollHeight })
+  }, [chat.messages]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onScroll = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80)
+  }, [])
 
   const send = useCallback(() => {
     const text = input.trim()
@@ -486,7 +497,7 @@ function ChatColumn({
 
   return (
     <div className="chatcol">
-      <div className="chatcol-scroll" ref={listRef}>
+      <div className="chatcol-scroll" ref={listRef} onScroll={onScroll}>
         <div className="chatcol-inner">
           {chat.messages.length === 0 ? (
             <div className="chatcol-hero">
@@ -511,6 +522,19 @@ function ChatColumn({
           ))}
         </div>
       </div>
+      {!atBottom && chat.messages.length > 0 ? (
+        <button
+          className="chatcol-jumpdown"
+          title="滚动到底部"
+          onClick={() => {
+            const el = listRef.current
+            if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+            setAtBottom(true)
+          }}
+        >
+          ↓
+        </button>
+      ) : null}
 
       <div className="composer glass-float">
         {attach ? (
