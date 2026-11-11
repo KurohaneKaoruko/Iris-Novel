@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
-import { createDir, createFile, listWorkspaceTree, readText, renameEntry, deleteEntry as del, writeText, getSkills, getChatSession, saveChatSession, deleteChatSession, getAppSettings, getApiKeyStatus, type Skill, type ChatMessagePayload } from '../../api/backend'
+import { createDir, createFile, listWorkspaceTree, readText, renameEntry, deleteEntry as del, writeText, getSkills, getChatSession, saveChatSession, deleteChatSession, getAppSettings, getApiKeyStatus, exportWork, type Skill, type ChatMessagePayload } from '../../api/backend'
 import { listChapters, createChapterFile } from '../../api/novel'
+
+/** Blob 触发浏览器下载 */
+function downloadText(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 import { subscribeEvent } from '../../api/rpc'
 import { useProject } from '../../state/ProjectContext'
 import { useChat, type ChatItem } from '../../hooks/useChat'
@@ -9,6 +20,7 @@ import { useTheme } from '../../state/ThemeContext'
 import { SessionSidebar } from './SessionSidebar'
 import { FileTree } from './FileTree'
 import { MarkdownView, extractToc } from './MarkdownView'
+import { CommandPalette, type Command } from './CommandPalette'
 import { Markdown } from './Markdown'
 import { StepCard } from './StepCard'
 import { PromptDialog, ConfirmDialog } from '../workspace/Dialogs'
@@ -22,7 +34,7 @@ import './AgentWorkspace.css'
  * [会话侧栏] [中央对话流：消息 + 工具步骤卡 + 悬浮输入] [Artifacts 文件面板（可折叠）]
  */
 export function AgentWorkspace() {
-  const { workRoot, workName, activePath, setActivePath, setError } = useProject()
+  const { workRoot, workName, activePath, setActivePath, setError, closeWork } = useProject()
   const { theme, toggleTheme } = useTheme()
   const chat = useChat()
   const [tree, setTree] = useState<FsEntry | null>(null)
@@ -47,6 +59,7 @@ export function AgentWorkspace() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
   const sessionIdRef = useRef<string | null>(null)
@@ -203,6 +216,49 @@ export function AgentWorkspace() {
     [chat],
   )
 
+  // Ctrl+K / Cmd+K 打开命令面板
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const paletteCommands = useMemo<Command[]>(() => [
+    { id: 'new-session', icon: '✦', label: '新建会话', hint: 'Ctrl+K 后回车', run: newSession },
+    { id: 'new-chapter', icon: '＋', label: '新建章节', keywords: 'chapter 写作', run: () => setDialog({ kind: 'new-chapter' }) },
+    { id: 'new-file', icon: '＋', label: '新建 Markdown 文件', keywords: 'file create', run: () => setDialog({ kind: 'new-file' }) },
+    { id: 'new-dir', icon: '＋', label: '新建目录', keywords: 'folder mkdir', run: () => setDialog({ kind: 'new-dir' }) },
+    { id: 'tools-stats', icon: '📊', label: '作品统计', keywords: '工具 stats 统计', run: () => setToolsOpen(true) },
+    { id: 'toggle-panel', icon: '📁', label: panelOpen ? '隐藏文件面板' : '显示文件面板', keywords: 'panel 文件', run: () => setPanelOpen((v) => !v) },
+    { id: 'toggle-sidebar', icon: '☰', label: sidebarCollapsed ? '展开会话栏' : '折叠会话栏', keywords: 'sidebar 会话', run: () => setSidebarCollapsed((v) => !v) },
+    { id: 'toggle-theme', icon: theme === 'dark' ? '☀️' : '🌙', label: '切换主题', keywords: 'theme dark light 主题', run: toggleTheme },
+    { id: 'settings', icon: '⚙', label: '打开设置', keywords: 'settings provider key 设置', run: () => setSettingsOpen(true) },
+    {
+      id: 'export-md',
+      icon: '⬇',
+      label: '导出整本（Markdown）',
+      keywords: 'export 导出',
+      run: () => {
+        void exportWork('md').then(({ filename, content }) => downloadText(filename, content))
+      },
+    },
+    {
+      id: 'export-txt',
+      icon: '⬇',
+      label: '导出整本（TXT）',
+      keywords: 'export 导出',
+      run: () => {
+        void exportWork('txt').then(({ filename, content }) => downloadText(filename, content))
+      },
+    },
+    { id: 'close-work', icon: '⏏', label: '关闭工程（返回启动页）', keywords: 'close launch', run: closeWork },
+  ], [newSession, panelOpen, sidebarCollapsed, theme, toggleTheme, closeWork])
+
   const mdFiles = useMemo(() => {
     const out: FsEntry[] = []
     const walk = (e: FsEntry) => {
@@ -281,6 +337,9 @@ export function AgentWorkspace() {
         <span className="agw-name">{workName}</span>
         <span className="agw-badge">Agent</span>
         <span className="agw-spacer" />
+        <button className="agw-btn" onClick={() => setPaletteOpen(true)} title="命令面板（Ctrl+K）">
+          Ctrl+K
+        </button>
         <button className="agw-btn" onClick={() => setToolsOpen(true)} title="统计 / 一致性检查 / 正文体检 / 导入切章">
           工具
         </button>
@@ -417,6 +476,7 @@ export function AgentWorkspace() {
       ) : null}
 
       {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
+      {paletteOpen ? <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} /> : null}
       {toolsOpen ? (
         <ToolsDialog
           onClose={() => setToolsOpen(false)}

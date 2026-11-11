@@ -1,0 +1,115 @@
+/* ============ Ctrl+K 命令面板 ============ */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: rgba(8, 10, 14, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  animation: cmdk-fade 0.12s ease;
+}
+
+@keyframes cmdk-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cmdk {
+  width: min(560px, 92vw);
+  border-radius: 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: cmdk-pop 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+
+@keyframes cmdk-pop {
+  from { transform: translateY(-8px) scale(0.98); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.cmdk-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 15px;
+  padding: 14px 18px;
+  outline: none;
+}
+
+.cmdk-input::placeholder {
+  color: var(--text-muted);
+}
+
+.cmdk-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.cmdk-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cmdk-item.active {
+  background: var(--accent-weak);
+  color: var(--text-primary);
+}
+
+.cmdk-icon {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.cmdk-item.active .cmdk-icon {
+  color: var(--accent);
+}
+
+.cmdk-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmdk-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.cmdk-foot {
+  display: flex;
+  gap: 14px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
