@@ -27,6 +27,7 @@ import { PromptDialog, ConfirmDialog } from '../workspace/Dialogs'
 import { SettingsDialog } from './SettingsDialog'
 import { ToolsDialog } from './ToolsDialog'
 import { ChaptersPanel } from './ChaptersPanel'
+import { LorePanel } from './LorePanel'
 import './AgentWorkspace.css'
 
 /**
@@ -47,7 +48,7 @@ export function AgentWorkspace() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   // 窄屏（<1100px）面板是覆盖抽屉，默认收起，避免遮挡输入区
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 1100)
-  const [panelTab, setPanelTab] = useState<'tree' | 'chapters' | 'file'>('tree')
+  const [panelTab, setPanelTab] = useState<'tree' | 'chapters' | 'lore' | 'file'>('tree')
   const [dialog, setDialog] = useState<
     | { kind: 'new-file' }
     | { kind: 'new-dir' }
@@ -367,6 +368,7 @@ export function AgentWorkspace() {
             <div className="agw-side-tabs">
               <button className={panelTab === 'tree' ? 'active' : ''} onClick={() => setPanelTab('tree')}>文件</button>
               <button className={panelTab === 'chapters' ? 'active' : ''} onClick={() => setPanelTab('chapters')}>章节</button>
+              <button className={panelTab === 'lore' ? 'active' : ''} onClick={() => setPanelTab('lore')}>设定</button>
               <button className={panelTab === 'file' ? 'active' : ''} disabled={!activePath} onClick={() => setPanelTab('file')}>预览</button>
               <span className="agw-side-spacer" />
               <button className="agw-icon-btn" title="新建文件" onClick={() => setDialog({ kind: 'new-file' })}>＋</button>
@@ -390,6 +392,14 @@ export function AgentWorkspace() {
                   <div className="agw-empty">加载中…</div>
                 )}
               </div>
+            ) : panelTab === 'lore' ? (
+              <LorePanel
+                activePath={activePath}
+                onOpen={(p) => {
+                  setActivePath(p)
+                  setPanelTab('file')
+                }}
+              />
             ) : panelTab === 'chapters' ? (
               <ChaptersPanel
                 activePath={activePath}
