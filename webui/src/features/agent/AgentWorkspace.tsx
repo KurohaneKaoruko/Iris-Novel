@@ -30,6 +30,7 @@ export function AgentWorkspace() {
   const [fileLoading, setFileLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editDraft, setEditDraft] = useState('')
+  const [externalChange, setExternalChange] = useState<{ path: string; at: number } | null>(null)
   const [skills, setSkills] = useState<Skill[]>([])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   // 窄屏（<1100px）面板是覆盖抽屉，默认收起，避免遮挡输入区
@@ -92,7 +93,11 @@ export function AgentWorkspace() {
       timer = window.setTimeout(() => {
         void refreshTree()
         if (p.path && activePath && p.path === activePath) {
-          void readText(activePath).then(setFileContent).catch(() => {})
+          void readText(activePath).then((c) => {
+            setFileContent(c)
+            // 非编辑态下文件被外部（Agent）修改时，给一条可关闭的提示
+            setExternalChange((prev) => (prev?.path === p.path ? prev : { path: p.path, at: Date.now() }))
+          }).catch(() => {})
         }
       }, 600)
     })
@@ -358,6 +363,12 @@ export function AgentWorkspace() {
                         )}
                       </span>
                     </div>
+                    {externalChange && externalChange.path === activePath && !editing ? (
+                      <div className="agw-external-note">
+                        <span>↻ 此文件刚被更新（可能来自 Agent 写入）</span>
+                        <button onClick={() => setExternalChange(null)}>知道了</button>
+                      </div>
+                    ) : null}
                     <div className="agw-file-body">
                       {fileLoading ? (
                         <div className="agw-empty">加载中…</div>

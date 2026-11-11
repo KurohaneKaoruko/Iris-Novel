@@ -933,3 +933,34 @@
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
+
+/* Agent 写入后的变更提示条 */
+.agw-external-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 10px 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(90, 140, 255, 0.10);
+  border: 1px solid rgba(90, 140, 255, 0.25);
+  font-size: 12px;
+  color: var(--accent, #5a8cff);
+  animation: jumpdown-in 0.15s ease;
+}
+
+.agw-external-note button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.agw-external-note button:hover {
+  background: var(--hover);
+}
