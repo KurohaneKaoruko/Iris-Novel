@@ -51,6 +51,17 @@
   background: var(--hover);
 }
 
+/* 未配 Key 提醒红点 */
+.agw-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--danger);
+  vertical-align: 2px;
+}
+
 .agw-btn.primary {
   background: var(--accent);
   color: var(--accent-contrast);
@@ -82,6 +93,13 @@
 
 .agw-main .chatcol {
   flex: 1;
+  min-width: 0;
+}
+
+/* 右侧面板固定宽度，绝不被内容撑爆 */
+.agw-side {
+  width: clamp(300px, 30vw, 400px);
+  flex-shrink: 0;
   min-width: 0;
 }
 
@@ -181,26 +199,52 @@
   border: 1px solid var(--border);
   font-size: 14px;
   line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
-/* assistant：全宽无气泡（主流做法），左侧留头像位 */
+/* assistant：全宽无气泡（主流做法） */
 .msg.assistant {
   flex: 1;
   min-width: 0;
   padding-left: 4px;
   font-size: 15px;
   line-height: 1.8;
+  overflow-wrap: anywhere;
 }
 
+/* 失败消息：独立错误卡（ChatGPT 风格），不用左边框 */
 .msg.failed {
-  border-left: 3px solid var(--danger);
-  padding-left: 12px;
+  border: none;
+  padding-left: 4px;
 }
 
 .msg-error {
   margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.msg-error-action {
+  padding: 3px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: 999px;
   font-size: 12px;
   color: var(--danger);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.msg-error-action:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .msg-typing {
@@ -701,16 +745,21 @@
   box-shadow: none;
 }
 
-/* 窄屏：面板改为覆盖层 */
+/* 窄屏：面板改为右侧实心抽屉（不遮挡输入区） */
 @media (max-width: 1100px) {
+  .agw-main {
+    position: relative;
+  }
+
   .agw-side {
-    position: fixed;
-    right: 10px;
-    top: 58px;
-    bottom: 10px;
-    width: min(420px, 92vw);
-    z-index: 50;
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: min(360px, 88vw);
+    z-index: 40;
     box-shadow: var(--shadow-lg);
+    background: var(--bg-secondary);
   }
 
   .sss {

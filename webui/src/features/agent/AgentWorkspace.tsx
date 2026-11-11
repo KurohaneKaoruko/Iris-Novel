@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
-import { createDir, createFile, listWorkspaceTree, readText, renameEntry, deleteEntry as del, writeText, getSkills, getChatSession, saveChatSession, type Skill, type ChatMessagePayload } from '../../api/backend'
+import { createDir, createFile, listWorkspaceTree, readText, renameEntry, deleteEntry as del, writeText, getSkills, getChatSession, saveChatSession, getAppSettings, getApiKeyStatus, type Skill, type ChatMessagePayload } from '../../api/backend'
 import { subscribeEvent } from '../../api/rpc'
 import { useProject } from '../../state/ProjectContext'
 import { useChat, type ChatItem } from '../../hooks/useChat'
@@ -11,6 +11,7 @@ import { MarkdownView } from './MarkdownView'
 import { Markdown } from './Markdown'
 import { StepCard } from './StepCard'
 import { PromptDialog, ConfirmDialog } from '../workspace/Dialogs'
+import { SettingsDialog } from './SettingsDialog'
 import './AgentWorkspace.css'
 
 /**
@@ -28,7 +29,8 @@ export function AgentWorkspace() {
   const [editDraft, setEditDraft] = useState('')
   const [skills, setSkills] = useState<Skill[]>([])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [panelOpen, setPanelOpen] = useState(true)
+  // 窄屏（<1100px）面板是覆盖抽屉，默认收起，避免遮挡输入区
+  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 1100)
   const [panelTab, setPanelTab] = useState<'tree' | 'file'>('tree')
   const [dialog, setDialog] = useState<
     | { kind: 'new-file' }
@@ -38,6 +40,8 @@ export function AgentWorkspace() {
     | null
   >(null)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
   const sessionIdRef = useRef<string | null>(null)
 
@@ -57,6 +61,23 @@ export function AgentWorkspace() {
   useEffect(() => {
     void getSkills().then(setSkills).catch(() => setSkills([]))
   }, [])
+
+  // 检查激活 Provider 是否已配 Key：未配则顶栏红点提醒
+  useEffect(() => {
+    void (async () => {
+      try {
+        const s = await getAppSettings()
+        if (!s.providers.length) {
+          setKeyMissing(true)
+          return
+        }
+        const active = s.providers.find((p) => p.id === s.active_provider_id) ?? s.providers[0]
+        setKeyMissing(!(await getApiKeyStatus(active.id).catch(() => false)))
+      } catch {
+        setKeyMissing(false)
+      }
+    })()
+  }, [settingsOpen])
 
   useEffect(() => {
     let timer = 0
@@ -229,6 +250,9 @@ export function AgentWorkspace() {
         <span className="agw-name">{workName}</span>
         <span className="agw-badge">Agent</span>
         <span className="agw-spacer" />
+        <button className="agw-btn" onClick={() => setSettingsOpen(true)} title="模型与密钥设置">
+          设置{keyMissing ? <span className="agw-dot" /> : null}
+        </button>
         <button className="agw-btn" onClick={toggleTheme} title="切换主题">{theme === 'dark' ? '🌙' : '☀️'}</button>
         <button className="agw-btn" onClick={() => setPanelOpen((v) => !v)}>{panelOpen ? '隐藏文件' : '文件'}</button>
       </header>
@@ -242,7 +266,7 @@ export function AgentWorkspace() {
           onToggle={() => setSidebarCollapsed((v) => !v)}
         />
 
-        <ChatColumn chat={chat} skills={skills} workName={workName} onJumpFile={jumpToFile} />
+        <ChatColumn chat={chat} skills={skills} workName={workName} onJumpFile={jumpToFile} onOpenSettings={() => setSettingsOpen(true)} />
 
         {panelOpen ? (
           <aside className="agw-side glass-panel">
@@ -333,6 +357,8 @@ export function AgentWorkspace() {
       {dialog?.kind === 'delete' ? (
         <ConfirmDialog title="删除确认" message={`确认删除 ${dialog.path}？`} danger onConfirm={() => void runDialog(dialog, '')} onCancel={() => setDialog(null)} />
       ) : null}
+
+      {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
     </div>
   )
 }
@@ -343,11 +369,13 @@ function ChatColumn({
   skills,
   workName,
   onJumpFile,
+  onOpenSettings,
 }: {
   chat: ReturnType<typeof useChat>
   skills: Skill[]
   workName: string
   onJumpFile: (p: string) => void
+  onOpenSettings: () => void
 }) {
   const [input, setInput] = useState('')
   const [skillId, setSkillId] = useState('')
@@ -421,7 +449,7 @@ function ChatColumn({
           ) : null}
 
           {chat.messages.map((m) => (
-            <MessageRow key={m.id} m={m} onJumpFile={onJumpFile} onRetry={retryLast} canRetry={!chat.busy} />
+            <MessageRow key={m.id} m={m} onJumpFile={onJumpFile} onRetry={retryLast} canRetry={!chat.busy} onOpenSettings={onOpenSettings} />
           ))}
         </div>
       </div>
@@ -466,7 +494,7 @@ function ChatColumn({
   )
 }
 
-function MessageRow({ m, onJumpFile, onRetry, canRetry }: { m: ChatItem; onJumpFile: (p: string) => void; onRetry: () => void; canRetry: boolean }) {
+function MessageRow({ m, onJumpFile, onRetry, canRetry, onOpenSettings }: { m: ChatItem; onJumpFile: (p: string) => void; onRetry: () => void; canRetry: boolean; onOpenSettings: () => void }) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
     void navigator.clipboard.writeText(m.content)
@@ -492,7 +520,12 @@ function MessageRow({ m, onJumpFile, onRetry, canRetry }: { m: ChatItem; onJumpF
         ) : (
           <p className="msg-user-text">{m.content}</p>
         )}
-        {m.failed ? <div className="msg-error">{m.failed}</div> : null}
+        {m.failed ? (
+          <div className="msg-error">
+            <span>{m.failed}</span>
+            <button className="msg-error-action" onClick={onOpenSettings}>打开设置 →</button>
+          </div>
+        ) : null}
         {m.role === 'assistant' && !m.streaming && m.content ? (
           <div className="msg-actions">
             <button onClick={copy}>{copied ? '已复制' : '复制'}</button>
