@@ -4,9 +4,34 @@ type MdViewProps = {
   content: string
 }
 
+/** 从 Markdown 提取标题目录（h1-h3）：(层级, 文本, 锚点 id) */
+export function extractToc(content: string): Array<{ lvl: number; text: string; id: string }> {
+  const out: Array<{ lvl: number; text: string; id: string }> = []
+  let inFence = false
+  const seen = new Map<string, number>()
+  for (const line of content.split('\n')) {
+    if (line.trimStart().startsWith('```')) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    const h = line.match(/^(#{1,3})\s+(.+?)\s*$/)
+    if (!h) continue
+    const text = h[2].replace(/[*`_]/g, '').trim()
+    if (!text) continue
+    let id = `mdv-toc-${text}`
+    const n = seen.get(id) ?? 0
+    seen.set(id, n + 1)
+    if (n > 0) id = `${id}-${n}`
+    out.push({ lvl: h[1].length, text, id })
+  }
+  return out
+}
+
 /**
  * 轻量 Markdown 渲染：标题/列表/引用/代码块/粗斜体/分隔线。
  * 小说正文以段落为主，无需重型 md 库；渲染结果为纯只读视图。
+ * 标题渲染带 mdv-toc-N 锚点 id（与 extractToc 对应），供 TOC 跳转。
  */
 export function MarkdownView({ content }: MdViewProps) {
   const blocks = useMemo(() => parse(content), [content])
@@ -17,6 +42,15 @@ function parse(content: string): JSX.Element[] {
   const lines = content.split('\n')
   const out: JSX.Element[] = []
   let i = 0
+  // 标题锚点去重计数（与 extractToc 同规则）
+  const seen = new Map<string, number>()
+  const anchorOf = (text: string): string => {
+    const clean = text.replace(/[*`_]/g, '').trim()
+    let id = `mdv-toc-${clean}`
+    const n = seen.get(id) ?? 0
+    seen.set(id, n + 1)
+    return n > 0 ? `${id}-${n}` : id
+  }
   while (i < lines.length) {
     const line = lines[i]
 
@@ -42,7 +76,11 @@ function parse(content: string): JSX.Element[] {
     if (h) {
       const lvl = h[1].length
       const Tag = (`h${Math.min(lvl, 6)}` as unknown) as 'h1'
-      out.push(<Tag key={out.length} className={`mdv-h mdv-h${lvl}`}>{inline(h[2])}</Tag>)
+      out.push(
+        <Tag key={out.length} id={anchorOf(h[2])} className={`mdv-h mdv-h${lvl}`}>
+          {inline(h[2])}
+        </Tag>,
+      )
       i += 1
       continue
     }

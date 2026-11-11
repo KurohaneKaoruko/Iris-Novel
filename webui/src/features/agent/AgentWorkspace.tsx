@@ -8,7 +8,7 @@ import { useChat, type ChatItem } from '../../hooks/useChat'
 import { useTheme } from '../../state/ThemeContext'
 import { SessionSidebar } from './SessionSidebar'
 import { FileTree } from './FileTree'
-import { MarkdownView } from './MarkdownView'
+import { MarkdownView, extractToc } from './MarkdownView'
 import { Markdown } from './Markdown'
 import { StepCard } from './StepCard'
 import { PromptDialog, ConfirmDialog } from '../workspace/Dialogs'
@@ -387,7 +387,7 @@ export function AgentWorkspace() {
                           autoFocus
                         />
                       ) : (
-                        <MarkdownView content={fileContent} />
+                        <FilePreviewWithToc content={fileContent} />
                       )}
                     </div>
                   </>
@@ -633,6 +633,36 @@ function MessageRow({ m, onJumpFile, onRetry, canRetry, onOpenSettings }: { m: C
           </div>
         ) : null}
       </div>
+    </div>
+  )
+}
+
+/** 文件预览：TOC 折叠条 + Markdown 正文（标题带锚点，点击目录平滑跳转） */
+function FilePreviewWithToc({ content }: { content: string }) {
+  const [tocOpen, setTocOpen] = useState(false)
+  const toc = useMemo(() => extractToc(content), [content])
+  if (toc.length < 2) return <MarkdownView content={content} />
+  return (
+    <div className="mdv-with-toc">
+      <button className="mdv-toc-toggle" onClick={() => setTocOpen((v) => !v)}>
+        <span className={`mdv-toc-arrow ${tocOpen ? 'open' : ''}`}>▸</span> 目录（{toc.length}）
+      </button>
+      {tocOpen ? (
+        <nav className="mdv-toc">
+          {toc.map((t, i) => (
+            <button
+              key={i}
+              className={`mdv-toc-item lvl${t.lvl}`}
+              onClick={() => {
+                document.getElementById(t.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
+            >
+              {t.text}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+      <MarkdownView content={content} />
     </div>
   )
 }

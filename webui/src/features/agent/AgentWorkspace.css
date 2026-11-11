@@ -964,3 +964,69 @@
 .agw-external-note button:hover {
   background: var(--hover);
 }
+
+/* ============ 预览 TOC ============ */
+.mdv-toc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.mdv-toc-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.mdv-toc-arrow {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  font-size: 10px;
+}
+
+.mdv-toc-arrow.open {
+  transform: rotate(90deg);
+}
+
+.mdv-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  padding: 8px;
+  margin-bottom: 14px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.mdv-toc-item {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  text-align: left;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdv-toc-item:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+.mdv-toc-item.lvl2 { padding-left: 22px; }
+.mdv-toc-item.lvl3 { padding-left: 34px; color: var(--text-muted); }
