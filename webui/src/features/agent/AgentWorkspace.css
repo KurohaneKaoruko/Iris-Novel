@@ -1616,3 +1616,57 @@
 .chp-row.active .chp-bar {
   opacity: 1;
 }
+
+/* ============ 编辑器选区浮动工坊工具条 ============ */
+.agw-editorwrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.agw-editorwrap .agw-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.agw-selbar {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-secondary);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  z-index: 5;
+}
+
+.agw-selcount {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+.agw-selbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.agw-selbtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}

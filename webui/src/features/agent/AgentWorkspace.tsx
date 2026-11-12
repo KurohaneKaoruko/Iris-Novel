@@ -68,6 +68,8 @@ export function AgentWorkspace() {
   const [toolsTab, setToolsTab] = useState<'planner' | 'stats' | 'consistency' | 'lint' | 'import'>('planner')
   const [studioOpen, setStudioOpen] = useState(false)
   const [studioToolId, setStudioToolId] = useState<string | null>(null)
+  /** 编辑器选中文本（选中时显示浮动工坊按钮） */
+  const [selection, setSelection] = useState('')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
@@ -337,6 +339,13 @@ export function AgentWorkspace() {
     [activePath, refreshTree, setActivePath, setError],
   )
 
+  /** 编辑器选区捕获：供浮动工坊按钮取用 */
+  const captureSelection = useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const el = e.currentTarget
+    const sel = el.value.slice(el.selectionStart, el.selectionEnd)
+    setSelection(sel.length > 0 && sel.length <= 12000 ? sel : '')
+  }, [])
+
   const saveEdit = useCallback(async () => {
     if (!activePath) return
     try {
@@ -481,18 +490,78 @@ export function AgentWorkspace() {
                       ) : fileLoading ? (
                         <div className="agw-empty">加载中…</div>
                       ) : editing ? (
-                        <textarea
-                          className="agw-editor"
-                          value={editDraft}
-                          onChange={(e) => setEditDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-                              e.preventDefault()
-                              void saveEdit()
-                            }
-                          }}
-                          autoFocus
-                        />
+                        <div className="agw-editorwrap">
+                          <textarea
+                            className="agw-editor"
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                                e.preventDefault()
+                                void saveEdit()
+                              }
+                            }}
+                            onMouseUp={captureSelection}
+                            onKeyUp={captureSelection}
+                            autoFocus
+                          />
+                          {selection.trim() ? (
+                            <div className="agw-selbar">
+                              <span className="agw-selcount">已选 {selection.length} 字</span>
+                              <button
+                                className="agw-selbtn"
+                                onClick={() => {
+                                  setStudioToolId('polish')
+                                  setStudioOpen(true)
+                                }}
+                              >
+                                <Icon name="sparkles" size={12} />
+                                润色
+                              </button>
+                              <button
+                                className="agw-selbtn"
+                                onClick={() => {
+                                  setStudioToolId('expand')
+                                  setStudioOpen(true)
+                                }}
+                              >
+                                <Icon name="sparkles" size={12} />
+                                扩写
+                              </button>
+                              <button
+                                className="agw-selbtn"
+                                onClick={() => {
+                                  setStudioToolId('rewrite-style')
+                                  setStudioOpen(true)
+                                }}
+                              >
+                                <Icon name="refresh" size={12} />
+                                改文风
+                              </button>
+                              <button
+                                className="agw-selbtn"
+                                onClick={() => {
+                                  setStudioToolId('critique')
+                                  setStudioOpen(true)
+                                }}
+                              >
+                                <Icon name="search" size={12} />
+                                评审
+                              </button>
+                              <button
+                                className="agw-selbtn"
+                                onClick={() => {
+                                  setStudioToolId(null)
+                                  setStudioOpen(true)
+                                }}
+                                title="带着选中文本打开创作工坊自选工具"
+                              >
+                                <Icon name="arrow-right" size={12} />
+                                更多工具
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
                       ) : (
                         <FilePreviewWithToc content={fileContent} />
                       )}
@@ -538,13 +607,17 @@ export function AgentWorkspace() {
       {studioOpen ? (
         <StudioDialog
           initialToolId={studioToolId ?? undefined}
+          initialText={selection || undefined}
           activePath={activePath}
           activeContent={fileContent}
           onInsertToEditor={(text) => {
             setEditDraft((d) => (d ? `${d}\n\n${text}` : text))
             setEditing(true)
           }}
-          onClose={() => setStudioOpen(false)}
+          onClose={() => {
+            setStudioOpen(false)
+            setSelection('')
+          }}
         />
       ) : null}
     </div>

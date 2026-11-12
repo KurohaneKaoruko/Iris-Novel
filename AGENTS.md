@@ -58,8 +58,8 @@ pnpm run tauri:ios:dev
   - `ChaptersPanel.tsx` - 章节页签（字数/状态三态循环/拖拽排序/新建/导入直跳）
   - `LorePanel.tsx` - 设定页签（人物卡/情节线/设定集三合一，直读 novel.ts 解析 concept|outline 下的 Markdown）
   - `ToolsDialog.tsx` - 工具中心（任务队列/统计/一致性/铁律/导入切章五页签；任务队列=AI 拆解目标或大纲导入→逐章连续生成正文）
-  - `PlannerTab.tsx` - 任务队列页签（studio 纯净补全通道逐章生成 + 人物卡/前章结尾/文风指纹上下文 + lint 一级套路质检闸门不过即标待重试、连写遇拦截即停；`buildChapterPrompt`/`gateIssues` 纯函数有单测）
-  - `StudioDialog.tsx` - 创作工坊（16 个 AI 快捷创作工具四分类；风格学习：范文提取六维文风指纹徽章可移除；多稿对照开关 2-4 稿不同视角选稿卡片；四个出口：复制 / 存为 studio/*.md / 存为章节（stories/chapter-XXXX.md 纳入章节管理）/ 插入编辑器；Ctrl+K 有快捷入口）
+  - `PlannerTab.tsx` - 任务队列页签（studio 纯净补全通道逐章生成 + 人物卡/前章结尾/文风指纹上下文 + lint 一级套路质检闸门不过即标待重试、连写遇拦截即停；手动添加任务/内联编辑细纲/批量重试；`buildChapterPrompt`/`gateIssues` 纯函数有单测）
+  - `StudioDialog.tsx` - 创作工坊（16 个 AI 快捷创作工具四分类；支持 initialText 预填——编辑器选中文本经浮动工具条直达润改；风格学习：范文提取六维文风指纹徽章可移除；多稿对照开关 2-4 稿不同视角选稿卡片；四个出口：复制 / 存为 studio/*.md / 存为章节（stories/chapter-XXXX.md 纳入章节管理）/ 插入编辑器；Ctrl+K 有快捷入口）
   - `CommandPalette.tsx` - Ctrl+K 命令面板（模糊过滤/键盘导航）
   - `MarkdownView.tsx` - 轻量只读渲染（标题锚点 + `extractToc` 纯函数 TOC，有单测）
   - `DiffView.tsx` - 文件变更历史 diff（覆盖写自动留快照；LCS 行级对比、±统计、上下文折叠、版本恢复）

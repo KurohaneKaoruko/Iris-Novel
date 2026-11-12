@@ -21,6 +21,8 @@ import './StudioDialog.css'
 
 type Props = {
   initialToolId?: string
+  /** 打开时预填输入框（编辑器选中文字直达润改） */
+  initialText?: string
   /** 当前编辑器打开的文件路径；「插入」按钮依赖它 */
   activePath: string | null
   /** 当前编辑器内容 */
@@ -36,19 +38,20 @@ type RunState = 'idle' | 'running' | 'done' | 'error'
 const VARIANT_ANGLE_LABELS = ['悬疑冷峻', '细腻心理', '快节奏冲突', '感官画面']
 
 /** 创作工坊：一站式 AI 文本创作工具集（构思 / 写作 / 润改 / 实用） */
-export function StudioDialog({ initialToolId, activePath, activeContent, onInsertToEditor, onClose }: Props) {
+export function StudioDialog({ initialToolId, initialText, activePath, activeContent, onInsertToEditor, onClose }: Props) {
   const [toolId, setToolId] = useState(initialToolId ?? STUDIO_TOOLS[0].id)
   const tool = useMemo(
     () => STUDIO_TOOLS.find((t) => t.id === toolId) ?? STUDIO_TOOLS[0],
     [toolId],
   )
 
-  const [inputText, setInputText] = useState('')
   const [instruction, setInstruction] = useState('')
   const [style, setStyle] = useState('')
   const [targetWords, setTargetWords] = useState('')
   const [providerId, setProviderId] = useState<string>('')
   const [providers, setProviders] = useState<Array<{ id: string; name: string }>>([])
+  // 选中文字直达：仅挂载时预填一次
+  const [inputText, setInputText] = useState(initialText ?? '')
 
   const [runState, setRunState] = useState<RunState>('idle')
   const [result, setResult] = useState('')

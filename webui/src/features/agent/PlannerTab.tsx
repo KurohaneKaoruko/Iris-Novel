@@ -8,6 +8,7 @@ import {
   parseAiTasks,
   loadOutlineChapters,
   outlineToTasks,
+  newTaskId,
   type NovelTask,
   type TaskStatus,
 } from '../../api/planner'
@@ -160,6 +161,61 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
     },
     [tasks, persist],
   )
+
+  // ==== 手动添加 / 编辑细纲 ====
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editPrompt, setEditPrompt] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
+  const [addTitle, setAddTitle] = useState('')
+  const [addPrompt, setAddPrompt] = useState('')
+
+  const beginEdit = useCallback((t: NovelTask) => {
+    setEditingId(t.id)
+    setEditPrompt(t.task_prompt)
+  }, [])
+
+  const commitEdit = useCallback(() => {
+    if (editingId === null) return
+    void persist(tasks.map((t) => (t.id === editingId ? { ...t, task_prompt: editPrompt.trim() } : t)))
+    setEditingId(null)
+  }, [editingId, editPrompt, tasks, persist])
+
+  const addTask = useCallback(() => {
+    const title = addTitle.trim()
+    if (!title) return
+    const existingIdx = tasks.map((t) => t.chapter_index)
+    const idx = existingIdx.length > 0 ? Math.max(...existingIdx) + 1 : startChapterN
+    const id = newTaskId(idx)
+    const task: NovelTask = {
+      id,
+      title,
+      status: 'todo',
+      priority: 'medium',
+      depends_on: tasks.length > 0 ? [tasks[tasks.length - 1].id] : [],
+      target_words: wordsN,
+      scope: `stories/chapter-${String(idx).padStart(4, '0')}.md`,
+      volume: 1,
+      chapter_index: idx,
+      acceptance_checks: [],
+      arc_targets: [],
+      foreshadow_refs: [],
+      timeline_window: 'global',
+      task_prompt: addPrompt.trim(),
+      retries: 0,
+    }
+    void persist([...tasks, task])
+    setAddOpen(false)
+    setAddTitle('')
+    setAddPrompt('')
+  }, [addTitle, addPrompt, tasks, startChapterN, wordsN, persist])
+
+  /** 批量重试：所有待重试任务 → 待执行（按依赖顺序自动推进） */
+  const retryAll = useCallback(() => {
+    const n = tasks.filter((t) => t.status === 'retry').length
+    if (n === 0) return
+    void persist(tasks.map((t) => (t.status === 'retry' ? { ...t, status: 'todo' as TaskStatus, last_error: undefined } : t)))
+  }, [tasks, persist])
+  const retryCount = tasks.filter((t) => t.status === 'retry').length
 
   /**
    * 逐章生成核心（单章与连写共用）：上下文 → 纯净补全 → 质检 → 落盘 → 状态推进。
@@ -340,7 +396,47 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
                 停止
               </button>
             ) : null}
+            <span style={{ flex: 1 }} />
+            {retryCount > 0 && runningId === null ? (
+              <button className="tools-run" onClick={retryAll} title={`把 ${retryCount} 个待重试任务重置为待执行`}>
+                <Icon name="refresh" size={13} />
+                重试全部（{retryCount}）
+              </button>
+            ) : null}
+            {runningId === null ? (
+              <button className="tools-run" onClick={() => setAddOpen((v) => !v)} title="手动添加一个章节任务到队列末尾">
+                <Icon name="plus" size={13} />
+                添加任务
+              </button>
+            ) : null}
           </div>
+          {addOpen ? (
+            <div className="planner-addrow">
+              <input
+                className="planner-goal"
+                style={{ flex: 2 }}
+                value={addTitle}
+                onChange={(e) => setAddTitle(e.target.value)}
+                placeholder="任务标题，如「第 8 章 · 灯塔下的对峙」"
+                spellCheck={false}
+              />
+              <input
+                className="planner-goal"
+                style={{ flex: 3 }}
+                value={addPrompt}
+                onChange={(e) => setAddPrompt(e.target.value)}
+                placeholder="本章细纲（可选）：剧情推进 / 出场人物 / 章末钩子"
+                spellCheck={false}
+              />
+              <button className="tools-run primary" disabled={!addTitle.trim()} onClick={addTask}>
+                <Icon name="check" size={13} />
+                加入队列
+              </button>
+              <button className="tools-run" onClick={() => setAddOpen(false)}>
+                取消
+              </button>
+            </div>
+          ) : null}
           {runLog ? <div className="planner-log">{runLog}</div> : null}
           <div className="planner-list">
             {tasks.map((t) => (
@@ -355,13 +451,43 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
                       第 {t.chapter_index} 章 · {t.target_words} 字{t.arc_targets.length ? ` · ${t.arc_targets.join('/')}` : ''}
                     </span>
                   </div>
-                  {t.last_error ? <div className="planner-taskerr">{t.last_error}</div> : null}
+                  {editingId === t.id ? (
+                    <div className="planner-editrow">
+                      <textarea
+                        className="planner-editprompt"
+                        value={editPrompt}
+                        onChange={(e) => setEditPrompt(e.target.value)}
+                        placeholder="本章细纲：剧情推进 / 出场人物 / 章末钩子"
+                        rows={3}
+                        spellCheck={false}
+                      />
+                      <div className="planner-editops">
+                        <button className="tools-run" onClick={commitEdit} disabled={!editPrompt.trim()}>
+                          <Icon name="check" size={12} />
+                          保存细纲
+                        </button>
+                        <button className="tools-run" onClick={() => setEditingId(null)}>
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {t.task_prompt ? <div className="planner-taskprompt">{t.task_prompt}</div> : null}
+                      {t.last_error ? <div className="planner-taskerr">{t.last_error}</div> : null}
+                    </>
+                  )}
                 </div>
                 <div className="planner-taskops">
                   {t.status !== 'done' && runningId === null ? (
                     <button className="tools-run" onClick={() => void runTask(t)} title="生成本章正文">
                       <Icon name="pen-line" size={12} />
                       生成
+                    </button>
+                  ) : null}
+                  {editingId !== t.id ? (
+                    <button className="tools-run" onClick={() => beginEdit(t)} title="编辑本章细纲">
+                      <Icon name="square-pen" size={12} />
                     </button>
                   ) : null}
                   {t.status === 'done' ? (

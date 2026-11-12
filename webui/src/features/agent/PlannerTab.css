@@ -196,3 +196,51 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ============ 细纲预览 / 内联编辑 / 添加任务行 ============ */
+.planner-taskprompt {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 520px;
+}
+
+.planner-editrow {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.planner-editprompt {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 56px;
+}
+.planner-editprompt:focus { outline: none; border-color: var(--accent); }
+
+.planner-editops {
+  display: flex;
+  gap: 6px;
+}
+
+.planner-addrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border-strong);
+  background: var(--bg-secondary);
+}
