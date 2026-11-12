@@ -367,3 +367,55 @@ export async function loadOutlineChapters(): Promise<OutlineChapter[]> {
   }
   return parseOutlineChapters(text)
 }
+
+/** 任务状态 → Markdown checkbox 符号 */
+const STATUS_MARK: Record<TaskStatus, string> = {
+  done: 'x',
+  running: '~',
+  blocked: '!',
+  retry: '!',
+  todo: ' ',
+}
+
+/**
+ * 任务队列 → Markdown 写作计划（浏览器下载/存盘两用）。
+ * 含进度概览 + 逐章任务（状态/章号/字数/细纲/验收标准/情节线/伏笔/时间窗）。
+ */
+export function tasksToPlanMarkdown(tasks: NovelTask[], title = '写作计划'): string {
+  const done = tasks.filter((t) => t.status === 'done').length
+  const lines: string[] = [
+    `# ${title}`,
+    '',
+    `- 任务总数：${tasks.length}`,
+    `- 已完成：${done}（${tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0}%）`,
+    `- 导出时间：${new Date().toLocaleString('zh-CN')}`,
+    '',
+    '## 任务链',
+    '',
+  ]
+  for (const t of tasks) {
+    const mark = STATUS_MARK[t.status]
+    const meta = [`第 ${t.chapter_index} 章`, `目标 ${t.target_words} 字`]
+    if (t.timeline_window && t.timeline_window !== 'global') meta.push(`时间窗 ${t.timeline_window}`)
+    if (t.arc_targets.length > 0) meta.push(`情节线：${t.arc_targets.join('、')}`)
+    if (t.foreshadow_refs.length > 0) meta.push(`伏笔：${t.foreshadow_refs.join('、')}`)
+    lines.push(`### [${mark}] ${t.title}`)
+    lines.push('')
+    lines.push(`- ${meta.join(' · ')}`)
+    if (t.depends_on.length > 0) lines.push(`- 依赖：${t.depends_on.join(' → ')}`)
+    if (t.task_prompt) {
+      lines.push('')
+      for (const p of t.task_prompt.split('\n')) lines.push(`> ${p}`)
+    }
+    if (t.acceptance_checks.length > 0) {
+      lines.push('')
+      for (const c of t.acceptance_checks) lines.push(`- [ ] 验收：${c}`)
+    }
+    if (t.last_error) {
+      lines.push('')
+      lines.push(`- ⚠ 最近错误：${t.last_error}`)
+    }
+    lines.push('')
+  }
+  return lines.join('\n') + '\n'
+}

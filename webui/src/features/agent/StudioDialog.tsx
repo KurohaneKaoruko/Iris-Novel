@@ -29,6 +29,10 @@ type Props = {
   activeContent: string
   /** 追加到编辑器草稿（插入结果） */
   onInsertToEditor: (text: string) => void
+  /** 编辑器存在有效选区时为 true；「替换选区」按钮依赖它 */
+  canReplaceSelection?: boolean
+  /** 用结果替换编辑器原选区（润改闭环） */
+  onReplaceSelection?: (text: string) => void
   onClose: () => void
 }
 
@@ -38,7 +42,7 @@ type RunState = 'idle' | 'running' | 'done' | 'error'
 const VARIANT_ANGLE_LABELS = ['悬疑冷峻', '细腻心理', '快节奏冲突', '感官画面']
 
 /** 创作工坊：一站式 AI 文本创作工具集（构思 / 写作 / 润改 / 实用） */
-export function StudioDialog({ initialToolId, initialText, activePath, activeContent, onInsertToEditor, onClose }: Props) {
+export function StudioDialog({ initialToolId, initialText, activePath, activeContent, onInsertToEditor, canReplaceSelection, onReplaceSelection, onClose }: Props) {
   const [toolId, setToolId] = useState(initialToolId ?? STUDIO_TOOLS[0].id)
   const tool = useMemo(
     () => STUDIO_TOOLS.find((t) => t.id === toolId) ?? STUDIO_TOOLS[0],
@@ -249,6 +253,13 @@ export function StudioDialog({ initialToolId, initialText, activePath, activeCon
     onInsertToEditor(result)
     onClose()
   }, [result, activePath, onInsertToEditor, onClose])
+
+  /** 替换编辑器原选区（润改闭环：旧文删除、新文就位） */
+  const replaceInEditor = useCallback(() => {
+    if (!result.trim() || !onReplaceSelection) return
+    onReplaceSelection(result)
+    onClose()
+  }, [result, onReplaceSelection, onClose])
 
   // ==== 存为章节：结果直写 stories/chapter-XXXX.md 并纳入章节管理 ====
   const [saveChapterOpen, setSaveChapterOpen] = useState(false)
@@ -486,6 +497,17 @@ export function StudioDialog({ initialToolId, initialText, activePath, activeCon
                     <Icon name="arrow-right" size={12} />
                     插入编辑器
                   </button>
+                  {canReplaceSelection && onReplaceSelection ? (
+                    <button
+                      className="ok"
+                      onClick={replaceInEditor}
+                      disabled={!hasResult || running}
+                      title="用结果替换编辑器中原来的选中文本（润改闭环）"
+                    >
+                      <Icon name="square-pen" size={12} />
+                      替换选区
+                    </button>
+                  ) : null}
                 </div>
               </div>
               {saveChapterOpen ? (

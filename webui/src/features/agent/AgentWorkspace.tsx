@@ -70,6 +70,7 @@ export function AgentWorkspace() {
   const [studioToolId, setStudioToolId] = useState<string | null>(null)
   /** 编辑器选中文本（选中时显示浮动工坊按钮） */
   const [selection, setSelection] = useState('')
+  const [selRange, setSelRange] = useState<{ start: number; end: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
@@ -342,9 +343,19 @@ export function AgentWorkspace() {
   /** 编辑器选区捕获：供浮动工坊按钮取用 */
   const captureSelection = useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
     const el = e.currentTarget
-    const sel = el.value.slice(el.selectionStart, el.selectionEnd)
+    const { selectionStart: start, selectionEnd: end } = el
+    const sel = el.value.slice(start, end)
+    setSelRange(start < end ? { start, end } : null)
     setSelection(sel.length > 0 && sel.length <= 12000 ? sel : '')
   }, [])
+
+  /** 用工坊结果替换编辑器原选区（润改闭环：旧文删除、新文就位、光标落在新文末尾） */
+  const replaceSelection = useCallback((text: string) => {
+    setEditDraft((d) => applyReplaceSelection(d, selRange, selection, text))
+    setEditing(true)
+    setSelection('')
+    setSelRange(null)
+  }, [selRange, selection])
 
   const saveEdit = useCallback(async () => {
     if (!activePath) return
@@ -614,6 +625,8 @@ export function AgentWorkspace() {
             setEditDraft((d) => (d ? `${d}\n\n${text}` : text))
             setEditing(true)
           }}
+          canReplaceSelection={!!selRange && !!selection.trim()}
+          onReplaceSelection={replaceSelection}
           onClose={() => {
             setStudioOpen(false)
             setSelection('')
@@ -622,6 +635,22 @@ export function AgentWorkspace() {
       ) : null}
     </div>
   )
+}
+
+/**
+ * 选区替换纯函数：选区仍与捕获时一致 → 原位替换；已失效（内容被改过）→
+ * 退化为追加，绝不错删用户文本。
+ */
+export function applyReplaceSelection(
+  draft: string,
+  range: { start: number; end: number } | null,
+  original: string,
+  replacement: string,
+): string {
+  if (!range || draft.slice(range.start, range.end) !== original) {
+    return draft ? `${draft}\n\n${replacement}` : replacement
+  }
+  return draft.slice(0, range.start) + replacement + draft.slice(range.end)
 }
 
 /* ============ 中央对话列 ============ */

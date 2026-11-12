@@ -9,6 +9,7 @@ import {
   loadOutlineChapters,
   outlineToTasks,
   newTaskId,
+  tasksToPlanMarkdown,
   type NovelTask,
   type TaskStatus,
 } from '../../api/planner'
@@ -217,6 +218,18 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
   }, [tasks, persist])
   const retryCount = tasks.filter((t) => t.status === 'retry').length
 
+  /** 导出 Markdown 写作计划（浏览器下载） */
+  const exportPlan = useCallback(() => {
+    const md = tasksToPlanMarkdown(tasks, '写作计划')
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `writing-plan-${new Date().toISOString().slice(0, 10)}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [tasks])
+
   /**
    * 逐章生成核心（单章与连写共用）：上下文 → 纯净补全 → 质检 → 落盘 → 状态推进。
    * 状态读写都走磁盘队列（loadRunQueue/saveRunQueue），连写时闭包不过期。
@@ -409,6 +422,10 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
                 添加任务
               </button>
             ) : null}
+            <button className="tools-run" onClick={exportPlan} title="导出 Markdown 写作计划（进度概览 + 逐章任务细纲）">
+              <Icon name="download" size={13} />
+              导出计划
+            </button>
           </div>
           {addOpen ? (
             <div className="planner-addrow">
