@@ -44,6 +44,7 @@ pnpm run tauri:ios:dev
 - **`api/import.ts`** - 存量作品导入：智能切章（第X章/Chapter X/数字序号，中文数字转阿拉伯）
 - **`api/consistency.ts`** - 一致性检查：人物断档/情节线推进/伏笔回收/章节健康四维交叉核对
 - **`api/writing.ts`** - AI 写作工作流：续写/大纲/细纲/润色提示词构建 + 流式生成
+- **`api/studio.ts`** - 创作工坊工具集：16 个 AI 快捷创作工具（构思/写作/润改/实用四分类），prompt 模板化 + 纯净补全通道（`studio_complete_stream` RPC，不走 ReAct、不要求打开作品目录），有单测
 - **`features/launch/`** - 启动页：继续上次工程（last_workspace + 书架统计）、点选式目录选择器（`browse_dir`/`quick_locations`，拒绝手输路径）、新建标准工程
 - **`features/agent/`** - Agent 工作台（2026-11 重构，主流 Agent 布局，视觉规范：实体表面+SVG 图标，禁 emoji/玻璃拟态/胶囊按钮）：
   - `AgentWorkspace.tsx` - 三栏主体：会话侧栏 | 中央对话流 | Artifacts 文件面板
@@ -55,6 +56,7 @@ pnpm run tauri:ios:dev
   - `ChaptersPanel.tsx` - 章节页签（字数/状态三态循环/拖拽排序/新建/导入直跳）
   - `LorePanel.tsx` - 设定页签（人物卡/情节线/设定集三合一，直读 novel.ts 解析 concept|outline 下的 Markdown）
   - `ToolsDialog.tsx` - 工具中心（统计/一致性/铁律/导入切章四页签 + 导出整本）
+  - `StudioDialog.tsx` - 创作工坊（16 个 AI 快捷创作工具四分类；流式生成 → 复制/存为 studio/*.md/插入编辑器；Ctrl+K 有快捷入口）
   - `CommandPalette.tsx` - Ctrl+K 命令面板（模糊过滤/键盘导航）
   - `MarkdownView.tsx` - 轻量只读渲染（标题锚点 + `extractToc` 纯函数 TOC，有单测）
   - `DiffView.tsx` - 文件变更历史 diff（覆盖写自动留快照；LCS 行级对比、±统计、上下文折叠、版本恢复）
@@ -71,7 +73,7 @@ pnpm run tauri:ios:dev
 - **`lib.rs`** - 共享库：桌面（Tauri）与 `iris-creation-server` 共用的服务层
 - **`main.rs`** - Tauri 桌面壳入口：setup 内嵌 `iris_creation::server::run`（127.0.0.1:8765），窗口直接加载该地址，与独立 iris-creation-server 形态行为一致；invoke 通道保留但 webui 不使用
 - **`bin/iris-creation-server.rs`** - 本地 Web 服务端入口：托管 webui 静态资源 + RPC + WS
-- **`server/`** - HTTP/WS 服务：`rpc_dispatch.rs`（67 命令分发）、WS 升级与 cancel 指令
+- **`server/`** - HTTP/WS 服务：`rpc_dispatch.rs`（68 命令分发）、WS 升级与 cancel 指令
 - **`commands.rs`** - 命令实现（`*_impl` 共用函数供 Tauri/RPC 双通道调用）
 - **`agent_system.rs`** - AI 代理运行时，包含工具注册表和记忆存储
 - **`skills/mod.rs`** - 写作技能：内置技能 + Novelist-Skills 子模块（`skills/` 目录，编译期内嵌 + 运行时目录覆盖）
