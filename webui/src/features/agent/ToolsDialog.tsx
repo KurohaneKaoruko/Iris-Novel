@@ -17,13 +17,16 @@ import type { IconName } from '../../components/Icon'
 import { splitIntoChapters, importSummary } from '../../api/import'
 import { readText } from '../../api/backend'
 import { Icon } from '../../components/Icon'
+import { PlannerTab } from './PlannerTab'
 import './ToolsDialog.css'
+import './PlannerTab.css'
 
-type TabId = 'import' | 'consistency' | 'lint' | 'stats'
+type TabId = 'import' | 'consistency' | 'lint' | 'stats' | 'planner'
 
 const TABS: Array<{ id: TabId; label: string; icon: IconName }> = [
+  { id: 'planner', label: '任务队列', icon: 'list-checks' },
   { id: 'stats', label: '作品统计', icon: 'chart' },
-  { id: 'consistency', label: '一致性检查', icon: 'list-checks' },
+  { id: 'consistency', label: '一致性检查', icon: 'check-circle' },
   { id: 'lint', label: '正文铁律', icon: 'scale' },
   { id: 'import', label: '导入切章', icon: 'file-input' },
 ]
@@ -31,7 +34,7 @@ const TABS: Array<{ id: TabId; label: string; icon: IconName }> = [
 type Props = { initialTab?: TabId; onClose: () => void; onOpenFile: (path: string) => void }
 
 /** 工具中心：作品统计 / 一致性检查 / 正文铁律体检 / 存量导入切章 */
-export function ToolsDialog({ initialTab = 'stats', onClose, onOpenFile }: Props) {
+export function ToolsDialog({ initialTab = 'planner', onClose, onOpenFile }: Props) {
   const [tab, setTab] = useState<TabId>(initialTab)
   return (
     <div className="tools-overlay" onClick={onClose}>
@@ -51,6 +54,7 @@ export function ToolsDialog({ initialTab = 'stats', onClose, onOpenFile }: Props
           {tab === 'stats' ? <StatsTab onOpenFile={onOpenFile} /> : null}
           {tab === 'consistency' ? <ConsistencyTab onOpenFile={onOpenFile} /> : null}
           {tab === 'lint' ? <LintTab onOpenFile={onOpenFile} /> : null}
+          {tab === 'planner' ? <PlannerTab onOpenFile={onOpenFile} /> : null}
           {tab === 'import' ? <ImportTab /> : null}
         </div>
       </div>

@@ -115,6 +115,9 @@ export async function saveRunQueue(mode: WriterMode | null, tasks: NovelTask[]):
     lines.push(`- [${checked}] ${t.id} ${t.title} (${t.scope}, ${t.target_words}字, ${t.status})`)
   }
   const body = lines.join('\n')
+  // 确保 .novel/tasks/ 目录存在（新建工程可能没有；已存在时报错被吞掉）
+  const { createDir } = await import('./backend')
+  await createDir('.novel/tasks').catch(() => {})
   await writeText(RUN_QUEUE_PATH, `---\n${JSON.stringify(meta, null, 2)}\n---\n\n${body}\n`)
 }
 

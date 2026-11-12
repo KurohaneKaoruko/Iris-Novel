@@ -65,7 +65,7 @@ export function AgentWorkspace() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
-  const [toolsTab, setToolsTab] = useState<'stats' | 'consistency' | 'lint' | 'import'>('stats')
+  const [toolsTab, setToolsTab] = useState<'planner' | 'stats' | 'consistency' | 'lint' | 'import'>('planner')
   const [studioOpen, setStudioOpen] = useState(false)
   const [studioToolId, setStudioToolId] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -247,6 +247,7 @@ export function AgentWorkspace() {
     { id: 'studio-brainstorm', icon: 'sparkles', label: '工坊：头脑风暴', keywords: '工坊 点子 创意 brainstorm', run: () => { setStudioToolId('brainstorm'); setStudioOpen(true) } },
     { id: 'studio-polish', icon: 'pencil', label: '工坊：润色文本', keywords: '工坊 润色 polish 改写', run: () => { setStudioToolId('polish'); setStudioOpen(true) } },
     { id: 'studio-critique', icon: 'search', label: '工坊：专业评审', keywords: '工坊 评审 critique 编辑', run: () => { setStudioToolId('critique'); setStudioOpen(true) } },
+    { id: 'tools-planner', icon: 'list-checks', label: 'AI 任务队列', keywords: '工具 任务 拆解 队列 planner 章节 连续生成', run: () => { setToolsTab('planner'); setToolsOpen(true) } },
     { id: 'tools-stats', icon: 'chart', label: '作品统计', keywords: '工具 stats 统计', run: () => { setToolsTab('stats'); setToolsOpen(true) } },
     { id: 'tools-consistency', icon: 'list-checks', label: '一致性检查', keywords: '工具 检查 consistency 人物 伏笔 情节线', run: () => { setToolsTab('consistency'); setToolsOpen(true) } },
     { id: 'tools-lint', icon: 'scale', label: '正文铁律体检', keywords: '工具 lint 体检 套路', run: () => { setToolsTab('lint'); setToolsOpen(true) } },
