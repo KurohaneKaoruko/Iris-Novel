@@ -74,7 +74,7 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
   let index_file = dist_dir.join("index.html");
   let serve_frontend = tower_http::services::ServeDir::new(&dist_dir)
     // 用 fallback（而非 not_found_service）：后者会把响应状态强制覆盖为 404，
-    // SPA 路由需要 200 + index.html。
+    // SPA 路由需要 200 + index.html。缓存头由下方 Router 中间件统一附加。
     .fallback(tower::service_fn(move |req: axum::http::Request<axum::body::Body>| {
       // SPA fallback：非 API/WS 路径全部回退到 index.html
       let index = index_file.clone();
@@ -92,6 +92,7 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
           Ok(bytes) => Ok(axum::http::Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "text/html; charset=utf-8")
+            .header("cache-control", "no-cache")
             .body(axum::body::Body::from(bytes))
             .unwrap()),
           Err(_) => Ok(axum::http::Response::builder()
@@ -107,7 +108,26 @@ pub async fn run(config: ServerConfig) -> Result<(), String> {
     .route("/api/rpc/{command}", post(rpc))
     .route("/ws", get(ws_upgrade))
     .fallback_service(serve_frontend)
-    .with_state(ctx);
+    .with_state(ctx)
+    // 静态资源缓存策略：HTML/杂项快速 revalidate，带哈希的 /assets/ 长缓存
+    .layer(axum::middleware::from_fn(
+      |req: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| async move {
+        let path = req.uri().path().to_string();
+        let mut res = next.run(req).await;
+        if path.starts_with("/api/") || path == "/ws" {
+          return Ok::<_, std::convert::Infallible>(res);
+        }
+        let value = if path.starts_with("/assets/") {
+          // 带内容哈希的文件名：内容变→文件名变，可安全长缓存
+          axum::http::HeaderValue::from_static("public, max-age=31536000, immutable")
+        } else {
+          // index.html / favicon 等：浏览器每次 revalidate（配合 ETag 多为 304）
+          axum::http::HeaderValue::from_static("no-cache")
+        };
+        res.headers_mut().insert("cache-control", value);
+        Ok::<_, std::convert::Infallible>(res)
+      },
+    ));
 
   let listener = tokio::net::TcpListener::bind(addr)
     .await
