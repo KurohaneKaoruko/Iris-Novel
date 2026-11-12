@@ -44,7 +44,7 @@ pnpm run tauri:ios:dev
 - **`api/import.ts`** - 存量作品导入：智能切章（第X章/Chapter X/数字序号，中文数字转阿拉伯）
 - **`api/consistency.ts`** - 一致性检查：人物断档/情节线推进/伏笔回收/章节健康四维交叉核对
 - **`api/writing.ts`** - AI 写作工作流：续写/大纲/细纲/润色提示词构建 + 流式生成
-- **`api/studio.ts`** - 创作工坊工具集：16 个 AI 快捷创作工具（构思/写作/润改/实用四分类），prompt 模板化 + 纯净补全通道（`studio_complete_stream` RPC，不走 ReAct、不要求打开作品目录）；多稿对照（`generateVariants`，同输入 2-4 稿不同视角并排择优），有单测
+- **`api/studio.ts`** - 创作工坊工具集：16 个 AI 快捷创作工具（构思/写作/润改/实用四分类），prompt 模板化 + 纯净补全通道（`studio_complete_stream` RPC，不走 ReAct、不要求打开作品目录）；多稿对照（`generateVariants`，同输入 2-4 稿不同视角并排择优）；风格学习（`learnStyleFingerprint`+`parseStyleFingerprint`，范文 → 六维文风指纹注入所有文风类工具），有单测
 - **`api/rpc.ts`** - Web RPC 客户端 + WS 事件订阅：流式事件走全局共享 WS 连接（`subscribeStreamEvents`，多流并发不漏帧；旧的 `subscribeEvent` 每订阅一条连接仅限低频事件使用）
 - **`features/launch/`** - 启动页：继续上次工程（last_workspace + 书架统计）、点选式目录选择器（`browse_dir`/`quick_locations`，拒绝手输路径）、新建标准工程
 - **`features/agent/`** - Agent 工作台（2026-11 重构，主流 Agent 布局，视觉规范：实体表面+SVG 图标，禁 emoji/玻璃拟态/胶囊按钮）：
@@ -57,7 +57,7 @@ pnpm run tauri:ios:dev
   - `ChaptersPanel.tsx` - 章节页签（字数/状态三态循环/拖拽排序/新建/导入直跳）
   - `LorePanel.tsx` - 设定页签（人物卡/情节线/设定集三合一，直读 novel.ts 解析 concept|outline 下的 Markdown）
   - `ToolsDialog.tsx` - 工具中心（任务队列/统计/一致性/铁律/导入切章五页签；任务队列=AI 拆解目标或大纲导入→逐章连续生成正文）
-  - `StudioDialog.tsx` - 创作工坊（16 个 AI 快捷创作工具四分类；多稿对照开关 2-4 稿不同视角选稿卡片；四个出口：复制 / 存为 studio/*.md / 存为章节（stories/chapter-XXXX.md 纳入章节管理）/ 插入编辑器；Ctrl+K 有快捷入口）
+  - `StudioDialog.tsx` - 创作工坊（16 个 AI 快捷创作工具四分类；风格学习：范文提取六维文风指纹徽章可移除；多稿对照开关 2-4 稿不同视角选稿卡片；四个出口：复制 / 存为 studio/*.md / 存为章节（stories/chapter-XXXX.md 纳入章节管理）/ 插入编辑器；Ctrl+K 有快捷入口）
   - `CommandPalette.tsx` - Ctrl+K 命令面板（模糊过滤/键盘导航）
   - `MarkdownView.tsx` - 轻量只读渲染（标题锚点 + `extractToc` 纯函数 TOC，有单测）
   - `DiffView.tsx` - 文件变更历史 diff（覆盖写自动留快照；LCS 行级对比、±统计、上下文折叠、版本恢复）

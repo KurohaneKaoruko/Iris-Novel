@@ -5,8 +5,12 @@ import {
   STUDIO_STYLES,
   runStudioTool,
   generateVariants,
+  learnStyleFingerprint,
+  parseStyleFingerprint,
+  fingerprintText,
   studioResultToMarkdown,
   type StudioHandle,
+  type StyleFingerprint,
 } from '../../api/studio'
 import { getAppSettings, createDir, writeText } from '../../api/backend'
 import { chapterBodyFromResult, createChapterWithContent } from '../../api/novel'
@@ -58,6 +62,12 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
   const [variants, setVariants] = useState<Array<{ text: string; done: boolean }>>([])
   const [pickedVariant, setPickedVariant] = useState<number | null>(null)
 
+  // 风格学习：范文 → 文风指纹
+  const [styleFp, setStyleFp] = useState<StyleFingerprint | null>(null)
+  const [fpLearning, setFpLearning] = useState(false)
+  const [fpErr, setFpErr] = useState('')
+  const fpHandleRef = useRef<StudioHandle | null>(null)
+
   useEffect(() => {
     void getAppSettings()
       .then((s) => {
@@ -93,6 +103,7 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
       instruction,
       style,
       targetWords: targetWords ? Number(targetWords) : undefined,
+      fingerprint: styleFp,
     }
     const pid = providerId || null
 
@@ -147,7 +158,7 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
         setErrMsg(e instanceof Error ? e.message : String(e))
         setRunState('error')
       })
-  }, [inputText, runState, tool, instruction, style, targetWords, providerId, onToken, multiMode, variantCount])
+  }, [inputText, runState, tool, instruction, style, targetWords, providerId, onToken, multiMode, variantCount, styleFp])
 
   /** 多稿模式选稿：选中稿进入主结果区（复制/存盘/插入都作用于它） */
   const pickVariant = useCallback((i: number) => {
@@ -161,8 +172,34 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
   const cancel = useCallback(() => {
     handleRef.current?.cancel()
     for (const h of variantHandlesRef.current) h.cancel()
+    fpHandleRef.current?.cancel()
     setRunState('idle')
   }, [])
+
+  /** 风格学习：从输入框范文提取文风指纹（覆盖旧指纹） */
+  const learnStyle = useCallback(() => {
+    if (!inputText.trim() || fpLearning) return
+    setFpLearning(true)
+    setFpErr('')
+    fpHandleRef.current = learnStyleFingerprint({
+      sample: inputText,
+      providerId: providerId || null,
+    })
+    fpHandleRef.current.promise
+      .then((raw) => {
+        const fp = parseStyleFingerprint(raw)
+        if (fp) {
+          setStyleFp(fp)
+        } else {
+          setFpErr('AI 输出未能解析为文风指纹，请换一段特征更鲜明的范文重试')
+        }
+        setFpLearning(false)
+      })
+      .catch((e) => {
+        setFpErr(e instanceof Error ? e.message : String(e))
+        setFpLearning(false)
+      })
+  }, [inputText, fpLearning, providerId])
 
   // Esc 关闭
   useEffect(() => {
@@ -334,6 +371,35 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
                     </select>
                   </label>
                 ) : null}
+                {tool.styleField ? (
+                  <label className="studio-field">
+                    <span className="studio-label">风格学习（粘贴范文后提取其文风）</span>
+                    {styleFp ? (
+                      <div className="studio-fp">
+                        <span className="studio-fp-tag" title={fingerprintText(styleFp)}>
+                          <Icon name="pen-line" size={12} />
+                          已学习范文风格
+                        </span>
+                        <button type="button" className="studio-fp-x" onClick={() => setStyleFp(null)} title="移除文风指纹">
+                          <Icon name="x" size={11} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="studio-stop"
+                        style={{ justifyContent: 'flex-start' }}
+                        disabled={!inputText.trim() || fpLearning}
+                        onClick={learnStyle}
+                        title="把上方输入框的范文交给 AI 分析，提取文风指纹套用到生成"
+                      >
+                        <Icon name={fpLearning ? 'clock' : 'search'} size={13} />
+                        {fpLearning ? '分析中……' : '从范文学习文风'}
+                      </button>
+                    )}
+                  </label>
+                ) : null}
+                {fpErr ? <div className="studio-fp-err">{fpErr}</div> : null}
                 {tool.wordsField ? (
                   <label className="studio-field" style={{ maxWidth: 150 }}>
                     <span className="studio-label">目标字数</span>

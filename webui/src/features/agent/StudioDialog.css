@@ -408,3 +408,46 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ============ 风格学习（文风指纹） ============ */
+.studio-fp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.studio-fp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: var(--bg-tertiary);
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-fp-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.studio-fp-x:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+
+.studio-fp-err {
+  font-size: 12px;
+  color: var(--warn);
+  margin-top: 4px;
+}
