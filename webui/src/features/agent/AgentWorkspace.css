@@ -759,7 +759,19 @@
 }
 
 /* 窄屏：面板改为右侧实心抽屉（不遮挡输入区） */
+/* 中屏：三栏压缩并存（右栏收窄、会话栏收窄），不再隐藏右栏 */
 @media (max-width: 1100px) {
+  .agw-side {
+    width: clamp(264px, 30vw, 320px);
+  }
+
+  .sss {
+    width: 172px;
+  }
+}
+
+/* 极窄屏（手机级）：右栏退化为覆盖抽屉，会话栏收成窄条 */
+@media (max-width: 900px) {
   .agw-main {
     position: relative;
   }
@@ -769,14 +781,14 @@
     right: 0;
     top: 0;
     bottom: 0;
-    width: min(360px, 88vw);
+    width: min(340px, 86vw);
     z-index: 40;
     box-shadow: var(--shadow-lg);
     background: var(--bg-secondary);
   }
 
   .sss {
-    width: 200px;
+    width: 56px;
   }
 }
 

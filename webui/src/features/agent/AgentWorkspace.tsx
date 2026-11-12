@@ -49,8 +49,8 @@ export function AgentWorkspace() {
   const [previewMode, setPreviewMode] = useState<'content' | 'history'>('content')
   const [skills, setSkills] = useState<Skill[]>([])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  // 窄屏（<1100px）面板是覆盖抽屉，默认收起，避免遮挡输入区
-  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 1100)
+  // 右侧文件面板默认常驻（对标主流 Agent 三栏）；极窄屏（<900px）才退化为覆盖抽屉
+  const [panelOpen, setPanelOpen] = useState(true)
   const [panelTab, setPanelTab] = useState<'tree' | 'chapters' | 'lore' | 'file'>('tree')
   const [dialog, setDialog] = useState<
     | { kind: 'new-file' }
