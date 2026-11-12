@@ -3,7 +3,7 @@
  * 每个工具 = system 人设 + user 消息模板；走 studio_complete_stream 纯净补全
  * （无 ReAct 工具循环、不要求已打开作品目录）。
  */
-import { subscribeEvent, type Unlisten } from './rpc'
+import { subscribeStreamEvents, type Unlisten } from './rpc'
 import { studioCompleteStream, chatCancelStream, type ChatMessagePayload } from './backend'
 
 // ---- 工具目录 ----
@@ -296,32 +296,99 @@ export function runStudioTool(args: {
   onToken?: (fullText: string) => void
 }): StudioHandle {
   const { system, user } = args.tool.build(args.input)
+  return streamStudio({
+    system,
+    user,
+    providerId: args.providerId,
+    onToken: args.onToken,
+  })
+}
+
+/**
+ * 多稿生成：同一输入并行产生 n 稿（每稿注入视角指令与 VARIANT_INDEX 标记）。
+ * 逐稿完成即回调 onVariant（保持序号）；全部结束后 resolve。
+ */
+export async function generateVariants(args: {
+  tool: StudioTool
+  input: StudioInput
+  count: number
+  providerId?: string | null
+  onVariant?: (index: number, text: string, done: boolean) => void
+  /** 传入数组，生成期间每个流的 StudioHandle 会填入其中（供外部 cancel） */
+  handlesOut?: StudioHandle[]
+}): Promise<string[]> {
+  const { system, user } = args.tool.build(args.input)
+  const n = Math.max(2, Math.min(4, args.count))
+  const handles: StudioHandle[] = args.handlesOut ?? []
+  handles.length = 0
+  const results: string[] = new Array(n).fill('')
+  for (let i = 0; i < n; i++) {
+    const angle = VARIANT_ANGLES[i % VARIANT_ANGLES.length]
+    const markedUser = `【第 ${i + 1} 稿视角要求】${angle}\n\nVARIANT_INDEX: ${i}\n\n${user}`
+    let acc = ''
+    const h = streamStudio({
+      system,
+      user: markedUser,
+      providerId: args.providerId,
+      onToken: (full) => {
+        acc = full
+        args.onVariant?.(i, full, false)
+      },
+    })
+    handles.push(h)
+    h.promise
+      .then((text) => {
+        results[i] = text
+        args.onVariant?.(i, text, true)
+      })
+      .catch(() => {
+        results[i] = acc || `（第 ${i + 1} 稿生成失败）`
+        args.onVariant?.(i, results[i], true)
+      })
+  }
+  await Promise.all(handles.map((h) => h.promise))
+  return results
+}
+
+const VARIANT_ANGLES = [
+  '侧重悬疑冷峻的氛围与克制表达',
+  '侧重人物内心与细腻心理描写',
+  '侧重快节奏、强冲突与对话张力',
+  '侧重感官细节与画面感',
+]
+
+/** 纯净补全底层：system+user → 流式完整文本。 */
+export function streamStudio(args: {
+  system: string
+  user: string
+  providerId?: string | null
+  onToken?: (fullText: string) => void
+}): StudioHandle {
   const streamId = `studio-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   let output = ''
   let cancelled = false
-  const ups: Unlisten[] = []
+  let sub: { unlisten: Unlisten } | null = null
 
   const promise = new Promise<string>((resolve, reject) => {
     let settled = false
     const finish = (fn: () => void) => {
       if (settled) return
       settled = true
-      for (const u of ups) u()
+      sub?.unlisten()
       fn()
     }
 
-    ups.push(
-      subscribeEvent('ai_stream_token', (raw) => {
-        const p = (raw ?? {}) as StreamPayload
-        if (streamIdOf(p) !== streamId) return
+    // 共享 WS 事件连接：所有流复用一条连接，按 streamId 过滤。
+    // 连接就绪后才发 RPC——保证 token/done 不会在订阅生效前广播出去。
+    const tokenSub = subscribeStreamEvents((event, raw) => {
+      const p = (raw ?? {}) as StreamPayload
+      if (streamIdOf(p) !== streamId) return
+      if (event === 'ai_stream_token') {
         const token = typeof p.token === 'string' ? p.token : ''
         if (!token) return
         output += token
         args.onToken?.(output)
-      }),
-      subscribeEvent('ai_stream_done', (raw) => {
-        const p = (raw ?? {}) as StreamPayload
-        if (streamIdOf(p) !== streamId) return
+      } else if (event === 'ai_stream_done') {
         if (cancelled || p.cancelled === true) {
           finish(() => resolve(output))
           return
@@ -331,17 +398,21 @@ export function runStudioTool(args: {
           return
         }
         finish(() => resolve(output))
-      }),
-    )
+      }
+    })
+    sub = tokenSub
 
-    const messages: ChatMessagePayload[] = [{ role: 'user', content: user }]
-    studioCompleteStream({
-      streamId,
-      system,
-      messages,
-      temperature: null,
-      providerId: args.providerId ?? null,
-    }).catch((e) => finish(() => reject(e instanceof Error ? e : new Error(String(e)))))
+    const messages: ChatMessagePayload[] = [{ role: 'user', content: args.user }]
+    const start = () =>
+      studioCompleteStream({
+        streamId,
+        system: args.system,
+        messages,
+        temperature: null,
+        providerId: args.providerId ?? null,
+      }).catch((e) => finish(() => reject(e instanceof Error ? e : new Error(String(e)))))
+
+    void tokenSub.waitReady().then(start)
   })
 
   return {

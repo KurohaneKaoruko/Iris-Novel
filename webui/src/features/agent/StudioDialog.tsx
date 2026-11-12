@@ -4,6 +4,7 @@ import {
   STUDIO_CATEGORIES,
   STUDIO_STYLES,
   runStudioTool,
+  generateVariants,
   studioResultToMarkdown,
   type StudioHandle,
 } from '../../api/studio'
@@ -25,6 +26,9 @@ type Props = {
 
 type RunState = 'idle' | 'running' | 'done' | 'error'
 
+/** 与 studio.ts VARIANT_ANGLES 对齐的短标签（选稿卡片用） */
+const VARIANT_ANGLE_LABELS = ['悬疑冷峻', '细腻心理', '快节奏冲突', '感官画面']
+
 /** 创作工坊：一站式 AI 文本创作工具集（构思 / 写作 / 润改 / 实用） */
 export function StudioDialog({ initialToolId, activePath, activeContent, onInsertToEditor, onClose }: Props) {
   const [toolId, setToolId] = useState(initialToolId ?? STUDIO_TOOLS[0].id)
@@ -44,7 +48,14 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
   const [result, setResult] = useState('')
   const [errMsg, setErrMsg] = useState('')
   const handleRef = useRef<StudioHandle | null>(null)
+  const variantHandlesRef = useRef<StudioHandle[]>([])
   const resultBodyRef = useRef<HTMLDivElement | null>(null)
+
+  // 多稿对照
+  const [multiMode, setMultiMode] = useState(false)
+  const [variantCount, setVariantCount] = useState(2)
+  const [variants, setVariants] = useState<Array<{ text: string; done: boolean }>>([])
+  const [pickedVariant, setPickedVariant] = useState<number | null>(null)
 
   useEffect(() => {
     void getAppSettings()
@@ -62,6 +73,8 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
     setRunState('idle')
     setResult('')
     setErrMsg('')
+    setVariants([])
+    setPickedVariant(null)
   }, [])
 
   const onToken = useCallback((full: string) => {
@@ -73,19 +86,57 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
   const run = useCallback(() => {
     if (!inputText.trim() || runState === 'running') return
     setRunState('running')
-    setResult('')
     setErrMsg('')
-    handleRef.current = runStudioTool({
-      tool,
-      input: {
-        text: inputText,
-        instruction,
-        style,
-        targetWords: targetWords ? Number(targetWords) : undefined,
-      },
-      providerId: providerId || null,
-      onToken,
-    })
+    const input = {
+      text: inputText,
+      instruction,
+      style,
+      targetWords: targetWords ? Number(targetWords) : undefined,
+    }
+    const pid = providerId || null
+
+    if (multiMode) {
+      // 多稿：清空旧稿，逐稿流式更新
+      setVariants(new Array(variantCount).fill(null).map(() => ({ text: '', done: false })))
+      setPickedVariant(null)
+      setResult('')
+      void generateVariants({
+        tool,
+        input,
+        count: variantCount,
+        providerId: pid,
+        handlesOut: variantHandlesRef.current,
+        onVariant: (i, text, done) => {
+          setVariants((vs) => {
+            const next = [...vs]
+            next[i] = { text, done }
+            return next
+          })
+          if (done) {
+            const el = resultBodyRef.current
+            if (el) el.scrollTop = el.scrollHeight
+          }
+        },
+      })
+        .then((results) => {
+          setVariants(results.map((text) => ({ text, done: true })))
+          // 自动选中第一份成功稿
+          const firstOk = results.findIndex((r) => r.trim())
+          setPickedVariant(firstOk >= 0 ? firstOk : null)
+          setResult(results[firstOk] ?? '')
+          setRunState('done')
+        })
+        .catch((e) => {
+          setErrMsg(e instanceof Error ? e.message : String(e))
+          setRunState('error')
+        })
+      return
+    }
+
+    setResult('')
+    setPickedVariant(null)
+    setVariants([])
+    handleRef.current = runStudioTool({ tool, input, providerId: pid, onToken })
     handleRef.current.promise
       .then((out) => {
         setResult(out)
@@ -95,10 +146,20 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
         setErrMsg(e instanceof Error ? e.message : String(e))
         setRunState('error')
       })
-  }, [inputText, runState, tool, instruction, style, targetWords, providerId, onToken])
+  }, [inputText, runState, tool, instruction, style, targetWords, providerId, onToken, multiMode, variantCount])
+
+  /** 多稿模式选稿：选中稿进入主结果区（复制/存盘/插入都作用于它） */
+  const pickVariant = useCallback((i: number) => {
+    setPickedVariant(i)
+    setVariants((vs) => {
+      if (vs[i]) setResult(vs[i].text)
+      return vs
+    })
+  }, [])
 
   const cancel = useCallback(() => {
     handleRef.current?.cancel()
+    for (const h of variantHandlesRef.current) h.cancel()
     setRunState('idle')
   }, [])
 
@@ -211,6 +272,32 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
                 </label>
               </div>
               <div className="studio-fieldrow">
+                <label className="studio-field" style={{ maxWidth: 170 }}>
+                  <span className="studio-label">多稿对照</span>
+                  <div className="studio-multirow">
+                    <button
+                      type="button"
+                      className={`studio-multi-toggle${multiMode ? ' on' : ''}`}
+                      onClick={() => setMultiMode((v) => !v)}
+                      title="同一输入并排生成 2-4 稿不同视角，择优选用"
+                    >
+                      <Icon name={multiMode ? 'check-circle' : 'book-open'} size={13} />
+                      {multiMode ? '已开启' : '关闭'}
+                    </button>
+                    {multiMode ? (
+                      <select
+                        className="studio-select"
+                        style={{ minHeight: 0 }}
+                        value={variantCount}
+                        onChange={(e) => setVariantCount(Number(e.target.value))}
+                      >
+                        {[2, 3, 4].map((n) => (
+                          <option key={n} value={n}>{n} 稿</option>
+                        ))}
+                      </select>
+                    ) : null}
+                  </div>
+                </label>
                 {tool.styleField ? (
                   <label className="studio-field" style={{ maxWidth: 150 }}>
                     <span className="studio-label">文风</span>
@@ -297,6 +384,25 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
                 </div>
               </div>
               <div className="studio-resultbody" ref={resultBodyRef}>
+                {variants.length > 0 ? (
+                  <div className="studio-variants">
+                    {variants.map((v, i) => (
+                      <button
+                        key={i}
+                        className={`studio-variant${pickedVariant === i ? ' picked' : ''}${v.done ? '' : ' gen'}`}
+                        onClick={() => pickVariant(i)}
+                        title={v.done ? '点击选用此稿' : '生成中…'}
+                      >
+                        <span className="studio-variant-head">
+                          {v.done ? <Icon name="file-text" size={12} /> : <Icon name="clock" size={12} />}
+                          第 {i + 1} 稿 · {VARIANT_ANGLE_LABELS[i % VARIANT_ANGLE_LABELS.length]}
+                          {pickedVariant === i ? <Icon name="check" size={12} /> : null}
+                        </span>
+                        <span className="studio-variant-body">{v.text.slice(0, 90) || '……'}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 {hasResult ? (
                   running ? (
                     <pre style={{ whiteSpace: 'pre-wrap', font: 'inherit', margin: 0 }}>

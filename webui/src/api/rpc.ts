@@ -95,3 +95,90 @@ export function wsSend(message: Record<string, unknown>): boolean {
     return false
   }
 }
+
+/* ============ 流式事件共享连接 ============ *
+ * ai_stream_* 事件高频且并发（多稿对照同时 2-4 条流）。每流各开 WS 会在
+ * 服务端 subscribe() 前漏掉先广播的事件（快 Provider 下必现）。改为全局
+ * 一条共享连接：首个订阅者触发建立，之后新流零握手直接挂上，按 streamId
+ * 自行过滤。最后一个订阅者取消后关闭连接。 */
+
+type StreamEvtHandler = (event: string, payload: unknown) => void
+
+const streamSubs = new Set<StreamEvtHandler>()
+let streamWs: WebSocket | null = null
+let streamWsReady = false
+let streamRetryTimer: number | null = null
+
+function ensureStreamWs(): void {
+  if (streamWs) return
+  streamWsReady = false
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+  const ws = new WebSocket(`${proto}://${location.host}/ws`)
+  streamWs = ws
+  ws.onopen = () => {
+    if (streamWs === ws) streamWsReady = true
+  }
+  ws.onmessage = (msg) => {
+    try {
+      const data = JSON.parse(msg.data as string) as { event?: string; payload?: unknown }
+      if (!data.event) return
+      for (const h of streamSubs) h(data.event, data.payload)
+    } catch {
+      // 忽略非 JSON 帧
+    }
+  }
+  ws.onclose = () => {
+    if (streamWs !== ws) return
+    streamWs = null
+    streamWsReady = false
+    // 还有订阅者（页面未关）时自动重连
+    if (streamSubs.size > 0 && streamRetryTimer === null) {
+      streamRetryTimer = window.setTimeout(() => {
+        streamRetryTimer = null
+        ensureStreamWs()
+      }, 1000)
+    }
+  }
+  ws.onerror = () => {
+    ws.close()
+  }
+}
+
+/** 订阅流式事件（共享 WS）。返回 {unlisten, waitReady}；连接已就绪时 waitReady 立即 resolve。 */
+export function subscribeStreamEvents(handler: StreamEvtHandler): {
+  unlisten: Unlisten
+  waitReady: () => Promise<void>
+} {
+  streamSubs.add(handler)
+  ensureStreamWs()
+  let cancelled = false
+  const waitReady = () =>
+    new Promise<void>((resolve) => {
+      if (cancelled) return resolve()
+      if (streamWsReady) return resolve()
+      const t = window.setInterval(() => {
+        if (cancelled || streamWsReady) {
+          window.clearInterval(t)
+          resolve()
+        }
+      }, 30)
+      // 最多等 2 秒：WS 不可用时不能永远卡住，RPC 错误会自然浮出
+      window.setTimeout(() => {
+        window.clearInterval(t)
+        resolve()
+      }, 2000)
+    })
+  return {
+    unlisten: () => {
+      cancelled = true
+      streamSubs.delete(handler)
+      if (streamSubs.size === 0 && streamWs) {
+        const ws = streamWs
+        streamWs = null
+        streamWsReady = false
+        ws.close()
+      }
+    },
+    waitReady,
+  }
+}
