@@ -135,8 +135,45 @@ export async function createChapterFile(title: string, order?: number): Promise<
   return path
 }
 
-/** 批量导入章节（存量作品切章后调用）：从 startOrder 起逐章写文件+元数据，返回落盘路径列表 */
-export async function importChapters(
+/**
+ * 工坊结果 → 章节正文体：剥掉 AI 产出的首行 `# 标题`（避免与章节标题重复），
+ * 返回 {title, body}；无标题行时 title 传空由调用方兜底。
+ */
+export function chapterBodyFromResult(raw: string): { title: string; body: string } {
+  const normalized = raw.replace(/\r\n/g, '\n').trim()
+  const m = normalized.match(/^#\s+(.+?)\s*\n/)
+  if (m) {
+    return { title: m[1].trim(), body: normalized.slice(m[0].length).trim() }
+  }
+  return { title: '', body: normalized }
+}
+
+/**
+ * 工坊结果直写新章节：写入 stories/chapter-XXXX.md（自动接在现有章节末尾），
+ * 登记章节元数据，返回落盘路径。标题缺省用「第 N 章」。
+ */
+export async function createChapterWithContent(title: string, content: string): Promise<string> {
+  const chapters = await listChapters()
+  const order = chapters.reduce((mx, c) => Math.max(mx, c.order), 0) + 1
+  const num = String(order).padStart(4, '0')
+  const path = `stories/chapter-${num}.md`
+  const cleanTitle = title.trim() || `第 ${order} 章`
+  const heading = `# ${cleanTitle}\n\n`
+  const body = heading + content.trim() + '\n'
+  await writeText(path, body)
+  await saveChapterMeta({
+    id: path,
+    filePath: path,
+    title: cleanTitle,
+    wordCount: words(body),
+    status: 'draft',
+    lastModified: Date.now(),
+    order,
+  })
+  return path
+}
+
+/** 批量导入章节（存量作品切章后调用）：从 startOrder 起逐章写文件+元数据，返回落盘路径列表 */export async function importChapters(
   items: Array<{ title: string; content: string }>,
   startOrder: number,
 ): Promise<string[]> {

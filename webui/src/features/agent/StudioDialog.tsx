@@ -9,6 +9,7 @@ import {
   type StudioHandle,
 } from '../../api/studio'
 import { getAppSettings, createDir, writeText } from '../../api/backend'
+import { chapterBodyFromResult, createChapterWithContent } from '../../api/novel'
 import { MarkdownView } from './MarkdownView'
 import { Icon, type IconName } from '../../components/Icon'
 import './StudioDialog.css'
@@ -202,6 +203,30 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
     onClose()
   }, [result, activePath, onInsertToEditor, onClose])
 
+  // ==== 存为章节：结果直写 stories/chapter-XXXX.md 并纳入章节管理 ====
+  const [saveChapterOpen, setSaveChapterOpen] = useState(false)
+  const [chapterTitle, setChapterTitle] = useState('')
+  const [chapterSaved, setChapterSaved] = useState<string | null>(null)
+
+  const openSaveChapter = useCallback(() => {
+    // 预填：AI 产出的首行 `# 标题`（chapterBodyFromResult 剥除后不会重复出现在正文）
+    const { title } = chapterBodyFromResult(result)
+    setChapterTitle(title)
+    setSaveChapterOpen(true)
+    setChapterSaved(null)
+  }, [result])
+
+  const saveAsChapter = useCallback(async () => {
+    const { body } = chapterBodyFromResult(result)
+    try {
+      const path = await createChapterWithContent(chapterTitle, body)
+      setChapterSaved(path)
+    } catch (e) {
+      setErrMsg(`存为章节失败：${e instanceof Error ? e.message : String(e)}`)
+      setRunState('error')
+    }
+  }, [chapterTitle, result])
+
   const running = runState === 'running'
   const hasResult = result.trim().length > 0
 
@@ -372,6 +397,10 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
                     <Icon name="download" size={12} />
                     存为文件
                   </button>
+                  <button className="ok" onClick={openSaveChapter} disabled={!hasResult || running} title="写入新章节文件并纳入章节管理">
+                    <Icon name="file-plus" size={12} />
+                    存为章节
+                  </button>
                   <button
                     className="ok"
                     onClick={insertToEditor}
@@ -383,6 +412,34 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
                   </button>
                 </div>
               </div>
+              {saveChapterOpen ? (
+                <div className="studio-savechapter">
+                  <input
+                    className="studio-input"
+                    style={{ minHeight: 0, flex: 1 }}
+                    value={chapterTitle}
+                    onChange={(e) => setChapterTitle(e.target.value)}
+                    placeholder="章节标题（缺省用「第 N 章」）"
+                    spellCheck={false}
+                  />
+                  {chapterSaved ? (
+                    <span className="studio-saved-ok">
+                      <Icon name="check-circle" size={13} />
+                      已存入 {chapterSaved}
+                    </span>
+                  ) : (
+                    <>
+                      <button className="studio-run" onClick={() => void saveAsChapter()}>
+                        <Icon name="check" size={12} />
+                        写入
+                      </button>
+                      <button className="studio-stop" onClick={() => setSaveChapterOpen(false)}>
+                        取消
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : null}
               <div className="studio-resultbody" ref={resultBodyRef}>
                 {variants.length > 0 ? (
                   <div className="studio-variants">

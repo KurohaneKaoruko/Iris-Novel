@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCharacters, serializeCharacters, parsePlotLines, serializePlotLines } from './novel'
+import { parseCharacters, serializeCharacters, parsePlotLines, serializePlotLines, chapterBodyFromResult } from './novel'
 import {
   scanCharacterMentions,
   buildCharacterStateIndex,
@@ -283,5 +283,34 @@ describe('scanForeshadows + buildForeshadowIndex（伏笔抽取）', () => {
 
   it('空输入输出占位说明', () => {
     expect(buildForeshadowIndex('', [])).toContain('暂未发现疑似伏笔')
+  })
+})
+
+describe('chapterBodyFromResult（工坊结果 → 章节体）', () => {
+  it('剥除首行 # 标题并提取标题', () => {
+    const r = chapterBodyFromResult('# 雨夜便利店\n\n\n正文第一段。\n\n正文第二段。')
+    expect(r.title).toBe('雨夜便利店')
+    expect(r.body).toBe('正文第一段。\n\n正文第二段。')
+    expect(r.body).not.toContain('# 雨夜便利店')
+  })
+
+  it('无标题行时 title 为空、正文原样保留', () => {
+    const raw = '直接开头，没有标题。\n\n第二段。'
+    const r = chapterBodyFromResult(raw)
+    expect(r.title).toBe('')
+    expect(r.body).toBe(raw)
+  })
+
+  it('二级标题不被误剥（只认首行一级标题）', () => {
+    const raw = '## 镜头一\n\n内容'
+    const r = chapterBodyFromResult(raw)
+    expect(r.title).toBe('')
+    expect(r.body).toContain('## 镜头一')
+  })
+
+  it('容忍 CRLF 与首尾空白', () => {
+    const r = chapterBodyFromResult('\r\n# 标题X\r\n\r\n正文\r\n')
+    expect(r.title).toBe('标题X')
+    expect(r.body).toBe('正文')
   })
 })
