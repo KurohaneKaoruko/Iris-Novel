@@ -39,7 +39,7 @@ pnpm run tauri:ios:dev
 
 - **`api/backend.ts`** - 类型化 RPC 命令绑定（与 `rpc_dispatch.rs` 一一对应）
 - **`api/novel.ts`** - 作品内数据层：章节元数据、人物卡、设定集 Codex、情节线、记忆索引、写作历史、章节排序（Markdown/JSON 直读直写，`parseCharacters`/`parsePlotLines`/`parseCodex` 等纯函数有单测）
-- **`api/planner.ts`** - 规划队列：run-queue.md JSON frontmatter 读写 + 大纲→任务链导入（`parseOutlineChapters`/`outlineToTasks`，与旧桌面端格式兼容）
+- **`api/planner.ts`** - 规划队列：run-queue.md JSON frontmatter 读写 + 大纲→任务链导入（`parseOutlineChapters`/`outlineToTasks`，与旧桌面端格式兼容）；AI 拆解（`buildTaskDraftPrompt`+`parseAiTasks`，id/依赖链重建防 AI 输出不可信字段）；UI 在 ToolsDialog「任务队列」页签（拆解/导入/逐章生成/连续生成）
 - **`api/lint.ts`** - 正文铁律体检：对齐 novel-ai-lexicon 的规则引擎（一级套路/二级限频/句式模板）
 - **`api/import.ts`** - 存量作品导入：智能切章（第X章/Chapter X/数字序号，中文数字转阿拉伯）
 - **`api/consistency.ts`** - 一致性检查：人物断档/情节线推进/伏笔回收/章节健康四维交叉核对
@@ -55,7 +55,7 @@ pnpm run tauri:ios:dev
   - `FileTree.tsx` - 递归文件树（重命名/删除/新建，`fs_changed` 事件驱动刷新）
   - `ChaptersPanel.tsx` - 章节页签（字数/状态三态循环/拖拽排序/新建/导入直跳）
   - `LorePanel.tsx` - 设定页签（人物卡/情节线/设定集三合一，直读 novel.ts 解析 concept|outline 下的 Markdown）
-  - `ToolsDialog.tsx` - 工具中心（统计/一致性/铁律/导入切章四页签 + 导出整本）
+  - `ToolsDialog.tsx` - 工具中心（任务队列/统计/一致性/铁律/导入切章五页签；任务队列=AI 拆解目标或大纲导入→逐章连续生成正文）
   - `StudioDialog.tsx` - 创作工坊（16 个 AI 快捷创作工具四分类；流式生成 → 复制/存为 studio/*.md/插入编辑器；Ctrl+K 有快捷入口）
   - `CommandPalette.tsx` - Ctrl+K 命令面板（模糊过滤/键盘导航）
   - `MarkdownView.tsx` - 轻量只读渲染（标题锚点 + `extractToc` 纯函数 TOC，有单测）
