@@ -179,6 +179,22 @@ export const saveChatSession = (session: ChatSession) => rpc<void>('save_chat_se
 export const deleteChatSession = (id: string) => rpc<boolean>('delete_chat_session', { id })
 
 /** 发起 AI 流式生成；token 经 WS ai_stream_token 事件到达。 */
+/** 创作工坊纯净补全：不走 ReAct/Agent，system+messages 原样透传 provider。 */
+export const studioCompleteStream = (args: {
+  streamId: string
+  system?: string | null
+  messages: ChatMessagePayload[]
+  temperature?: number | null
+  providerId?: string | null
+}) =>
+  rpc<void>('studio_complete_stream', {
+    streamId: args.streamId,
+    system: args.system ?? null,
+    messages: args.messages,
+    temperature: args.temperature ?? null,
+    providerId: args.providerId ?? null,
+  })
+
 export const chatGenerateStream = (args: {
   streamId: string
   messages: ChatMessagePayload[]

@@ -312,6 +312,29 @@ pub async fn dispatch(ctx: &ServerContext, command: &str, args: Value) -> Result
     }
 
     // ---- ai stream ----
+    "studio_complete_stream" => {
+      let stream_id = arg_str(&args, &["streamId", "stream_id"])?;
+      let system = arg_opt_str(&args, &["system"]).map(|s| {
+        s.trim().to_string()
+      });
+      let system = system.filter(|s| !s.is_empty());
+      let messages = arg_t::<Vec<crate::ai_types::ChatMessage>>(&args, "messages")?;
+      let temperature = args
+        .get("temperature")
+        .and_then(|v| v.as_f64())
+        .map(|v| v as f32);
+      let provider_id = arg_opt_str(&args, &["providerId", "provider_id"]);
+      crate::services::ai_stream::studio_complete_stream_service(
+        ctx.event_sink.clone(),
+        state,
+        stream_id,
+        system,
+        messages,
+        temperature,
+        provider_id,
+      )?;
+      Ok(json!(null))
+    }
     "chat_generate_stream" => {
       let stream_id = arg_str(&args, &["streamId", "stream_id"])?;
       let messages = arg_t::<Vec<crate::ai_types::ChatMessage>>(&args, "messages")?;

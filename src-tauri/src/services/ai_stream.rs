@@ -600,6 +600,141 @@ pub(crate) fn chat_generate_stream_service(
 
   Ok(())
 }
+/// 创作工坊纯净补全：不走 ReAct 工具循环，system/messages 原样透传给 provider，
+/// 不要求已打开作品目录。流式 token 走同一 WS 事件通道（ai_stream_token/done），
+/// 前端按 streamId 过滤；取消复用 chat_cancel_stream（同一 STREAM_TASKS 注册表）。
+#[allow(clippy::too_many_arguments)]
+pub fn studio_complete_stream_service(
+  sink: crate::event_sink::SharedEventSink,
+  state: &crate::state::AppState,
+  stream_id: String,
+  system: Option<String>,
+  messages: Vec<ChatMessage>,
+  temperature: Option<f32>,
+  provider_id: Option<String>,
+) -> Result<(), String> {
+  let _ = state;
+  let sink_for_task = sink.clone();
+  let stream_id_for_task = stream_id.clone();
+  let live_session = LiveStreamSession::new(sink.clone(), stream_id.clone());
+
+  let task = tokio::spawn(async move {
+    let payload_start = serde_json::json!({ "streamId": stream_id_for_task });
+    sink_for_task.emit("ai_stream_start", payload_start);
+    emit_stream_status(sink_for_task.as_ref(), &stream_id_for_task, "initializing");
+
+    let settings = match app_settings::load() {
+      Ok(v) => v,
+      Err(e) => {
+        sink_for_task.emit(
+          "ai_error",
+          serde_json::json!({ "streamId": stream_id_for_task, "stage": "settings", "message": e }),
+        );
+        clear_stream_task_by_id(&stream_id_for_task);
+        emit_stream_done(sink_for_task.as_ref(), &stream_id_for_task, false);
+        return;
+      }
+    };
+    let client = match crate::services::build_http_client() {
+      Ok(v) => v,
+      Err(e) => {
+        sink_for_task.emit(
+          "ai_error",
+          serde_json::json!({ "streamId": stream_id_for_task, "stage": "provider", "message": e }),
+        );
+        clear_stream_task_by_id(&stream_id_for_task);
+        emit_stream_done(sink_for_task.as_ref(), &stream_id_for_task, false);
+        return;
+      }
+    };
+    let current_provider = match resolve_chat_provider(&settings, provider_id.as_deref()) {
+      Ok(p) => p,
+      Err(e) => {
+        sink_for_task.emit(
+          "ai_error",
+          serde_json::json!({
+            "streamId": stream_id_for_task,
+            "provider": provider_id,
+            "stage": "provider",
+            "message": e
+          }),
+        );
+        clear_stream_task_by_id(&stream_id_for_task);
+        emit_stream_done(sink_for_task.as_ref(), &stream_id_for_task, false);
+        return;
+      }
+    };
+
+    emit_stream_status(sink_for_task.as_ref(), &stream_id_for_task, "thinking");
+    let system_text = system.unwrap_or_default();
+    let call_result = match current_provider.kind {
+      app_settings::ProviderKind::OpenAI | app_settings::ProviderKind::OpenAICompatible => {
+        call_openai_unbounded(
+          &client,
+          &current_provider,
+          &messages,
+          system_text.as_str(),
+          temperature,
+          Some(&live_session),
+        )
+        .await
+      },
+      app_settings::ProviderKind::Anthropic => {
+        call_anthropic_unbounded(
+          &client,
+          &current_provider,
+          &messages,
+          system_text.as_str(),
+          Some(&live_session),
+        )
+        .await
+      },
+    };
+
+    match call_result {
+      Ok(full_text) => {
+        if !live_session.has_emitted() {
+          // Provider 不支持流式：按既有节奏分块补发
+          emit_stream_status(sink_for_task.as_ref(), &stream_id_for_task, "responding");
+          let step_chars = 48usize;
+          let mut buf = String::new();
+          let mut count = 0usize;
+          for ch in full_text.chars() {
+            buf.push(ch);
+            count += 1;
+            if count >= step_chars {
+              let payload =
+                serde_json::json!({ "streamId": stream_id_for_task, "token": buf });
+              sink_for_task.emit("ai_stream_token", payload);
+              buf = String::new();
+              count = 0;
+              tokio::time::sleep(std::time::Duration::from_millis(15)).await;
+            }
+          }
+          if !buf.is_empty() {
+            let payload = serde_json::json!({ "streamId": stream_id_for_task, "token": buf });
+            sink_for_task.emit("ai_stream_token", payload);
+          }
+        }
+        clear_stream_task_by_id(&stream_id_for_task);
+        emit_stream_done(sink_for_task.as_ref(), &stream_id_for_task, false);
+      },
+      Err(e) => {
+        sink_for_task.emit(
+          "ai_error",
+          serde_json::json!({ "streamId": stream_id_for_task, "stage": "call", "message": e }),
+        );
+        clear_stream_task_by_id(&stream_id_for_task);
+        emit_stream_done(sink_for_task.as_ref(), &stream_id_for_task, false);
+      },
+    }
+  });
+
+  register_stream_task(&stream_id, task);
+
+  Ok(())
+}
+
 fn append_chunk_with_overlap(full_text: &mut String, chunk: &str) -> (usize, String) {
   const MAX_OVERLAP_CHARS: usize = 4096;
   if chunk.is_empty() {

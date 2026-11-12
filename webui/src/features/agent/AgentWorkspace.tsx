@@ -28,6 +28,7 @@ import { StepCard } from './StepCard'
 import { PromptDialog, ConfirmDialog } from '../workspace/Dialogs'
 import { SettingsDialog } from './SettingsDialog'
 import { ToolsDialog } from './ToolsDialog'
+import { StudioDialog } from './StudioDialog'
 import { ChaptersPanel } from './ChaptersPanel'
 import { LorePanel } from './LorePanel'
 import { DiffView } from './DiffView'
@@ -65,6 +66,8 @@ export function AgentWorkspace() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [toolsTab, setToolsTab] = useState<'stats' | 'consistency' | 'lint' | 'import'>('stats')
+  const [studioOpen, setStudioOpen] = useState(false)
+  const [studioToolId, setStudioToolId] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
@@ -240,6 +243,10 @@ export function AgentWorkspace() {
     { id: 'new-chapter', icon: 'file-plus', label: '新建章节', keywords: 'chapter 写作', run: () => setDialog({ kind: 'new-chapter' }) },
     { id: 'new-file', icon: 'file-plus', label: '新建 Markdown 文件', keywords: 'file create', run: () => setDialog({ kind: 'new-file' }) },
     { id: 'new-dir', icon: 'folder-plus', label: '新建目录', keywords: 'folder mkdir', run: () => setDialog({ kind: 'new-dir' }) },
+    { id: 'studio', icon: 'sparkles', label: '创作工坊', keywords: 'studio 工坊 创作 头脑风暴 场景 对话 润色 翻译 摘要', run: () => { setStudioToolId(null); setStudioOpen(true) } },
+    { id: 'studio-brainstorm', icon: 'sparkles', label: '工坊：头脑风暴', keywords: '工坊 点子 创意 brainstorm', run: () => { setStudioToolId('brainstorm'); setStudioOpen(true) } },
+    { id: 'studio-polish', icon: 'pencil', label: '工坊：润色文本', keywords: '工坊 润色 polish 改写', run: () => { setStudioToolId('polish'); setStudioOpen(true) } },
+    { id: 'studio-critique', icon: 'search', label: '工坊：专业评审', keywords: '工坊 评审 critique 编辑', run: () => { setStudioToolId('critique'); setStudioOpen(true) } },
     { id: 'tools-stats', icon: 'chart', label: '作品统计', keywords: '工具 stats 统计', run: () => { setToolsTab('stats'); setToolsOpen(true) } },
     { id: 'tools-consistency', icon: 'list-checks', label: '一致性检查', keywords: '工具 检查 consistency 人物 伏笔 情节线', run: () => { setToolsTab('consistency'); setToolsOpen(true) } },
     { id: 'tools-lint', icon: 'scale', label: '正文铁律体检', keywords: '工具 lint 体检 套路', run: () => { setToolsTab('lint'); setToolsOpen(true) } },
@@ -349,6 +356,9 @@ export function AgentWorkspace() {
         <span className="agw-spacer" />
         <button className="agw-iconbtn" onClick={() => setPaletteOpen(true)} title="命令面板（Ctrl+K）">
           <Icon name="command" size={17} />
+        </button>
+        <button className="agw-iconbtn" onClick={() => { setStudioToolId(null); setStudioOpen(true) }} title="创作工坊：头脑风暴 / 场景 / 对话 / 润色等 AI 快捷创作">
+          <Icon name="sparkles" size={16} />
         </button>
         <button className="agw-iconbtn" onClick={() => setToolsOpen(true)} title="工具中心：统计 / 一致性 / 铁律 / 导入切章">
           <Icon name="wrench" size={17} />
@@ -522,6 +532,18 @@ export function AgentWorkspace() {
             jumpToFile(p)
             setToolsOpen(false)
           }}
+        />
+      ) : null}
+      {studioOpen ? (
+        <StudioDialog
+          initialToolId={studioToolId ?? undefined}
+          activePath={activePath}
+          activeContent={fileContent}
+          onInsertToEditor={(text) => {
+            setEditDraft((d) => (d ? `${d}\n\n${text}` : text))
+            setEditing(true)
+          }}
+          onClose={() => setStudioOpen(false)}
         />
       ) : null}
     </div>
