@@ -180,3 +180,19 @@
 }
 .planner-empty svg { opacity: 0.4; }
 .planner-empty-sub { font-size: 12px; opacity: 0.8; }
+
+/* ============ 文风指纹提示 ============ */
+.planner-fp {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

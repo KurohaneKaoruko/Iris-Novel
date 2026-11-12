@@ -12,7 +12,10 @@ import {
   type TaskStatus,
 } from '../../api/planner'
 import { readText, writeText } from '../../api/backend'
-import { createChapterFile } from '../../api/novel'
+import { syncChapterContent } from '../../api/novel'
+import { lintChapter, type LintIssue } from '../../api/lint'
+import { streamStudio, type StudioHandle } from '../../api/studio'
+import { loadStyleFingerprint, fingerprintText, type StyleFingerprint } from '../../api/stylefp'
 import { Icon } from '../../components/Icon'
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -25,9 +28,37 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 
 const STATUS_CYCLE: TaskStatus[] = ['todo', 'running', 'blocked', 'done', 'retry']
 
+/** 章节正文生成系统人设：只产出成品正文 */
+const CHAPTER_SYSTEM =
+  '你是 Iris-Creation 的专业中文小说写作引擎，为长篇项目逐章产出成品正文。' +
+  '只输出正文本身：不要解释、不要前言结语、不要 Markdown 代码围栏、不要输出章节标题行。'
+
+/** 组装逐章生成的用户提示词（人物卡 + 前章结尾 + 任务细纲 + 文风指纹） */
+export function buildChapterPrompt(
+  task: NovelTask,
+  ctx: { charactersText?: string; prevTail?: string; fingerprint?: StyleFingerprint | null },
+): string {
+  const parts = [
+    ctx.charactersText ? `【人物设定】\n${ctx.charactersText.slice(0, 2500)}` : '',
+    ctx.prevTail ? `【前章结尾（承接其情节与悬念）】\n${ctx.prevTail}` : '',
+    `【本章任务】${task.title}`,
+    task.task_prompt ? `【本章细纲】\n${task.task_prompt}` : '',
+    task.acceptance_checks.length ? `【验收标准】\n${task.acceptance_checks.map((c) => `- ${c}`).join('\n')}` : '',
+    fingerprintText(ctx.fingerprint) ? `【${fingerprintText(ctx.fingerprint)}】` : '',
+    `请写出本章完整正文，目标 ${task.target_words} 字左右。只输出正文。`,
+  ]
+  return parts.filter(Boolean).join('\n\n')
+}
+
+/** 生成质量闸门：一级套路（error）即不合格；返回空数组表示通过 */
+export function gateIssues(content: string): LintIssue[] {
+  return lintChapter(content).filter((i) => i.level === 'error')
+}
+
 /**
  * 任务队列页签：AI 拆解写作目标 → 任务链管理 → 逐章生成正文。
  * 数据持久化在 .novel/tasks/run-queue.md（与旧桌面端格式兼容）。
+ * 生成走 studio 纯净补全通道（无 ReAct 工具循环），产出过 lint 一级套路闸门。
  */
 export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
   const [tasks, setTasks] = useState<NovelTask[]>([])
@@ -44,7 +75,9 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
   // 逐章生成
   const [runningId, setRunningId] = useState<string | null>(null)
   const [runLog, setRunLog] = useState('')
+  const [fp, setFp] = useState<StyleFingerprint | null>(null)
   const runAbortRef = useRef(false)
+  const genHandleRef = useRef<StudioHandle | null>(null)
 
   useEffect(() => {
     void loadRunQueue()
@@ -53,6 +86,7 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
+    void loadStyleFingerprint().then(setFp)
   }, [])
 
   const persist = useCallback(async (next: NovelTask[]) => {
@@ -64,16 +98,15 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
   const countN = Math.max(1, Math.min(20, Number(count) || 3))
   const wordsN = Math.max(500, Math.min(20000, Number(targetWords) || 2000))
 
-  /** AI 拆解 → 失败回退规则模板 */
+  /** AI 拆解 → 失败回退规则模板（同样走纯净补全通道） */
   const planWithAI = useCallback(async () => {
     setPlanErr('')
     setPlanning(true)
     try {
-      const { streamChat } = await import('../../api/writing')
-      const handle = streamChat({
-        prompt: buildTaskDraftPrompt(goal, startChapterN, countN, wordsN),
-      })
-      const raw = await handle.promise
+      const raw = await streamStudio({
+        system: '你是小说项目的任务规划器，只输出 JSON 数组本身，不要解释、不要 Markdown 代码围栏。',
+        user: buildTaskDraftPrompt(goal, startChapterN, countN, wordsN),
+      }).promise
       const aiTasks = parseAiTasks(raw, startChapterN, countN, wordsN, goal)
       if (aiTasks && aiTasks.length > 0) {
         await persist(aiTasks)
@@ -128,115 +161,61 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
     [tasks, persist],
   )
 
-  /** 逐章生成：读前章结尾做上下文 → streamChat 写正文 → 落盘 → 标 done → 下一章 */
-  const runTask = useCallback(
-    async (task: NovelTask) => {
+  /**
+   * 逐章生成核心（单章与连写共用）：上下文 → 纯净补全 → 质检 → 落盘 → 状态推进。
+   * 状态读写都走磁盘队列（loadRunQueue/saveRunQueue），连写时闭包不过期。
+   */
+  const generateOne = useCallback(
+    async (task: NovelTask): Promise<boolean> => {
       setRunningId(task.id)
-      setRunLog('准备上下文…')
       runAbortRef.current = false
       try {
+        setRunLog(`准备上下文（${task.title}）…`)
         const prevPath = `stories/chapter-${String(task.chapter_index - 1).padStart(4, '0')}.md`
         let prevTail = ''
         try {
           const prev = await readText(prevPath)
           prevTail = prev.slice(-1200)
         } catch { /* 首章无前文 */ }
-
         const charactersText = await readText('concept/characters.md').catch(() => '')
-        const prompt = [
-          charactersText ? `【人物设定】\n${charactersText.slice(0, 2500)}` : '',
-          prevTail ? `【前章结尾（承接其情节与悬念）】\n${prevTail}` : '',
-          `【本章任务】${task.title}`,
-          task.task_prompt ? `【本章细纲】\n${task.task_prompt}` : '',
-          task.acceptance_checks.length ? `【验收标准】\n${task.acceptance_checks.map((c) => `- ${c}`).join('\n')}` : '',
-          `请写出本章完整正文，目标 ${task.target_words} 字左右。只输出正文。`,
-        ]
-          .filter(Boolean)
-          .join('\n\n')
 
-        setRunLog('AI 生成中……')
-        const { streamChat } = await import('../../api/writing')
-        const handle = streamChat({ prompt: prompt.trim() })
+        setRunLog(`AI 生成中（${task.title}）……`)
+        const handle = streamStudio({
+          system: CHAPTER_SYSTEM,
+          user: buildChapterPrompt(task, { charactersText, prevTail, fingerprint: fp }),
+          onToken: undefined,
+        })
+        genHandleRef.current = handle
         const content = await handle.promise
-        if (runAbortRef.current) return
+        if (runAbortRef.current) return false
+
+        // 质检闸门：一级套路零容忍
+        const issues = gateIssues(content)
+        if (issues.length > 0) {
+          const brief = issues.slice(0, 3).map((i) => i.rule).join('、')
+          const msg = `质检未通过：命中一级套路 ${issues.length} 处（${brief}），本章已标待重试；建议调整附加要求后重新生成`
+          setRunLog(msg)
+          const q = await loadRunQueue()
+          await saveRunQueue(
+            null,
+            q.tasks.map((t) => (t.id === task.id ? { ...t, status: 'retry' as TaskStatus, last_error: msg } : t)),
+          )
+          return false
+        }
 
         await writeText(task.scope, content)
-        setRunLog(`已写入 ${task.scope}（${content.length} 字）`)
+        // 章节元数据同步（文件已存在则只更新字数；不存在则登记）
+        await syncChapterContent(task.scope, content).catch(() => {})
+        setRunLog(`已写入 ${task.scope}（${content.length} 字，质检通过）`)
 
-        const next = tasks.map((t) =>
-          t.id === task.id ? { ...t, status: 'done' as TaskStatus, completed_at: new Date().toISOString() } : t,
-        )
-        await persist(next)
-
-        // 章节索引登记（chapter-XXXX 已存在时 create 会失败，容忍）
-        try {
-          await createChapterFile(`第${task.chapter_index}章`)
-        } catch { /* 文件已由 writeText 创建 */ }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        setRunLog(`失败：${msg}`)
-        await persist(tasks.map((t) => (t.id === task.id ? { ...t, status: 'retry' as TaskStatus, last_error: msg } : t)))
-      } finally {
-        setRunningId(null)
-      }
-    },
-    [tasks, persist],
-  )
-
-  const runNext = useCallback(async () => {
-    const t = nextExecutableTask(tasks)
-    if (!t) return
-    await runTask(t)
-  }, [tasks, runTask])
-
-  const runAll = useCallback(async () => {
-    runAbortRef.current = false
-    let guard = tasks.length + 2
-    let current = tasks
-    while (guard-- > 0) {
-      if (runAbortRef.current) return
-      const t = nextExecutableTask(current)
-      if (!t) break
-      // runTask 内部用 tasks state persist，需要串行等待
-      await runTaskById(t)
-      current = (await loadRunQueue()).tasks
-      setTasks(current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks])
-
-  // runAll 用直接读盘的版本避免闭包过期
-  const runTaskById = useCallback(
-    async (task: NovelTask) => {
-      setRunningId(task.id)
-      try {
-        const prevPath = `stories/chapter-${String(task.chapter_index - 1).padStart(4, '0')}.md`
-        let prevTail = ''
-        try {
-          const prev = await readText(prevPath)
-          prevTail = prev.slice(-1200)
-        } catch { /* 首章 */ }
-        const charactersText = await readText('concept/characters.md').catch(() => '')
-        const prompt = [
-          charactersText ? `【人物设定】\n${charactersText.slice(0, 2500)}` : '',
-          prevTail ? `【前章结尾】\n${prevTail}` : '',
-          `【本章任务】${task.title}`,
-          task.task_prompt ? `【本章细纲】\n${task.task_prompt}` : '',
-          task.acceptance_checks.length ? `【验收标准】\n${task.acceptance_checks.map((c) => `- ${c}`).join('\n')}` : '',
-          `请写出本章完整正文，目标 ${task.target_words} 字左右。只输出正文。`,
-        ]
-          .filter(Boolean)
-          .join('\n\n')
-        setRunLog(`生成 ${task.title}……`)
-        const { streamChat } = await import('../../api/writing')
-        const content = await streamChat({ prompt: prompt.trim() }).promise
-        if (runAbortRef.current) return
-        await writeText(task.scope, content)
         const q = await loadRunQueue()
-        const next = q.tasks.map((t) =>
-          t.id === task.id ? { ...t, status: 'done' as TaskStatus, completed_at: new Date().toISOString() } : t,
+        await saveRunQueue(
+          null,
+          q.tasks.map((t) =>
+            t.id === task.id ? { ...t, status: 'done' as TaskStatus, completed_at: new Date().toISOString() } : t,
+          ),
         )
-        await saveRunQueue(null, next)
+        return true
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         setRunLog(`失败：${msg}`)
@@ -245,10 +224,49 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
           null,
           q.tasks.map((t) => (t.id === task.id ? { ...t, status: 'retry' as TaskStatus, last_error: msg } : t)),
         )
+        return false
+      } finally {
+        genHandleRef.current = null
+        setRunningId(null)
       }
     },
-    [],
+    [fp],
   )
+
+  const runTask = useCallback(
+    async (task: NovelTask) => {
+      await generateOne(task)
+      setTasks((await loadRunQueue().catch(() => ({ tasks: [] as NovelTask[] }))).tasks)
+    },
+    [tasks, generateOne],
+  )
+
+  const runNext = useCallback(async () => {
+    const t = nextExecutableTask(tasks)
+    if (!t) return
+    await generateOne(t)
+    setTasks((await loadRunQueue().catch(() => ({ tasks: [] as NovelTask[] }))).tasks)
+  }, [tasks, generateOne])
+
+  const runAll = useCallback(async () => {
+    let guard = tasks.length + 2
+    let current = tasks
+    while (guard-- > 0) {
+      if (runAbortRef.current) return
+      const t = nextExecutableTask(current)
+      if (!t) break
+      const ok = await generateOne(t)
+      current = (await loadRunQueue()).tasks
+      setTasks(current)
+      // 质检不过/失败即停，避免连烧后续章节
+      if (!ok) return
+    }
+  }, [tasks, generateOne])
+
+  const stopAll = useCallback(() => {
+    runAbortRef.current = true
+    genHandleRef.current?.cancel()
+  }, [])
 
   if (!loaded) return <div className="tools-loading">加载队列…</div>
 
@@ -289,6 +307,12 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
             从大纲导入
           </button>
         </div>
+        {fp ? (
+          <div className="planner-fp" title={fingerprintText(fp)}>
+            <Icon name="pen-line" size={12} />
+            已启用范文文风指纹（创作工坊学习）
+          </div>
+        ) : null}
         {planErr ? <div className="planner-err">{planErr}</div> : null}
       </div>
 
@@ -306,18 +330,12 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
               <Icon name="pen-line" size={13} />
               生成下一章
             </button>
-            <button className="tools-run" disabled={runningId !== null || !next} onClick={() => void runAll()}>
+            <button className="tools-run" disabled={runningId !== null || !next} onClick={() => void runAll()} title="按依赖链串行生成全部任务；质检不过即停">
               <Icon name="chevrons-right" size={13} />
               连续生成
             </button>
             {runningId !== null ? (
-              <button
-                className="tools-run"
-                onClick={() => {
-                  runAbortRef.current = true
-                  handleCancelRunning()
-                }}
-              >
+              <button className="tools-run" onClick={stopAll}>
                 <Icon name="x" size={13} />
                 停止
               </button>
@@ -369,9 +387,4 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
       )}
     </div>
   )
-
-  function handleCancelRunning() {
-    // streamChat 的 handle 在 runTask/runTaskById 内部，这里通过 abort 标志让下一轮退出；
-    // 进行中的 HTTP 由后端 cancel 通道处理：streamId 未知，直接依赖自然结束。
-  }
 }

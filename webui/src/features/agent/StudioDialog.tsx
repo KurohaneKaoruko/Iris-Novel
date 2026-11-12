@@ -14,6 +14,7 @@ import {
 } from '../../api/studio'
 import { getAppSettings, createDir, writeText } from '../../api/backend'
 import { chapterBodyFromResult, createChapterWithContent } from '../../api/novel'
+import { loadStyleFingerprint, saveStyleFingerprint } from '../../api/stylefp'
 import { MarkdownView } from './MarkdownView'
 import { Icon, type IconName } from '../../components/Icon'
 import './StudioDialog.css'
@@ -62,11 +63,15 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
   const [variants, setVariants] = useState<Array<{ text: string; done: boolean }>>([])
   const [pickedVariant, setPickedVariant] = useState<number | null>(null)
 
-  // 风格学习：范文 → 文风指纹
+  // 风格学习：范文 → 文风指纹（持久化到工程，任务队列等场景共用）
   const [styleFp, setStyleFp] = useState<StyleFingerprint | null>(null)
   const [fpLearning, setFpLearning] = useState(false)
   const [fpErr, setFpErr] = useState('')
   const fpHandleRef = useRef<StudioHandle | null>(null)
+
+  useEffect(() => {
+    void loadStyleFingerprint().then(setStyleFp)
+  }, [])
 
   useEffect(() => {
     void getAppSettings()
@@ -187,9 +192,11 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
     })
     fpHandleRef.current.promise
       .then((raw) => {
-        const fp = parseStyleFingerprint(raw)
-        if (fp) {
-          setStyleFp(fp)
+        const learned = parseStyleFingerprint(raw)
+        if (learned) {
+          setStyleFp(learned)
+          // 持久化到工程（无工程时静默：本次会话内仍可用）
+          void saveStyleFingerprint(learned).catch(() => {})
         } else {
           setFpErr('AI 输出未能解析为文风指纹，请换一段特征更鲜明的范文重试')
         }
@@ -380,7 +387,7 @@ export function StudioDialog({ initialToolId, activePath, activeContent, onInser
                           <Icon name="pen-line" size={12} />
                           已学习范文风格
                         </span>
-                        <button type="button" className="studio-fp-x" onClick={() => setStyleFp(null)} title="移除文风指纹">
+                        <button type="button" className="studio-fp-x" onClick={() => { setStyleFp(null); void saveStyleFingerprint(null).catch(() => {}) }} title="移除文风指纹（工程内同步清除）">
                           <Icon name="x" size={11} />
                         </button>
                       </div>
