@@ -3,6 +3,7 @@ import { useProject } from '../../state/ProjectContext'
 import { useTheme } from '../../state/ThemeContext'
 import { createNovelWork, forgetWork } from '../../api/backend'
 import { DirPickerDialog } from './DirPickerDialog'
+import { Icon } from '../../components/Icon'
 import './LaunchScreen.css'
 
 /**
@@ -54,7 +55,7 @@ export function LaunchScreen() {
         <h1>Iris-Creation</h1>
         <span className="launch-tagline">本地目录 · 全 Markdown · Agent 工作台</span>
         <button className="launch-theme" onClick={toggleTheme} title="切换主题">
-          {theme === 'dark' ? '🌙' : '☀️'}
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} />
         </button>
       </header>
 
@@ -70,18 +71,19 @@ export function LaunchScreen() {
               {lastItem ? `${lastItem.chapters_count} 章 · ${lastItem.total_words.toLocaleString()} 字 · ` : ''}
               {lastPath}
             </span>
-            <span className="launch-resume-go">→</span>
+            <span className="launch-resume-go"><Icon name="arrow-right" size={20} /></span>
           </button>
         ) : null}
 
         <button className="launch-open glass-panel" onClick={() => setPickerOpen(true)}>
-          <span className="launch-open-icon">📂</span>
+          <span className="launch-open-icon"><Icon name="folder-open" size={44} strokeWidth={1.5} /></span>
           <span className="launch-open-title">打开目录…</span>
           <span className="launch-open-desc">选择任意文件夹作为作品工程，所有内容都是 Markdown</span>
         </button>
 
         <button className="launch-new" onClick={() => setCreating(true)}>
-          ＋ 新建作品工程
+          <Icon name="plus" size={15} />
+          新建作品工程
         </button>
 
         {creating ? (
@@ -123,7 +125,7 @@ export function LaunchScreen() {
                       title="从最近列表移除（不删除文件）"
                       onClick={() => void forgetWork(p.path).then(() => refresh())}
                     >
-                      ✕
+                      <Icon name="x" size={13} />
                     </button>
                   </div>
                 ))}

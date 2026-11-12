@@ -3,8 +3,7 @@
   position: fixed;
   inset: 0;
   z-index: 95;
-  background: rgba(8, 10, 14, 0.5);
-  backdrop-filter: blur(3px);
+  background: var(--overlay);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -82,13 +81,36 @@
 
 .cmdk-icon {
   width: 20px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   color: var(--text-muted);
 }
 
+.cmdk-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
 .cmdk-item.active .cmdk-icon {
   color: var(--accent);
+}
+
+.cmdk-foot kbd {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  margin-right: 3px;
+  line-height: 1.5;
 }
 
 .cmdk-label {

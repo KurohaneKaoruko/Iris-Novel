@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { listHistoryEntries, readHistorySnapshot, restoreHistorySnapshot, type HistoryEntry } from '../../api/backend'
 import { diffLines, diffStats, collapseDiff, type DiffLine } from '../../api/diff'
+import { Icon } from '../../components/Icon'
 
 type Props = {
   path: string
@@ -56,7 +57,7 @@ export function DiffView({ path, currentContent, onClose, onRestored }: Props) {
   return (
     <div className="diffv">
       <div className="diffv-head">
-        <button className="agw-btn" onClick={onClose}>← 返回预览</button>
+        <button className="agw-btn" onClick={onClose}><Icon name="arrow-left" size={14} /> 返回预览</button>
         <span className="diffv-path">{path}</span>
         {selected ? (
           <button className="agw-btn" onClick={() => { setSelected(null); setOldContent(null) }}>变更列表</button>
@@ -75,7 +76,7 @@ export function DiffView({ path, currentContent, onClose, onRestored }: Props) {
                 <span className="de-time">{formatTime(e.created_at)}</span>
                 <span className="de-reason">{e.reason || '修改'}</span>
                 <span className="de-words">{e.word_count.toLocaleString()} 字</span>
-                <span className="de-arrow">查看 →</span>
+                <span className="de-arrow"><Icon name="chevron-right" size={14} /></span>
               </button>
             ))
           )}

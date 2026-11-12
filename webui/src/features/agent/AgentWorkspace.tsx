@@ -17,6 +17,7 @@ import { subscribeEvent } from '../../api/rpc'
 import { useProject } from '../../state/ProjectContext'
 import { useChat, type ChatItem } from '../../hooks/useChat'
 import { useTheme } from '../../state/ThemeContext'
+import { Icon } from '../../components/Icon'
 import { SessionSidebar } from './SessionSidebar'
 import { FileTree } from './FileTree'
 import { MarkdownView, extractToc } from './MarkdownView'
@@ -235,21 +236,21 @@ export function AgentWorkspace() {
   }, [])
 
   const paletteCommands = useMemo<Command[]>(() => [
-    { id: 'new-session', icon: '✦', label: '新建会话', hint: 'Ctrl+K 后回车', run: newSession },
-    { id: 'new-chapter', icon: '＋', label: '新建章节', keywords: 'chapter 写作', run: () => setDialog({ kind: 'new-chapter' }) },
-    { id: 'new-file', icon: '＋', label: '新建 Markdown 文件', keywords: 'file create', run: () => setDialog({ kind: 'new-file' }) },
-    { id: 'new-dir', icon: '＋', label: '新建目录', keywords: 'folder mkdir', run: () => setDialog({ kind: 'new-dir' }) },
-    { id: 'tools-stats', icon: '📊', label: '作品统计', keywords: '工具 stats 统计', run: () => { setToolsTab('stats'); setToolsOpen(true) } },
-    { id: 'tools-consistency', icon: '🧩', label: '一致性检查', keywords: '工具 检查 consistency 人物 伏笔 情节线', run: () => { setToolsTab('consistency'); setToolsOpen(true) } },
-    { id: 'tools-lint', icon: '⚖️', label: '正文铁律体检', keywords: '工具 lint 体检 套路', run: () => { setToolsTab('lint'); setToolsOpen(true) } },
-    { id: 'tools-import', icon: '📥', label: '导入切章', keywords: '工具 导入 import txt 切章', run: () => { setToolsTab('import'); setToolsOpen(true) } },
-    { id: 'toggle-panel', icon: '📁', label: panelOpen ? '隐藏文件面板' : '显示文件面板', keywords: 'panel 文件', run: () => setPanelOpen((v) => !v) },
-    { id: 'toggle-sidebar', icon: '☰', label: sidebarCollapsed ? '展开会话栏' : '折叠会话栏', keywords: 'sidebar 会话', run: () => setSidebarCollapsed((v) => !v) },
-    { id: 'toggle-theme', icon: theme === 'dark' ? '☀️' : '🌙', label: '切换主题', keywords: 'theme dark light 主题', run: toggleTheme },
-    { id: 'settings', icon: '⚙', label: '打开设置', keywords: 'settings provider key 设置', run: () => setSettingsOpen(true) },
+    { id: 'new-session', icon: 'plus', label: '新建会话', hint: 'Ctrl+K 后回车', run: newSession },
+    { id: 'new-chapter', icon: 'file-plus', label: '新建章节', keywords: 'chapter 写作', run: () => setDialog({ kind: 'new-chapter' }) },
+    { id: 'new-file', icon: 'file-plus', label: '新建 Markdown 文件', keywords: 'file create', run: () => setDialog({ kind: 'new-file' }) },
+    { id: 'new-dir', icon: 'folder-plus', label: '新建目录', keywords: 'folder mkdir', run: () => setDialog({ kind: 'new-dir' }) },
+    { id: 'tools-stats', icon: 'chart', label: '作品统计', keywords: '工具 stats 统计', run: () => { setToolsTab('stats'); setToolsOpen(true) } },
+    { id: 'tools-consistency', icon: 'list-checks', label: '一致性检查', keywords: '工具 检查 consistency 人物 伏笔 情节线', run: () => { setToolsTab('consistency'); setToolsOpen(true) } },
+    { id: 'tools-lint', icon: 'scale', label: '正文铁律体检', keywords: '工具 lint 体检 套路', run: () => { setToolsTab('lint'); setToolsOpen(true) } },
+    { id: 'tools-import', icon: 'file-input', label: '导入切章', keywords: '工具 导入 import txt 切章', run: () => { setToolsTab('import'); setToolsOpen(true) } },
+    { id: 'toggle-panel', icon: 'panel-right', label: panelOpen ? '隐藏文件面板' : '显示文件面板', keywords: 'panel 文件', run: () => setPanelOpen((v) => !v) },
+    { id: 'toggle-sidebar', icon: 'panel-left', label: sidebarCollapsed ? '展开会话栏' : '折叠会话栏', keywords: 'sidebar 会话', run: () => setSidebarCollapsed((v) => !v) },
+    { id: 'toggle-theme', icon: theme === 'dark' ? 'sun' : 'moon', label: '切换主题', keywords: 'theme dark light 主题', run: toggleTheme },
+    { id: 'settings', icon: 'settings', label: '打开设置', keywords: 'settings provider key 设置', run: () => setSettingsOpen(true) },
     {
       id: 'export-md',
-      icon: '⬇',
+      icon: 'download',
       label: '导出整本（Markdown）',
       keywords: 'export 导出',
       run: () => {
@@ -258,14 +259,14 @@ export function AgentWorkspace() {
     },
     {
       id: 'export-txt',
-      icon: '⬇',
+      icon: 'download',
       label: '导出整本（TXT）',
       keywords: 'export 导出',
       run: () => {
         void exportWork('txt').then(({ filename, content }) => downloadText(filename, content))
       },
     },
-    { id: 'close-work', icon: '⏏', label: '关闭工程（返回启动页）', keywords: 'close launch', run: closeWork },
+    { id: 'close-work', icon: 'log-out', label: '关闭工程（返回启动页）', keywords: 'close launch', run: closeWork },
   ], [newSession, panelOpen, sidebarCollapsed, theme, toggleTheme, closeWork, setToolsTab])
 
   const mdFiles = useMemo(() => {
@@ -346,17 +347,24 @@ export function AgentWorkspace() {
         <span className="agw-name">{workName}</span>
         <span className="agw-badge">Agent</span>
         <span className="agw-spacer" />
-        <button className="agw-btn" onClick={() => setPaletteOpen(true)} title="命令面板（Ctrl+K）">
-          Ctrl+K
+        <button className="agw-iconbtn" onClick={() => setPaletteOpen(true)} title="命令面板（Ctrl+K）">
+          <Icon name="command" size={17} />
         </button>
-        <button className="agw-btn" onClick={() => setToolsOpen(true)} title="统计 / 一致性检查 / 正文体检 / 导入切章">
-          工具
+        <button className="agw-iconbtn" onClick={() => setToolsOpen(true)} title="工具中心：统计 / 一致性 / 铁律 / 导入切章">
+          <Icon name="wrench" size={17} />
         </button>
-        <button className="agw-btn" onClick={() => setSettingsOpen(true)} title="模型与密钥设置">
-          设置{keyMissing ? <span className="agw-dot" /> : null}
+        <button className="agw-iconbtn" onClick={() => setSettingsOpen(true)} title="模型与密钥设置">
+          <Icon name="settings" size={17} />
+          {keyMissing ? <span className="agw-dot" /> : null}
         </button>
-        <button className="agw-btn" onClick={toggleTheme} title="切换主题">{theme === 'dark' ? '🌙' : '☀️'}</button>
-        <button className="agw-btn" onClick={() => setPanelOpen((v) => !v)}>{panelOpen ? '隐藏文件' : '文件'}</button>
+        <button className="agw-iconbtn" onClick={toggleTheme} title="切换主题">
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} />
+        </button>
+        <span className="agw-head-sep" />
+        <button className="agw-btn" onClick={() => setPanelOpen((v) => !v)}>
+          <Icon name="panel-right" size={15} />
+          {panelOpen ? '隐藏面板' : '文件面板'}
+        </button>
       </header>
 
       <div className="agw-main">
@@ -379,8 +387,8 @@ export function AgentWorkspace() {
               <button className={panelTab === 'lore' ? 'active' : ''} onClick={() => setPanelTab('lore')}>设定</button>
               <button className={panelTab === 'file' ? 'active' : ''} disabled={!activePath} onClick={() => setPanelTab('file')}>预览</button>
               <span className="agw-side-spacer" />
-              <button className="agw-icon-btn" title="新建文件" onClick={() => setDialog({ kind: 'new-file' })}>＋</button>
-              <button className="agw-icon-btn" title="新建目录" onClick={() => setDialog({ kind: 'new-dir' })}>＋📁</button>
+              <button className="agw-iconbtn sm" title="新建文件" onClick={() => setDialog({ kind: 'new-file' })}><Icon name="file-plus" size={15} /></button>
+              <button className="agw-iconbtn sm" title="新建目录" onClick={() => setDialog({ kind: 'new-dir' })}><Icon name="folder-plus" size={15} /></button>
             </div>
 
             {panelTab === 'tree' ? (
@@ -444,7 +452,7 @@ export function AgentWorkspace() {
                     </div>
                     {externalChange && externalChange.path === activePath && !editing ? (
                       <div className="agw-external-note">
-                        <span>↻ 此文件刚被更新（可能来自 Agent 写入）</span>
+                        <span><Icon name="refresh" size={13} /> 此文件刚被更新（可能来自 Agent 写入）</span>
                         <button onClick={() => setExternalChange(null)}>知道了</button>
                       </div>
                     ) : null}
@@ -635,7 +643,8 @@ function ChatColumn({
               downloadText(`${workName}-会话记录.md`, md)
             }}
           >
-            ⬇ 导出会话
+            <Icon name="download" size={13} />
+            导出会话
           </button>
         </div>
       ) : null}
@@ -649,15 +658,16 @@ function ChatColumn({
             setAtBottom(true)
           }}
         >
-          ↓
+          <Icon name="arrow-down" size={16} />
         </button>
       ) : null}
 
       <div className="composer glass-float">
         {attach ? (
           <div className="composer-attach">
-            📎 <span title={attach.path}>{attach.path}</span>
-            <button onClick={() => setAttach(null)}>✕</button>
+            <Icon name="paperclip" size={13} />
+            <span title={attach.path}>{attach.path}</span>
+            <button onClick={() => setAttach(null)} title="移除附件"><Icon name="x" size={13} /></button>
           </div>
         ) : null}
         <textarea
@@ -691,7 +701,9 @@ function ChatColumn({
           {chat.busy ? (
             <button className="composer-btn stop" onClick={chat.cancel}>停止</button>
           ) : (
-            <button className="composer-btn send" disabled={!input.trim()} onClick={send}>↑</button>
+            <button className="composer-btn send" disabled={!input.trim()} onClick={send} title="发送（Enter）">
+              <Icon name="arrow-up" size={17} strokeWidth={2.4} />
+            </button>
           )}
         </div>
       </div>
@@ -720,7 +732,7 @@ function MessageRow({ m, onJumpFile, onRetry, canRetry, onOpenSettings }: { m: C
               </div>
             ) : null}
             <Markdown content={m.content} />
-            {m.streaming && !m.content && (!m.steps || m.steps.length === 0) ? <span className="msg-typing">● ● ●</span> : null}
+            {m.streaming && !m.content && (!m.steps || m.steps.length === 0) ? <span className="msg-typing" aria-label="正在输入" /> : null}
           </>
         ) : (
           <p className="msg-user-text">{m.content}</p>
@@ -750,7 +762,8 @@ function FilePreviewWithToc({ content }: { content: string }) {
   return (
     <div className="mdv-with-toc">
       <button className="mdv-toc-toggle" onClick={() => setTocOpen((v) => !v)}>
-        <span className={`mdv-toc-arrow ${tocOpen ? 'open' : ''}`}>▸</span> 目录（{toc.length}）
+        <span className={`mdv-toc-arrow ${tocOpen ? 'open' : ''}`}><Icon name="chevron-right" size={12} /></span>
+        目录（{toc.length}）
       </button>
       {tocOpen ? (
         <nav className="mdv-toc">

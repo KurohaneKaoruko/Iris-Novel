@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Icon, type IconName } from '../../components/Icon'
 import './CommandPalette.css'
 
 export type Command = {
@@ -6,7 +7,7 @@ export type Command = {
   label: string
   hint?: string
   keywords?: string
-  icon?: string
+  icon?: IconName
   run: () => void
 }
 
@@ -87,7 +88,7 @@ export function CommandPalette({ commands, onClose }: Props) {
                 onMouseEnter={() => setActive(i)}
                 onClick={() => pick(i)}
               >
-                <span className="cmdk-icon">{c.icon ?? '·'}</span>
+                <span className="cmdk-icon">{c.icon ? <Icon name={c.icon} size={15} /> : <span className="cmdk-dot" />}</span>
                 <span className="cmdk-label">{c.label}</span>
                 {c.hint ? <span className="cmdk-hint">{c.hint}</span> : null}
               </button>
@@ -95,9 +96,9 @@ export function CommandPalette({ commands, onClose }: Props) {
           )}
         </div>
         <div className="cmdk-foot">
-          <span>↑↓ 选择</span>
-          <span>↵ 执行</span>
-          <span>esc 关闭</span>
+          <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+          <span><kbd>↵</kbd> 执行</span>
+          <span><kbd>esc</kbd> 关闭</span>
         </div>
       </div>
     </div>

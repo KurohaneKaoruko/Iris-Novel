@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listChapters, markChapterStatus, reorderChapters, type Chapter, type ChapterStatus } from '../../api/novel'
+import { Icon } from '../../components/Icon'
 
 const STATUS_CYCLE: ChapterStatus[] = ['draft', 'revising', 'completed']
 
-const STATUS_META: Record<ChapterStatus, { label: string; icon: string }> = {
-  draft: { label: '草稿', icon: '○' },
-  revising: { label: '修稿', icon: '◐' },
-  completed: { label: '完结', icon: '●' },
+const STATUS_META: Record<ChapterStatus, { label: string }> = {
+  draft: { label: '草稿' },
+  revising: { label: '修稿' },
+  completed: { label: '完结' },
 }
 
 type Props = {
@@ -89,8 +90,14 @@ export function ChaptersPanel({ activePath, onOpen, onNewChapter, onImport }: Pr
       <div className="chp-toolbar">
         <span className="chp-total">{chapters.length} 章 · {totalWords.toLocaleString()} 字</span>
         <span className="chp-actions">
-          <button className="agw-btn" onClick={onImport} title="从全文导入章节">导入</button>
-          <button className="agw-btn primary" onClick={onNewChapter} title="新建章节">＋章</button>
+          <button className="agw-btn" onClick={onImport} title="从全文导入章节">
+            <Icon name="file-input" size={14} />
+            导入
+          </button>
+          <button className="agw-btn primary" onClick={onNewChapter} title="新建章节">
+            <Icon name="plus" size={14} />
+            新章
+          </button>
         </span>
       </div>
 
@@ -98,7 +105,7 @@ export function ChaptersPanel({ activePath, onOpen, onNewChapter, onImport }: Pr
         <div className="agw-empty">
           还没有章节。
           <br />
-          用「＋章」新建，或「导入」切分存量全文。
+          用「新章」新建，或「导入」切分存量全文。
         </div>
       ) : (
         <div className="chp-list">
@@ -128,7 +135,7 @@ export function ChaptersPanel({ activePath, onOpen, onNewChapter, onImport }: Pr
                   setOverPath(null)
                 }}
               >
-                <span className="chp-grip" title="拖拽排序">⋮⋮</span>
+                <span className="chp-grip" title="拖拽排序"><Icon name="grip" size={13} /></span>
                 <button className="chp-main" onClick={() => onOpen(c.filePath)}>
                   <span className="chp-order">#{c.order + 1}</span>
                   <span className="chp-title">{c.title}</span>
@@ -144,7 +151,8 @@ export function ChaptersPanel({ activePath, onOpen, onNewChapter, onImport }: Pr
                   title={`点击切换状态（当前：${meta.label}）`}
                   onClick={() => void cycleStatus(c)}
                 >
-                  {meta.icon} {meta.label}
+                  <span className="chp-status-dot" />
+                  {meta.label}
                 </button>
               </div>
             )

@@ -25,15 +25,20 @@
 }
 
 .launch-theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-left: auto;
   align-self: center;
-  font-size: 16px;
-  padding: 6px 10px;
-  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
 }
 
 .launch-theme:hover {
   background: var(--hover);
+  color: var(--text-primary);
 }
 
 .launch-main {
@@ -68,7 +73,7 @@
 }
 
 .launch-resume:hover {
-  box-shadow: var(--glass-highlight), var(--shadow-lg);
+  box-shadow: var(--shadow-lg);
   border-left-color: var(--accent-hover);
 }
 
@@ -99,9 +104,9 @@
   right: 22px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 20px;
   color: var(--accent);
   transition: transform var(--dur) var(--ease);
+  display: inline-flex;
 }
 
 .launch-resume:hover .launch-resume-go {
@@ -112,7 +117,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 44px 24px;
   cursor: pointer;
   text-align: center;
@@ -120,13 +125,18 @@
 }
 
 .launch-open:hover {
-  border-color: var(--accent);
-  transform: translateY(-3px);
-  box-shadow: var(--glass-highlight), var(--shadow-md);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .launch-open-icon {
-  font-size: 40px;
+  color: var(--text-muted);
+  display: inline-flex;
+}
+
+.launch-open:hover .launch-open-icon {
+  color: var(--accent);
 }
 
 .launch-open-title {
@@ -142,16 +152,20 @@
 
 .launch-new {
   align-self: center;
-  padding: 10px 26px;
-  border: 1px dashed var(--border-strong);
-  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   color: var(--text-secondary);
   font-size: 13.5px;
+  background: var(--bg-secondary);
 }
 
 .launch-new:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .launch-create {
@@ -210,8 +224,7 @@
 }
 
 .launch-recent-item:hover {
-  border-color: var(--accent);
-  transform: translateX(2px);
+  border-color: var(--border-strong);
 }
 
 .lr-open {

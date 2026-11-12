@@ -4,9 +4,7 @@
   width: 240px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
-  background: var(--glass-surface);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  background: var(--bg-secondary);
   min-height: 0;
 }
 
@@ -19,11 +17,13 @@
 
 .sss-expand,
 .sss-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-size: 14px;
   flex-shrink: 0;
 }
 
@@ -34,13 +34,14 @@
 }
 
 .sss-new-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
   background: var(--accent);
   color: var(--accent-contrast);
-  font-size: 16px;
-  font-weight: 700;
 }
 
 .sss-head {
@@ -51,25 +52,32 @@
 }
 
 .sss-work {
-  font-weight: 700;
-  font-size: 13.5px;
+  font-weight: 650;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .sss-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   margin: 4px 12px 10px;
-  padding: 8px;
-  border: 1px dashed var(--border-strong);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 13px;
   color: var(--text-secondary);
+  background: var(--bg-primary);
 }
 
 .sss-new:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: var(--hover);
 }
 
 .sss-list {
@@ -148,10 +156,9 @@
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
-  font-size: 11px;
   cursor: pointer;
 }
 
@@ -221,10 +228,18 @@
 
 .sss-foot-btn {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 7px 6px;
   border-radius: var(--radius-sm);
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.sss-foot-btn.icon-only {
+  flex: 0 0 34px;
 }
 
 .sss-foot-btn:hover {
@@ -264,8 +279,11 @@
   }
 
   .sss-item::before {
-    content: '💬';
-    font-size: 14px;
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
   }
 
   .sss-item-del,

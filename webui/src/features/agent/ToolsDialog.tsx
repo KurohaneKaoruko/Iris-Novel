@@ -13,17 +13,19 @@ import {
 } from '../../api/novel'
 import { runConsistencyCheck, type ConsistencyReport } from '../../api/consistency'
 import { lintChapter, type LintIssue } from '../../api/lint'
+import type { IconName } from '../../components/Icon'
 import { splitIntoChapters, importSummary } from '../../api/import'
 import { readText } from '../../api/backend'
+import { Icon } from '../../components/Icon'
 import './ToolsDialog.css'
 
 type TabId = 'import' | 'consistency' | 'lint' | 'stats'
 
-const TABS: Array<{ id: TabId; label: string; icon: string }> = [
-  { id: 'stats', label: '作品统计', icon: '📊' },
-  { id: 'consistency', label: '一致性检查', icon: '🧩' },
-  { id: 'lint', label: '正文铁律', icon: '⚖️' },
-  { id: 'import', label: '导入切章', icon: '📥' },
+const TABS: Array<{ id: TabId; label: string; icon: IconName }> = [
+  { id: 'stats', label: '作品统计', icon: 'chart' },
+  { id: 'consistency', label: '一致性检查', icon: 'list-checks' },
+  { id: 'lint', label: '正文铁律', icon: 'scale' },
+  { id: 'import', label: '导入切章', icon: 'file-input' },
 ]
 
 type Props = { initialTab?: TabId; onClose: () => void; onOpenFile: (path: string) => void }
@@ -38,11 +40,12 @@ export function ToolsDialog({ initialTab = 'stats', onClose, onOpenFile }: Props
           <div className="tools-tabs">
             {TABS.map((t) => (
               <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>
-                {t.icon} {t.label}
+                <Icon name={t.icon} size={14} />
+                {t.label}
               </button>
             ))}
           </div>
-          <button className="tools-x" onClick={onClose}>✕</button>
+          <button className="tools-x" onClick={onClose} title="关闭"><Icon name="x" size={16} /></button>
         </div>
         <div className="tools-body">
           {tab === 'stats' ? <StatsTab onOpenFile={onOpenFile} /> : null}
@@ -92,10 +95,10 @@ function StatsTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
     <div className="stats-wrap">
       <div className="stats-export">
         <button className="tools-run" disabled={exporting || stats.chapterCount === 0} onClick={() => void doExport('md')}>
-          {exporting ? '导出中…' : '⬇ 导出 Markdown'}
+          {exporting ? '导出中…' : <><Icon name="download" size={14} />导出 Markdown</>}
         </button>
         <button className="tools-run" disabled={exporting || stats.chapterCount === 0} onClick={() => void doExport('txt')}>
-          {exporting ? '导出中…' : '⬇ 导出 TXT'}
+          {exporting ? '导出中…' : <><Icon name="download" size={14} />导出 TXT</>}
         </button>
         <span className="tools-run-hint">按章序合并 stories/ 全部章节为单文件下载</span>
       </div>
@@ -192,7 +195,7 @@ function ConsistencyTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
             {report.chapterCount} 章 · {report.characterCount} 人物 · {report.plotLineCount} 情节线 · {report.issues.length} 个问题
           </div>
           {report.issues.length === 0 ? (
-            <div className="tools-ok">✓ 未发现问题</div>
+            <div className="tools-ok"><Icon name="check-circle" size={14} /> 未发现问题</div>
           ) : (
             <div className="issue-list">
               {report.issues.map((it, i) => (
@@ -266,7 +269,7 @@ function LintTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
       </div>
       {issues ? (
         issues.length === 0 ? (
-          <div className="tools-ok">✓ 本章通过全部铁律</div>
+          <div className="tools-ok"><Icon name="check-circle" size={14} /> 本章通过全部铁律</div>
         ) : (
           <div className="issue-list">
             {issues.map((it, i) => (
@@ -334,7 +337,7 @@ function ImportTab() {
     <div>
       {done ? (
         <div className="tools-ok">
-          ✓ 已导入 {done.length} 章到 stories/：{done.slice(0, 3).join('、')}{done.length > 3 ? '…' : ''}
+          <Icon name="check-circle" size={14} /> 已导入 {done.length} 章到 stories/：{done.slice(0, 3).join('、')}{done.length > 3 ? '…' : ''}
         </div>
       ) : null}
       <div className="import-row">

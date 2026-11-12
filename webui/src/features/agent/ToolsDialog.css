@@ -3,8 +3,7 @@
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgba(8, 10, 14, 0.55);
-  backdrop-filter: blur(4px);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,11 +49,14 @@
 }
 
 .tools-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  padding: 7px 14px;
-  border-radius: 8px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
@@ -66,18 +68,25 @@
 }
 
 .tools-tabs button.active {
-  background: var(--accent-weak);
-  color: var(--accent);
+  background: var(--active);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
+.tools-tabs button.active .icon {
+  color: var(--accent);
+}
+
 .tools-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   color: var(--text-secondary);
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
@@ -101,7 +110,12 @@
 }
 
 .tools-hint { color: var(--text-muted); }
-.tools-ok { color: var(--success); }
+.tools-ok {
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .tools-err {
   color: var(--danger);
@@ -127,11 +141,14 @@
 }
 
 .tools-run {
-  border: 1px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-primary);
-  padding: 7px 16px;
-  border-radius: 8px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.12s;
@@ -144,7 +161,7 @@
 .tools-run.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .tools-run.primary:hover:not(:disabled) { filter: brightness(1.08); }

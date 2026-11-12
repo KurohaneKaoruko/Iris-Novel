@@ -1,68 +1,69 @@
 /* ============================================================
-   Iris-Creation 设计令牌层 —— 液态玻璃视觉语言
-   依据 openspec/changes/redesign-liquid-glass-ui/specs/ui-design-system
+   Iris-Creation 设计令牌层 —— 安静的专业界面（quiet professional）
    深/浅两套主题提供同构令牌；组件仅允许消费令牌，禁止硬编码颜色。
+   设计原则：实体表面替代玻璃拟态；克制的强调色；图标一律 SVG。
    ============================================================ */
 
-/* ---- 深色主题（默认）：深蓝灰基调 + 玻璃配方 ---- */
+/* ---- 深色主题（默认）：高对比深灰蓝，接近 VS Code / Linear ---- */
 :root {
   color-scheme: dark;
 
-  /* 三级表面 */
-  --bg-primary: #10121a;
-  --bg-secondary: #161926;
-  --bg-tertiary: #1e2233;
+  /* 三级表面：面板底 > 卡片底 > 内嵌块底 */
+  --bg-primary: #14161d;
+  --bg-secondary: #1a1d26;
+  --bg-tertiary: #22262f;
 
-  /* 弹层 / 悬浮层专用玻璃表面 */
-  --bg-elev: rgba(30, 36, 54, 0.72);
+  /* 弹层专用（兼容旧类名，实体色） */
+  --bg-elev: #1e222c;
 
-  /* 玻璃配方 */
-  --glass-blur: 18px;
-  --glass-sat: 160%;
-  --glass-surface: rgba(30, 36, 54, 0.6);
-  --glass-surface-strong: rgba(24, 29, 45, 0.78);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  /* 兼容旧玻璃类名 → 实体表面（组件无需改动即可获得新视觉） */
+  --glass-blur: 0px;
+  --glass-sat: 100%;
+  --glass-surface: var(--bg-secondary);
+  --glass-surface-strong: var(--bg-elev);
+  --glass-highlight: none;
 
-  /* 发丝边框 */
-  --border: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* 边框 */
+  --border: #272b36;
+  --border-strong: #343947;
 
   /* 文字层级 */
-  --text: #e6e9f2;
-  --text-primary: #e6e9f2;
-  --text-secondary: #a6abc0;
-  --text-dim: #787e96;
-  --text-muted: #6b7186;
+  --text: #d6dae4;
+  --text-primary: #e8eaf0;
+  --text-secondary: #9ba1b0;
+  --text-dim: #7a8090;
+  --text-muted: #626878;
 
   /* 强调与语义色 */
-  --accent: #7aa2f7;
-  --accent-hover: #93b4ff;
-  --accent-weak: rgba(122, 162, 247, 0.14);
-  --accent-contrast: #10121a;
-  --success: #9ece6a;
-  --warn: #e0af68;
-  --danger: #f7768e;
+  --accent: #6c8cf5;
+  --accent-hover: #85a0f7;
+  --accent-weak: rgba(108, 140, 245, 0.13);
+  --accent-contrast: #ffffff;
+  --success: #58b86b;
+  --warn: #d29a45;
+  --danger: #e5586d;
 
   /* 功能层 */
-  --hover: rgba(255, 255, 255, 0.06);
-  --track: rgba(255, 255, 255, 0.09);
-  --overlay: rgba(6, 8, 14, 0.55);
-  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.28);
-  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.38);
-  --shadow-lg: 0 18px 60px rgba(0, 0, 0, 0.5);
+  --hover: rgba(255, 255, 255, 0.05);
+  --active: rgba(255, 255, 255, 0.08);
+  --track: rgba(255, 255, 255, 0.08);
+  --overlay: rgba(8, 10, 14, 0.62);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
 
-  /* 圆角阶梯 */
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  /* 圆角阶梯（全局统一走这四档） */
+  --radius-sm: 5px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 
   /* 动效：时长与缓动 */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-fast: 0.15s;
-  --dur: 0.24s;
-  --dur-slow: 0.42s;
+  --dur-fast: 0.12s;
+  --dur: 0.2s;
+  --dur-slow: 0.32s;
 
   /* 布局 */
   --sidebar-width: 280px;
@@ -74,40 +75,41 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --bg-primary: #eef1f8;
-  --bg-secondary: #f4f6fb;
-  --bg-tertiary: #e6eaf4;
-  --bg-elev: rgba(255, 255, 255, 0.78);
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f7f9;
+  --bg-tertiary: #eceef2;
+  --bg-elev: #ffffff;
 
-  --glass-blur: 18px;
-  --glass-sat: 140%;
-  --glass-surface: rgba(255, 255, 255, 0.62);
-  --glass-surface-strong: rgba(255, 255, 255, 0.82);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --glass-blur: 0px;
+  --glass-sat: 100%;
+  --glass-surface: var(--bg-secondary);
+  --glass-surface-strong: var(--bg-elev);
+  --glass-highlight: none;
 
-  --border: rgba(16, 22, 40, 0.1);
-  --border-strong: rgba(16, 22, 40, 0.18);
+  --border: #e3e6eb;
+  --border-strong: #d0d5dd;
 
-  --text: #1c2233;
-  --text-primary: #1c2233;
-  --text-secondary: #4a5170;
-  --text-dim: #6a7190;
-  --text-muted: #858ca6;
+  --text: #333a45;
+  --text-primary: #1a1f28;
+  --text-secondary: #5b6372;
+  --text-dim: #78808f;
+  --text-muted: #949aa7;
 
   --accent: #4a6fd8;
   --accent-hover: #3d61c8;
-  --accent-weak: rgba(74, 111, 216, 0.12);
+  --accent-weak: rgba(74, 111, 216, 0.1);
   --accent-contrast: #ffffff;
-  --success: #3e8e52;
+  --success: #2e9e4f;
   --warn: #b07f2e;
-  --danger: #cc4a63;
+  --danger: #d53952;
 
-  --hover: rgba(16, 22, 40, 0.05);
-  --track: rgba(16, 22, 40, 0.08);
-  --overlay: rgba(20, 26, 42, 0.32);
-  --shadow-sm: 0 2px 10px rgba(28, 36, 60, 0.1);
-  --shadow-md: 0 8px 28px rgba(28, 36, 60, 0.14);
-  --shadow-lg: 0 18px 60px rgba(28, 36, 60, 0.2);
+  --hover: rgba(20, 26, 42, 0.05);
+  --active: rgba(20, 26, 42, 0.08);
+  --track: rgba(20, 26, 42, 0.08);
+  --overlay: rgba(20, 26, 42, 0.4);
+  --shadow-sm: 0 1px 2px rgba(20, 26, 42, 0.08);
+  --shadow-md: 0 6px 20px rgba(20, 26, 42, 0.12);
+  --shadow-lg: 0 16px 48px rgba(20, 26, 42, 0.18);
 }
 
 /* ============================================================
@@ -129,10 +131,9 @@ body {
   font-family: var(--font-ui);
   font-size: 14px;
   color: var(--text-primary);
-  background:
-    radial-gradient(1100px 700px at 85% -10%, rgba(122, 162, 247, 0.09), transparent 60%),
-    radial-gradient(900px 600px at -10% 110%, rgba(246, 119, 142, 0.05), transparent 60%),
-    var(--bg-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button {
@@ -203,27 +204,23 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* ============================================================
-   通用玻璃基元（供各面板/弹窗直接消费）
+   通用表面基元（glass-* 类名保留，视觉已改为实体面板）
    ============================================================ */
 
-/* 玻璃面板：模糊 + 半透明 + 发丝边框 + 顶部高光 */
+/* 面板：实体表面 + 发丝边框 */
 .glass-panel {
-  background: var(--glass-surface);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--glass-highlight), var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
-/* 玻璃悬浮条（底部胶囊等） */
+/* 悬浮条 */
 .glass-float {
-  background: var(--glass-surface-strong);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  box-shadow: var(--glass-highlight), var(--shadow-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 /* ============================================================
@@ -234,8 +231,6 @@ input:focus, textarea:focus, select:focus {
   position: fixed;
   inset: 0;
   background: var(--overlay);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,12 +239,10 @@ input:focus, textarea:focus, select:focus {
 }
 
 .modal-box {
-  background: var(--glass-surface-strong);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--glass-highlight), var(--shadow-lg);
+  box-shadow: var(--shadow-lg);
   width: min(720px, 92vw);
   max-height: 84vh;
   display: flex;
@@ -282,7 +275,9 @@ input:focus, textarea:focus, select:focus {
   font-size: 13px;
   cursor: pointer;
   border-radius: var(--radius);
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  background: var(--bg-elev);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  box-shadow: var(--shadow-md);
   animation: toast-in var(--dur) var(--ease);
 }
 
@@ -291,6 +286,12 @@ input:focus, textarea:focus, select:focus {
     opacity: 0;
     transform: translate(-50%, -8px);
   }
+}
+
+/* 图标对齐辅助：SVG 与文字并排时 */
+.icon {
+  flex-shrink: 0;
+  vertical-align: -0.15em;
 }
 
 /* ============================================================

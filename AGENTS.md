@@ -45,7 +45,7 @@ pnpm run tauri:ios:dev
 - **`api/consistency.ts`** - 一致性检查：人物断档/情节线推进/伏笔回收/章节健康四维交叉核对
 - **`api/writing.ts`** - AI 写作工作流：续写/大纲/细纲/润色提示词构建 + 流式生成
 - **`features/launch/`** - 启动页：继续上次工程（last_workspace + 书架统计）、点选式目录选择器（`browse_dir`/`quick_locations`，拒绝手输路径）、新建标准工程
-- **`features/agent/`** - Agent 工作台（2026-11 重构，主流 Agent 布局）：
+- **`features/agent/`** - Agent 工作台（2026-11 重构，主流 Agent 布局，视觉规范：实体表面+SVG 图标，禁 emoji/玻璃拟态/胶囊按钮）：
   - `AgentWorkspace.tsx` - 三栏主体：会话侧栏 | 中央对话流 | Artifacts 文件面板
   - `SessionSidebar.tsx` - 历史会话（`list/get/save_chat_session`，按工程过滤，标题自动取首条用户消息）
   - `Markdown.tsx` - 零依赖 Markdown 渲染器（围栏代码块/表格/列表/行内格式，有单测）
@@ -60,6 +60,7 @@ pnpm run tauri:ios:dev
   - `DiffView.tsx` - 文件变更历史 diff（覆盖写自动留快照；LCS 行级对比、±统计、上下文折叠、版本恢复）
 - **`api/diff.ts`** - 零依赖行级 diff（LCS/collapseDiff，有单测）
 - **`api/sessionExport.ts`** - 会话导出 Markdown 分享稿（工具步骤 details 折叠，有单测）
+- **`components/Icon.tsx`** - 全应用统一 SVG 图标系统（lucide 线性风格 51 枚，`<Icon name size />`；界面图标禁止 emoji）
 - **`workspace/Dialogs`** - 全局 Prompt/Confirm 对话框（唯一从旧工作台保留的组件）
 - **`hooks/useChat.ts`** - 流式聊天（WS 事件协议：挂载时订阅一次 + activeStreamId ref 过滤消除竞态；`ai_error` 即终止；token 累积/done 收尾/会话恢复，有协议单测）
 - **`state/ProjectContext.tsx`** - workRoot/activePath/书架状态；`openDir` 自动登记 external_projects
@@ -157,6 +158,7 @@ pnpm exec vite            # dev 服务器端口 1421，/api /ws 代理到 8765
 - useChat 竞态教训：事件订阅必须在组件挂载时建立一次（ref 过滤 streamId），**不能**按 streamId 动态挂订阅——RPC 先于订阅到达会丢事件
 - 作品内数据（人物卡/情节线/章节元数据/记忆索引/写作历史）在 `webui/src/api/novel.ts`，直读直写 Markdown/JSON，与旧桌面端格式双向兼容
 - vite **不要**手动分包（manualChunks 会破坏 Prism 全局初始化契约，导致白屏）
+- 视觉规范教训：emoji 图标+玻璃拟态+999px 胶囊是「廉价感」三大来源（2026-11 用户否决）；设计令牌用 global.css 的 --radius-sm/radius/lg/xl 四档圆角与 --bg-primary/secondary/tertiary/elev 四级实体表面；弹层遮罩一律 var(--overlay) 不写死 rgba（浅色主题会发黑）
 - 测试：`pnpm exec vitest run`（include `src/**/*.test.ts(x)`；`.gitignore` 白名单已放开 `.test.tsx`）
 
 ## 代码约定

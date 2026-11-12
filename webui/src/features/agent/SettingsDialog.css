@@ -35,11 +35,14 @@
 .set-saved {
   font-size: 12px;
   color: var(--success);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .set-save {
-  padding: 5px 18px;
-  border-radius: 999px;
+  padding: 5px 16px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   color: var(--accent-contrast);
   font-size: 12.5px;
@@ -47,11 +50,13 @@
 }
 
 .set-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-size: 13px;
 }
 
 .set-x:hover {
@@ -115,7 +120,7 @@
 .set-keynone {
   font-size: 11px;
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
 }
 
 .set-keyok {
@@ -129,8 +134,8 @@
 }
 
 .set-test {
-  padding: 4px 14px;
-  border-radius: 999px;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   font-size: 12px;
   color: var(--text-secondary);
@@ -185,14 +190,19 @@
 }
 
 .set-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 10px;
-  border: 1px dashed var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 13px;
   color: var(--text-secondary);
 }
 
 .set-add:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: var(--hover);
 }

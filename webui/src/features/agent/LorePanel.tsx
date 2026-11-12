@@ -8,6 +8,7 @@ import {
   type PlotLine,
   type CodexEntry,
 } from '../../api/novel'
+import { Icon, type IconName } from '../../components/Icon'
 
 type Tab = 'characters' | 'plots' | 'codex'
 
@@ -15,6 +16,15 @@ const PLOT_STATUS: Record<PlotLine['status'], { label: string; cls: string }> = 
   ongoing: { label: '进行中', cls: 'ongoing' },
   completed: { label: '已完结', cls: 'completed' },
   paused: { label: '暂停', cls: 'paused' },
+}
+
+/** 设定集类型 → 图标（SVG，替代 emoji） */
+const CODEX_ICONS: Record<string, IconName> = {
+  location: 'map-pin',
+  faction: 'flag',
+  item: 'package',
+  term: 'book-open',
+  setting: 'sparkles',
 }
 
 type Props = {
@@ -71,7 +81,7 @@ export function LorePanel({ activePath, onOpen }: Props) {
           设定 {codex.length > 0 ? codex.length : ''}
         </button>
         <span className="lore-spacer" />
-        <button className="agw-icon-btn" title="刷新" onClick={() => void refresh()}>⟳</button>
+        <button className="agw-iconbtn sm" title="刷新" onClick={() => void refresh()}><Icon name="refresh" size={14} /></button>
       </div>
 
       {loading ? (
@@ -89,7 +99,7 @@ export function LorePanel({ activePath, onOpen }: Props) {
               characters.map((c) => (
                 <details key={c.id} className="lore-card">
                   <summary>
-                    <span className="lore-name">👤 {c.name}</span>
+                    <span className="lore-name"><Icon name="user" size={13} /> {c.name}</span>
                   </summary>
                   <div className="lore-fields">
                     {(Object.entries(c.data) as Array<[string, string | undefined]>)
@@ -122,7 +132,7 @@ export function LorePanel({ activePath, onOpen }: Props) {
                 return (
                   <div key={p.id} className="lore-card">
                     <div className="lore-plot-head">
-                      <span className="lore-name">🧵 {p.name}</span>
+                      <span className="lore-name"><Icon name="git-branch" size={13} /> {p.name}</span>
                       <span className={`plot-status ${st.cls}`}>{st.label}</span>
                     </div>
                     {p.description ? <div className="lore-desc">{p.description}</div> : null}
@@ -149,7 +159,7 @@ export function LorePanel({ activePath, onOpen }: Props) {
                   <details key={e.id} className="lore-card">
                     <summary>
                       <span className="lore-name">
-                        {t?.icon ?? '📄'} {e.name}
+                        <Icon name={(CODEX_ICONS[e.type] ?? 'package') as IconName} size={13} /> {e.name}
                       </span>
                       <span className="lore-type">{t?.zh ?? e.type}</span>
                     </summary>

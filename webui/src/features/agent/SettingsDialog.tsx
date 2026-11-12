@@ -10,6 +10,7 @@ import {
   type ProviderConnectivityResult,
 } from '../../api/backend'
 import { PromptDialog } from '../workspace/Dialogs'
+import { Icon } from '../../components/Icon'
 import './SettingsDialog.css'
 
 type Props = { onClose: () => void }
@@ -110,7 +111,7 @@ export function SettingsDialog({ onClose }: Props) {
     return (
       <div className="set-overlay" onClick={onClose}>
         <div className="set-dialog glass-panel" onClick={(e) => e.stopPropagation()}>
-          <div className="set-head"><b>设置</b><button className="set-x" onClick={onClose}>✕</button></div>
+          <div className="set-head"><b>设置</b><button className="set-x" onClick={onClose} title="关闭"><Icon name="x" size={15} /></button></div>
           <p className="set-err">加载失败：{loadErr}</p>
         </div>
       </div>
@@ -123,9 +124,9 @@ export function SettingsDialog({ onClose }: Props) {
         <div className="set-head">
           <b>设置 · 模型服务</b>
           <span className="set-head-actions">
-            {saved ? <span className="set-saved">已保存 ✓</span> : null}
+            {saved ? <span className="set-saved"><Icon name="check" size={13} /> 已保存</span> : null}
             <button className="set-save" onClick={() => void save()}>保存</button>
-            <button className="set-x" onClick={onClose}>✕</button>
+            <button className="set-x" onClick={onClose} title="关闭"><Icon name="x" size={15} /></button>
           </span>
         </div>
 
@@ -178,7 +179,7 @@ export function SettingsDialog({ onClose }: Props) {
             )
           })}
 
-          <button className="set-add" onClick={() => setNewProviderName({ open: true })}>＋ 添加自定义 Provider</button>
+          <button className="set-add" onClick={() => setNewProviderName({ open: true })}><Icon name="plus" size={14} /> 添加自定义 Provider</button>
         </div>
       </div>
 

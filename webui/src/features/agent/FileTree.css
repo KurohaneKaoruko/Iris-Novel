@@ -36,8 +36,7 @@
 }
 
 .ft-caret {
-  display: inline-block;
-  font-size: 10px;
+  display: inline-flex;
   color: var(--text-muted);
   transition: transform var(--dur-fast) var(--ease);
   flex-shrink: 0;
@@ -66,13 +65,14 @@
 }
 
 .ft-actions button {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
   color: var(--text-muted);
-  padding: 1px 4px;
-  border-radius: 3px;
+  padding: 2px;
+  border-radius: 4px;
 }
 
 .ft-actions button:hover {
-  color: var(--accent);
+  color: var(--text-primary);
   background: var(--hover);
 }

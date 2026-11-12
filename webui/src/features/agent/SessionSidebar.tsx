@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listChatSessions, type ChatSessionSummary } from '../../api/backend'
 import { useProject } from '../../state/ProjectContext'
+import { Icon } from '../../components/Icon'
 import './SessionSidebar.css'
 
 type SessionSidebarProps = {
@@ -43,8 +44,8 @@ export function SessionSidebar({ activeSessionId, onNewSession, onLoadSession, o
   if (collapsed) {
     return (
       <aside className="sss collapsed">
-        <button className="sss-expand" onClick={onToggle} title="展开会话栏">»</button>
-        <button className="sss-new-mini" onClick={onNewSession} title="新建会话">＋</button>
+        <button className="sss-expand" onClick={onToggle} title="展开会话栏"><Icon name="chevrons-right" size={15} /></button>
+        <button className="sss-new-mini" onClick={onNewSession} title="新建会话"><Icon name="plus" size={16} /></button>
       </aside>
     )
   }
@@ -52,11 +53,14 @@ export function SessionSidebar({ activeSessionId, onNewSession, onLoadSession, o
   return (
     <aside className="sss">
       <div className="sss-head">
-        <button className="sss-collapse" onClick={onToggle} title="折叠">«</button>
         <span className="sss-work" title={workRoot ?? ''}>{workName}</span>
+        <button className="sss-collapse" onClick={onToggle} title="折叠会话栏"><Icon name="chevrons-left" size={15} /></button>
       </div>
 
-      <button className="sss-new" onClick={onNewSession} title="新建会话">＋ 新建会话</button>
+      <button className="sss-new" onClick={onNewSession} title="新建会话">
+        <Icon name="square-pen" size={14} />
+        新建会话
+      </button>
 
       <div className="sss-list">
         <div className="sss-section">历史会话{loading ? '…' : `（${sessions.length}）`}</div>
@@ -89,7 +93,7 @@ export function SessionSidebar({ activeSessionId, onNewSession, onLoadSession, o
                   title="删除会话"
                   onClick={() => setConfirmingId(s.id)}
                 >
-                  ✕
+                  <Icon name="x" size={13} />
                 </button>
               )}
             </div>
@@ -98,8 +102,13 @@ export function SessionSidebar({ activeSessionId, onNewSession, onLoadSession, o
       </div>
 
       <div className="sss-foot">
-        <button className="sss-foot-btn" onClick={closeWork} title="关闭工程，返回启动页">⏏ 关闭工程</button>
-        <button className="sss-foot-btn" onClick={() => void refresh()} title="刷新列表">⟳</button>
+        <button className="sss-foot-btn" onClick={closeWork} title="关闭工程，返回启动页">
+          <Icon name="log-out" size={14} />
+          关闭工程
+        </button>
+        <button className="sss-foot-btn icon-only" onClick={() => void refresh()} title="刷新列表">
+          <Icon name="refresh" size={14} />
+        </button>
       </div>
     </aside>
   )

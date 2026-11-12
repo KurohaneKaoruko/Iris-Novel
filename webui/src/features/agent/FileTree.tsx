@@ -1,5 +1,6 @@
 import { useState, type MouseEvent } from 'react'
 import type { FsEntry } from '../../api/backend'
+import { Icon } from '../../components/Icon'
 import './FileTree.css'
 
 type FileTreeProps = {
@@ -51,20 +52,20 @@ function NodeView({
           style={{ paddingLeft: 8 + depth * 14 }}
           onClick={() => setOpen((v) => !v)}
         >
-          <span className="ft-caret">▸</span>
+          <span className="ft-caret"><Icon name="chevron-right" size={12} /></span>
           <span className="ft-name">{entry.name}</span>
         </button>
       ) : (
         <div
           className={`ft-row ft-file ${activePath === entry.path ? 'active' : ''} ${openable ? '' : 'disabled'}`}
-          style={{ paddingLeft: 8 + depth * 14 }}
+          style={{ paddingLeft: 8 + depth * 14 + 16 }}
           onClick={() => openable && onOpen(entry.path)}
           title={openable ? entry.path : '非文本文件，不可预览'}
         >
           <span className="ft-name">{entry.name}</span>
           <span className="ft-actions">
-            <button title="重命名" onClick={(e) => stop(e, () => onRename(entry.path))}>✎</button>
-            <button title="删除" onClick={(e) => stop(e, () => onDelete(entry.path))}>✕</button>
+            <button title="重命名" onClick={(e) => stop(e, () => onRename(entry.path))}><Icon name="pencil" size={13} /></button>
+            <button title="删除" onClick={(e) => stop(e, () => onDelete(entry.path))}><Icon name="trash" size={13} /></button>
           </span>
         </div>
       )}

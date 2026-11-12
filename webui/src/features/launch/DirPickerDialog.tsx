@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { browseDir, quickLocations, type DirListing, type DirEntryInfo } from '../../api/backend'
+import { Icon } from '../../components/Icon'
 import './DirPickerDialog.css'
 
 type DirPickerProps = {
@@ -54,10 +55,10 @@ export function DirPickerDialog({ onPick, onCancel }: DirPickerProps) {
             onClick={() => listing?.parent && void go(listing.parent)}
             title="上一级"
           >
-            ←
+            <Icon name="arrow-left" size={15} />
           </button>
           <button className={`dirpick-nav ${atHome ? 'active' : ''}`} onClick={() => void go('')} title="主目录">
-            ⌂
+            <Icon name="home" size={15} />
           </button>
           <span className="dirpick-path" title={listing?.path}>{listing?.path ?? '…'}</span>
         </div>
@@ -82,7 +83,7 @@ export function DirPickerDialog({ onPick, onCancel }: DirPickerProps) {
           ) : (
             listing!.entries.map((e) => (
               <button key={e.path} className="dirpick-item" onDoubleClick={() => void go(e.path)} onClick={() => void go(e.path)}>
-                <span className="dirpick-icon">📁</span>
+                <span className="dirpick-icon"><Icon name="folder" size={16} /></span>
                 <span className="dirpick-name">{e.name}</span>
                 {e.is_workspace ? <span className="dirpick-badge">作品</span> : null}
               </button>
