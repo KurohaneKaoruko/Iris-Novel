@@ -627,3 +627,65 @@
   margin-bottom: 14px;
   flex-wrap: wrap;
 }
+
+/* 写作趋势条（实体表面卡片） */
+.trend-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+
+.trend-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.trend-sum {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-sum b { color: var(--text-primary); font-weight: 600; }
+
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 88px;
+}
+
+.trend-bar {
+  flex: 1;
+  min-width: 4px;
+  background: var(--accent-weak);
+  border-radius: 2px 2px 0 0;
+  min-height: 0;
+}
+
+.trend-bar:where([style*='height: 0%']) { background: var(--track); }
+
+.trend-bar:hover { background: var(--accent-hover); }
+
+.trend-bar.hit-goal { background: var(--success); opacity: 0.8; }
+.trend-bar.hit-goal:hover { opacity: 1; }
+
+.trend-axis {
+  position: relative;
+  height: 16px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-axis span { transform: translateX(-50%); }
+.trend-axis span:first-child { transform: none; }
+.trend-axis span:first-child { position: absolute; }
+.trend-axis span:last-child { transform: translateX(-100%); }

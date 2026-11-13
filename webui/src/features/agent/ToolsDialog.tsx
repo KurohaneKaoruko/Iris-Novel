@@ -4,16 +4,18 @@ import {
   listCharacters,
   listPlotLines,
   loadChapterContents,
-  scanCharacterMentions,
+  loadWritingHistory,
   loadMemoryIndices,
   computeWorkStats,
   importChapters,
   type Chapter,
   type WorkStats,
 } from '../../api/novel'
+import { recentWritingDays, summarizeWritingDays, trendBarHeights, trendAxisLabels, type WritingDay } from '../../api/writingStats'
 import { runConsistencyCheck, type ConsistencyReport } from '../../api/consistency'
 import { lintChapter, type LintIssue } from '../../api/lint'
 import type { IconName } from '../../components/Icon'
+import { scanCharacterMentions } from '../../api/novel'
 import { splitIntoChapters, importSummary } from '../../api/import'
 import { readText } from '../../api/backend'
 import { Icon } from '../../components/Icon'
@@ -75,12 +77,18 @@ export function ToolsDialog({ initialTab = 'planner', onClose, onOpenFile }: Pro
 function StatsTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
   const [stats, setStats] = useState<WorkStats | null>(null)
   const [chapters, setChapters] = useState<Chapter[]>([])
+  const [trendDays, setTrendDays] = useState<WritingDay[]>([])
+  const [trendSummary, setTrendSummary] = useState<{ total: number; activeDays: number; avg: number } | null>(null)
   const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     void (async () => {
       setStats(await computeWorkStats().catch(() => null))
       setChapters((await listChapters().catch(() => []) as Chapter[]).sort((a, b) => a.order - b.order))
+      const { history } = await loadWritingHistory()
+      const days = recentWritingDays(history, 30)
+      setTrendDays(days)
+      setTrendSummary(summarizeWritingDays(days))
     })()
   }, [])
 
@@ -130,6 +138,8 @@ function StatsTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
         ) : null}
       </div>
 
+      <WritingTrend days={trendDays} summary={trendSummary} />
+
       {chapters.length > 0 ? (
         <div className="stats-chapters">
           <div className="tools-section-title">章节列表</div>
@@ -153,6 +163,53 @@ function StatsTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
 
 function statusLabel(s: Chapter['status']): string {
   return s === 'completed' ? '完结' : s === 'revising' ? '修稿' : '草稿'
+}
+
+/** 最近 30 天每日字数趋势条（实体表面样式；全零时显示空态说明） */
+function WritingTrend({ days, summary }: {
+  days: WritingDay[]
+  summary: { total: number; activeDays: number; avg: number } | null
+}) {
+  const heights = trendBarHeights(days.map((d) => d.wordCount))
+  const labels = trendAxisLabels(days)
+  const hasData = (summary?.total ?? 0) > 0
+  return (
+    <div className="trend-card">
+      <div className="trend-head">
+        <span className="tools-section-title" style={{ margin: 0 }}>最近 30 天写作趋势</span>
+        {hasData ? (
+          <span className="trend-sum">
+            合计 <b>{summary!.total.toLocaleString()}</b> 字 · 有产出 <b>{summary!.activeDays}</b> 天 · 日均 <b>{summary!.avg.toLocaleString()}</b> 字
+          </span>
+        ) : null}
+      </div>
+      {hasData ? (
+        <>
+          <div className="trend-bars">
+            {days.map((d, i) => (
+              <div
+                key={d.date}
+                className={`trend-bar ${d.wordCount >= (d.goal || 0) && d.goal > 0 ? 'hit-goal' : ''}`}
+                style={{ height: `${Math.round(heights[i] * 100)}%` }}
+                title={`${d.date}　${d.wordCount.toLocaleString()} 字${d.goal > 0 ? `（目标 ${d.goal}）` : ''}`}
+              />
+            ))}
+          </div>
+          <div className="trend-axis">
+            {labels.map((t) => (
+              <span key={t.index} style={{ position: 'absolute', left: `${(t.index / Math.max(1, days.length - 1)) * 100}%` }}>
+                {t.label}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="tools-hint">
+          暂无写作记录数据（.novel/.history/writing-history.json 为空）。在编辑器中写作后会按日累计字数。
+        </div>
+      )}
+    </div>
+  )
 }
 
 function Stat({ value, label, sub, big }: { value: string; label: string; sub?: string; big?: boolean }) {
