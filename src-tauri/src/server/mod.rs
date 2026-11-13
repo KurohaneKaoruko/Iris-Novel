@@ -149,8 +149,21 @@ async fn health() -> impl IntoResponse {
 /// 来源校验：仅允许本机回环来源（防 DNS rebinding / 跨站访问）。
 fn origin_allowed(headers: &HeaderMap) -> bool {
   fn host_is_local(host: &str) -> bool {
+    // IPv6 字面量在 Host/Origin 中必带方括号（如 "[::1]:8765"），按 ] 定界取地址本体
+    if let Some(rest) = host.strip_prefix('[') {
+      if let Some((inner, _port)) = rest.split_once(']') {
+        return inner == "::1";
+      }
+      return false;
+    }
     let h = host.split(':').next().unwrap_or("").trim();
-    h == "127.0.0.1" || h == "localhost" || h == "[::1]" || h.is_empty()
+    h == "127.0.0.1" || h == "localhost" || h.is_empty()
+  }
+  fn url_host_is_local(url: &str) -> bool {
+    // 从 origin URL 中取出 host 部分（scheme://host[:port]/），再按本机 host 判定
+    let after_scheme = url.split("://").nth(1).unwrap_or("");
+    let host = after_scheme.split(['/','?','#']).next().unwrap_or("");
+    host_is_local(host)
   }
   // Host header 必须是本机
   if let Some(host) = headers.get("host").and_then(|v| v.to_str().ok()) {
@@ -158,9 +171,9 @@ fn origin_allowed(headers: &HeaderMap) -> bool {
       return false;
     }
   }
-  // 若带 Origin，也必须是本机
+  // 若带 Origin，也必须是本机（精确 host 匹配，防 https://127.0.0.1.evil.com 子串绕过）
   if let Some(origin) = headers.get("origin").and_then(|v| v.to_str().ok()) {
-    if !origin.contains("127.0.0.1") && !origin.contains("localhost") {
+    if !url_host_is_local(origin) {
       return false;
     }
   }
@@ -246,6 +259,51 @@ async fn ws_handle(ctx: ServerContext, socket: axum::extract::ws::WebSocket) {
         }
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod origin_tests {
+  use super::origin_allowed;
+  use axum::http::HeaderMap;
+
+  fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
+    let mut map = HeaderMap::new();
+    for (k, v) in pairs {
+      map.insert(
+        axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
+        v.parse().unwrap(),
+      );
+    }
+    map
+  }
+
+  #[test]
+  fn local_origins_pass() {
+    assert!(origin_allowed(&headers(&[])));
+    assert!(origin_allowed(&headers(&[("host", "127.0.0.1:8765")])));
+    assert!(origin_allowed(&headers(&[("host", "127.0.0.1:8765"), ("origin", "http://127.0.0.1:1421")])));
+    assert!(origin_allowed(&headers(&[("host", "localhost:8765"), ("origin", "http://localhost:1421")])));
+    assert!(origin_allowed(&headers(&[("host", "[::1]:8765"), ("origin", "http://[::1]:1421")])));
+  }
+
+  #[test]
+  fn foreign_hosts_rejected() {
+    assert!(!origin_allowed(&headers(&[("host", "evil.com")])));
+    assert!(!origin_allowed(&headers(&[("host", "127.0.0.1:8765"), ("origin", "https://evil.com")])));
+  }
+
+  #[test]
+  fn origin_substring_bypass_rejected() {
+    // 旧实现 origin.contains("127.0.0.1") 会让以下来源通过，现必须拒绝
+    assert!(!origin_allowed(&headers(&[
+      ("host", "127.0.0.1:8765"),
+      ("origin", "https://127.0.0.1.evil.com")
+    ])));
+    assert!(!origin_allowed(&headers(&[
+      ("host", "localhost:8765"),
+      ("origin", "http://localhost.evil.com")
+    ])));
   }
 }
 
