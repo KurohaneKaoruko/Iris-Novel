@@ -32,6 +32,7 @@ import { StudioDialog } from './StudioDialog'
 import { ChaptersPanel } from './ChaptersPanel'
 import { LorePanel } from './LorePanel'
 import { DiffView } from './DiffView'
+import { findHits, nextHit, type FindHit } from '../../api/editorFind'
 import './AgentWorkspace.css'
 
 /**
@@ -71,6 +72,10 @@ export function AgentWorkspace() {
   /** 编辑器选中文本（选中时显示浮动工坊按钮） */
   const [selection, setSelection] = useState('')
   const [selRange, setSelRange] = useState<{ start: number; end: number } | null>(null)
+  /** 编辑器内查找条（Ctrl+F 唤起） */
+  const [findOpen, setFindOpen] = useState(false)
+  const editorRef = useRef<HTMLTextAreaElement>(null)
+  const findInputRef = useRef<HTMLInputElement>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
@@ -138,6 +143,7 @@ export function AgentWorkspace() {
   useEffect(() => {
     setEditing(false)
     setPreviewMode('content')
+    setFindOpen(false)
     if (!activePath) {
       setFileContent('')
       return
@@ -526,20 +532,34 @@ export function AgentWorkspace() {
                         <div className="agw-empty">加载中…</div>
                       ) : editing ? (
                         <div className="agw-editorwrap">
-                          <textarea
-                            className="agw-editor"
-                            value={editDraft}
-                            onChange={(e) => setEditDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-                                e.preventDefault()
-                                void saveEdit()
-                              }
-                            }}
-                            onMouseUp={captureSelection}
-                            onKeyUp={captureSelection}
-                            autoFocus
-                          />
+                          <div className="agw-find-anchor">
+                            <textarea
+                              ref={editorRef}
+                              className="agw-editor"
+                              value={editDraft}
+                              onChange={(e) => setEditDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                                  e.preventDefault()
+                                  void saveEdit()
+                                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+                                  e.preventDefault()
+                                  setFindOpen(true)
+                                }
+                              }}
+                              onMouseUp={captureSelection}
+                              onKeyUp={captureSelection}
+                              autoFocus
+                            />
+                            {findOpen ? (
+                              <EditorFindBar
+                                text={editDraft}
+                                editorRef={editorRef}
+                                inputRef={findInputRef}
+                                onClose={() => setFindOpen(false)}
+                              />
+                            ) : null}
+                          </div>
                           {selection.trim() ? (
                             <div className="agw-selbar">
                               <span className="agw-selcount">已选 {selection.length} 字</span>
@@ -675,6 +695,108 @@ export function applyReplaceSelection(
     return draft ? `${draft}\n\n${replacement}` : replacement
   }
   return draft.slice(0, range.start) + replacement + draft.slice(range.end)
+}
+
+/* ============ 编辑器内查找条 ============ */
+
+type FindBarProps = {
+  text: string
+  editorRef: React.RefObject<HTMLTextAreaElement | null>
+  inputRef: React.Ref<HTMLInputElement>
+  onClose: () => void
+}
+
+/** 章节编辑器查找条：Ctrl+F 唤起 / Esc 关闭；命中计数 + 上一个/下一个循环 + selection 定位。 */
+function EditorFindBar({ text, editorRef, inputRef, onClose }: FindBarProps) {
+  const [query, setQuery] = useState('')
+  const [caseSensitive, setCaseSensitive] = useState(false)
+  const [idx, setIdx] = useState(0) // 当前命中序号（0-based，供显示；导航仍由光标位置驱动）
+
+  const hits = useMemo<FindHit[]>(() => findHits(text, query, caseSensitive), [text, query, caseSensitive])
+
+  /** 把命中应用到 textarea：选中并滚动到可视区中央 */
+  const applyHit = useCallback(
+    (hit: FindHit | null) => {
+      const el = editorRef.current
+      if (!el || !hit) return
+      el.focus()
+      el.setSelectionRange(hit.start, hit.end)
+      // 按行估算滚动位置：命中行约在 hit.start 之前的新行数
+      const upTo = text.slice(0, hit.start)
+      const line = (upTo.match(/\n/g) ?? []).length
+      const lineHeight = 1.8 * 12.5 * (16 / 12) // css line-height 1.8 × 字号换算 px 的近似
+      el.scrollTop = Math.max(0, line * lineHeight - el.clientHeight / 2)
+    },
+    [editorRef, text],
+  )
+
+  const go = useCallback(
+    (next: boolean) => {
+      const el = editorRef.current
+      const hit = nextHit(hits, el ? el.selectionStart : 0, next)
+      if (hit) {
+        applyHit(hit)
+        setIdx(hits.findIndex((h) => h === hit))
+      }
+    },
+    [hits, applyHit, editorRef],
+  )
+
+  // 首次输入即定位首个命中；query 变化重置序号
+  useEffect(() => {
+    setIdx(0)
+    if (query) {
+      const el = editorRef.current
+      const hit = nextHit(hits, el ? el.selectionStart : 0, true)
+      if (hit) applyHit(hit)
+    }
+  }, [query, caseSensitive]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div
+      className="agw-findbar"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          e.stopPropagation()
+          onClose()
+          editorRef.current?.focus()
+        } else if (e.key === 'Enter') {
+          e.preventDefault()
+          go(!e.shiftKey)
+        }
+      }}
+    >
+      <Icon name="search" size={13} />
+      <input
+        ref={inputRef}
+        className="agw-find-input"
+        value={query}
+        placeholder="查找…"
+        autoFocus
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      <span className={`agw-find-count ${hits.length === 0 && query ? 'none' : ''}`}>
+        {query ? (hits.length > 0 ? `${idx + 1}/${hits.length}` : '无结果') : ''}
+      </span>
+      <button className="agw-iconbtn sm" title="上一个（Shift+Enter）" disabled={hits.length === 0} onClick={() => go(false)}>
+        <Icon name="chevron-left" size={14} />
+      </button>
+      <button className="agw-iconbtn sm" title="下一个（Enter）" disabled={hits.length === 0} onClick={() => go(true)}>
+        <Icon name="chevron-right" size={14} />
+      </button>
+      <button
+        className={`agw-iconbtn sm ${caseSensitive ? 'toggled' : ''}`}
+        title="区分大小写"
+        onClick={() => setCaseSensitive((v) => !v)}
+      >
+        Aa
+      </button>
+      <button className="agw-iconbtn sm" title="关闭（Esc）" onClick={onClose}>
+        <Icon name="x" size={14} />
+      </button>
+    </div>
+  )
 }
 
 /* ============ 中央对话列 ============ */

@@ -1791,6 +1791,65 @@
   min-height: 0;
 }
 
+/* 编辑器内查找条（Ctrl+F 唤起，悬浮于编辑器右上） */
+.agw-find-anchor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.agw-find-anchor .agw-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.agw-findbar {
+  position: absolute;
+  top: 10px;
+  right: 18px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+}
+
+.agw-find-input {
+  width: 150px;
+  padding: 4px 7px;
+  font-size: 12.5px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+}
+.agw-find-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: none;
+}
+
+.agw-find-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  text-align: center;
+  white-space: nowrap;
+}
+.agw-find-count.none { color: var(--danger); }
+
+.agw-findbar .agw-iconbtn.toggled {
+  color: var(--accent);
+  background: var(--accent-weak);
+}
+
 .agw-selbar {
   position: absolute;
   right: 18px;
