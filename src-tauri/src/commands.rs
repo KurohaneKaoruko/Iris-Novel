@@ -509,7 +509,7 @@ fn trim_for_risk_scan(content: &str, max_chars: usize) -> String {
     .rev()
     .collect::<String>();
   format!(
-    "{head}\n\n...[涓棿鍐呭宸茬渷鐣ワ紝绾?{} 瀛楃]...\n\n{tail}",
+    "{head}\n\n...[中间内容已省略，约 {} 字符]...\n\n{tail}",
     total.saturating_sub(max_chars)
   )
 }
@@ -666,24 +666,24 @@ pub async fn risk_scan_content_impl(
   let snippets = collect_related_chapter_snippets(&root, file_path.as_deref());
 
   let mut prompt = String::new();
-  prompt.push_str("璇峰浠ヤ笅灏忚鍐呭鍋氬悎瑙勯闄╂娴嬶紝閲嶇偣璇嗗埆杩濇硶杩濊銆佽繃搴︽毚鍔涜鑵ャ€佹湭鎴愬勾浜轰笉褰撳唴瀹广€佷粐鎭ㄦ瑙嗐€佽壊鎯呴湶楠ㄣ€佺幇瀹炴晱鎰熼闄╃瓑闂銆俓n");
-  prompt.push_str("璇疯繑鍥?JSON锛屽瓧娈靛繀椤诲畬鏁达細\n");
+  prompt.push_str("请对以下小说内容做合规风险检测，重点识别违法违规、过度暴力血腥、未成年人不当内容、民族仇恨歧视、色情露骨、现实敏感风险等问题。\n");
+  prompt.push_str("请返回 JSON，字段必须完整：\n");
   prompt.push_str("{\"summary\":\"...\",\"overall_level\":\"low|medium|high\",\"findings\":[{\"level\":\"low|medium|high\",\"category\":\"...\",\"excerpt\":\"...\",\"reason\":\"...\",\"suggestion\":\"...\",\"line_start\":1,\"line_end\":1}]}\n");
-  prompt.push_str("瑕佹眰锛歕n");
-  prompt.push_str("- 浠呰繑鍥?JSON锛屼笉瑕?Markdown銆俓n");
-  prompt.push_str("- 鑻ユ病鏈夋槑鏄鹃棶棰橈紝findings 杩斿洖绌烘暟缁勶紝overall_level=low銆俓n");
-  prompt.push_str("- excerpt 蹇呴』寮曠敤鍘熸枃涓殑鐭墖娈碉紝閬垮厤杩囬暱銆俓n");
-  prompt.push_str("- suggestion 缁欏嚭鍙墽琛屾敼鍐欏缓璁€俓n\n");
+  prompt.push_str("要求：\n");
+  prompt.push_str("- 仅返回 JSON，不要 Markdown。\n");
+  prompt.push_str("- 若没有明显问题，findings 返回空数组，overall_level=low。\n");
+  prompt.push_str("- excerpt 必须引用原文中的短片段，避免过长。\n");
+  prompt.push_str("- suggestion 给出可执行改写建议。\n\n");
   if let Some(path) = file_path.as_ref().filter(|p| !p.trim().is_empty()) {
-    prompt.push_str(format!("褰撳墠鏂囦欢: {}\n\n", path.trim()).as_str());
+    prompt.push_str(format!("当前文件: {}\n\n", path.trim()).as_str());
   }
   if !snippets.is_empty() {
-    prompt.push_str("鐩稿叧绔犺妭涓婁笅鏂囷紙鐢ㄤ簬閬垮厤璇垽锛岄潪蹇呴』閫愭潯鐐硅瘎锛夛細\n");
+    prompt.push_str("相关章节上下文（用于避免误判，非必须逐条点评）：\n");
     for (idx, (path, text)) in snippets.iter().enumerate() {
       prompt.push_str(format!("[Context {}] {}\n{}\n\n", idx + 1, path, text).as_str());
     }
   }
-  prompt.push_str("寰呮娴嬫鏂囷細\n");
+  prompt.push_str("待检测正文：\n");
   prompt.push_str(payload_text.as_str());
 
   let system_prompt = "你是严格的中文小说合规审校助手，输出务必是可解析 JSON，不得包含解释文字。";

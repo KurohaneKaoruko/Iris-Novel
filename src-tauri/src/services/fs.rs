@@ -170,7 +170,7 @@ pub(crate) fn validate_outline(existing_json: &str, new_json: &str) -> Result<()
       let by_time = per_character.entry(ch.clone()).or_default();
       if let Some(prev_loc) = by_time.get(&ev.time) {
         if !ev.location.trim().is_empty() && prev_loc != &ev.location {
-          conflicts.push(format!("鏃堕棿绾垮啿绐侊細{} 鍦?{} 鍚屾椂鍑虹幇鍦?{} 涓?{}", ch, ev.time, prev_loc, ev.location));
+          conflicts.push(format!("时间线冲突：{} 在 {} 同时出现在 {} 与 {}", ch, ev.time, prev_loc, ev.location));
         }
       } else if !ev.location.trim().is_empty() {
         by_time.insert(ev.time.clone(), ev.location.clone());
@@ -278,10 +278,10 @@ pub fn resolve_inline_references(
     });
   }
 
-  let selection_regex = Regex::new(r"#(?:閫夊尯|selection)\b").map_err(|e| format!("selection regex invalid: {e}"))?;
+  let selection_regex = Regex::new(r"#(?:选区|selection)\b").map_err(|e| format!("selection regex invalid: {e}"))?;
   let current_file_regex =
-    Regex::new(r"#(?:褰撳墠鏂囦欢|current_file|current)\b").map_err(|e| format!("current file regex invalid: {e}"))?;
-  let file_prefix_regex = Regex::new(r"#(?:鏂囦欢|file):([^\s#]+)").map_err(|e| format!("file prefix regex invalid: {e}"))?;
+    Regex::new(r"#(?:当前文件|current_file|current)\b").map_err(|e| format!("current file regex invalid: {e}"))?;
+  let file_prefix_regex = Regex::new(r"#(?:文件|file):([^\s#]+)").map_err(|e| format!("file prefix regex invalid: {e}"))?;
   let file_path_regex =
     Regex::new(r"#([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]{1,16})").map_err(|e| format!("file path regex invalid: {e}"))?;
 
@@ -444,7 +444,7 @@ pub fn validate_novel_task_quality(
   }
 
   if !content.trim().is_empty()
-    && task.acceptance_checks.iter().any(|check| check.contains("閽╁瓙"))
+    && task.acceptance_checks.iter().any(|check| check.contains("钩子"))
   {
     let tail: String = content.chars().rev().take(80).collect::<String>().chars().rev().collect();
     let has_hook_end = tail.chars().any(|ch| ['?', '!', '.', '？', '！', '。', '…'].contains(&ch));
