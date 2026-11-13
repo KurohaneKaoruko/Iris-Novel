@@ -95,6 +95,11 @@ const DAO_TAG_LIMIT = 4
 // 白名单：这些词的子串不计入（防误伤，如「知道」白名单，「意识到」仍查）
 const WHITELIST = ['可能', '或许', '虽然', '几乎', '确实', '知道', '认为', '充满', '不断', '巨大', '这次']
 
+/** 白名单遮蔽：把正文中的白名单词替换为等长占位符，使其内部出现的限频词命中不计入 */
+export function maskWhitelistWords(text: string): string {
+  return WHITELIST.reduce((acc, w) => acc.split(w).join('\u0000'.repeat(w.length)), text)
+}
+
 // 句式模板（结构正则）
 const SENTENCE_PATTERNS: Array<{ name: string; re: RegExp; advice: string }> = [
   { name: '声音框架', re: /声音(不大|轻细)，却/g, advice: '删框架，台词+动作直给' },
@@ -142,11 +147,11 @@ export function lintChapter(content: string): LintIssue[] {
     }
   }
 
-  // 二级限频：章内计数
+  // 二级限频：章内计数（白名单词先遮蔽为等长占位，其内部出现的限频词命中不计入）
   const full = content
+  const masked = maskWhitelistWords(full)
   for (const { word, limit } of LEVEL2_LIMITS) {
-    if (WHITELIST.some((w) => word.includes(w) && w !== word)) continue
-    const count = countOccurrences(full, word)
+    const count = countOccurrences(masked, word)
     if (count > limit) {
       const line = firstLineOf(lines, word)
       issues.push({
@@ -192,7 +197,7 @@ export function lintChapter(content: string): LintIssue[] {
     })
   }
 
-  // 结构层：段尾总结句（连续 3 段末句都是「他知道/他知道类」收束）
+  // 结构层：段尾总结句（连续 2 段末句都是「他知道」类收束即提示）
   const paraEnds = collectParagraphEndings(lines)
   let streak = 0
   for (const pe of paraEnds) {
@@ -246,6 +251,7 @@ function firstLineOf(lines: string[], word: string): number {
   return 1
 }
 
+/** 收集各段落末行（行号为 1-based，与其他 issue 定位约定一致） */
 function collectParagraphEndings(lines: string[]): Array<{ line: number; text: string }> {
   const out: Array<{ line: number; text: string }> = []
   let buf: string[] = []
@@ -254,10 +260,10 @@ function collectParagraphEndings(lines: string[]): Array<{ line: number; text: s
     if (t) {
       buf.push(t)
     } else if (buf.length > 0) {
-      out.push({ line: i - 1, text: buf[buf.length - 1] })
+      out.push({ line: i, text: buf[buf.length - 1] })
       buf = []
     }
   }
-  if (buf.length > 0) out.push({ line: lines.length - 1, text: buf[buf.length - 1] })
+  if (buf.length > 0) out.push({ line: lines.length, text: buf[buf.length - 1] })
   return out
 }
