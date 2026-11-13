@@ -103,10 +103,21 @@ export function checkPlotLines(
       continue
     }
     const lastHit = hitIdx[hitIdx.length - 1]
-    if (pl.status === 'completed' && lastHit < chapters.length - 1 && chapters.length - 1 - lastHit === 0) {
-      // completed 但最后一章仍在提
+    if (pl.status === 'completed') {
+      // 已完结线：解析 endChapter 章号，完结章之后仍有提及则提示「完结后又写了」
+      const endNum = parseChapterNumber(pl.endChapter)
+      if (endNum !== null && lastHit + 1 > endNum) {
+        issues.push({
+          dimension: 'plotline',
+          severity: 'low',
+          message: `情节线「${pl.name}」完结后仍有提及`,
+          detail: `该线标为已完结（结束于第 ${endNum} 章），但第 ${lastHit + 1} 章仍在正文提及。若非刻意回响，考虑复查线状态或删除多余提及。`,
+          jumpPath: chapters[lastHit]?.path,
+        })
+      }
+      continue
     }
-    if (pl.status !== 'completed' && hitIdx.length > 0) {
+    if (hitIdx.length > 0) {
       const stale = chapters.length - 1 - lastHit
       if (stale > 6) {
         issues.push({
@@ -120,6 +131,46 @@ export function checkPlotLines(
     }
   }
   return issues
+}
+
+/** 从「第 12 章」「12」「chapter-0012」等表述中解析章号，解析失败返回 null */
+function parseChapterNumber(text: string | undefined): number | null {
+  if (!text) return null
+  const m = text.match(/(\d+)/)
+  if (m) {
+    const n = Number(m[1])
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  const cn = text.match(/第([零一二三四五六七八九十百千]+)章/)
+  if (cn) return chineseToNumber(cn[1])
+  return null
+}
+
+/** 中文数字转阿拉伯（章号场景，如「十二」→ 12） */
+function chineseToNumber(text: string): number | null {
+  const digits: Record<string, number> = { 零: 0, 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 }
+  // 先按「十/百/千」分节累加
+  let total = 0
+  let section = 0
+  let current = 0
+  for (const ch of text) {
+    if (digits[ch] !== undefined) {
+      current = current * 10 + digits[ch]
+    } else if (ch === '十') {
+      section += (current || 1) * 10
+      current = 0
+    } else if (ch === '百') {
+      section += (current || 1) * 100
+      current = 0
+    } else if (ch === '千') {
+      section += (current || 1) * 1000
+      current = 0
+    } else {
+      return null
+    }
+  }
+  total = section + current
+  return total > 0 ? total : null
 }
 
 /** 伏笔回收核对：索引里「未回收」的条目，在埋设章之后是否还有呼应（同名关键词再现） */

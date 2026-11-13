@@ -45,6 +45,35 @@ describe('checkPlotLines（情节线推进）', () => {
     const issues = checkPlotLines(chapters, plotLines)
     expect(issues[0]?.message).toContain('全书无正文提及')
   })
+
+  it('已完结线在结束章之后仍有提及报 low（回归：completed 检查为死代码）', () => {
+    const chapters = mkChapters(8).map((c, i) =>
+      i < 4 ? { ...c, content: `复仇线推进。${c.content}` } : { ...c, content: `复仇线的余波还在。${c.content}` },
+    )
+    const plotLines: PlotLine[] = [
+      { id: 'p1', name: '复仇线', startChapter: '第 1 章', endChapter: '第 4 章', status: 'completed' },
+    ]
+    const issues = checkPlotLines(chapters, plotLines)
+    const hit = issues.find((i) => i.message.includes('完结后仍有提及'))
+    expect(hit).toBeDefined()
+    expect(hit?.severity).toBe('low')
+    // 跳转到最后一处提及（与消息「第 8 章仍在正文提及」一致）
+    expect(hit?.jumpPath).toBe(chapters[7].path)
+  })
+
+  it('已完结线在结束章内最后提及不报', () => {
+    const chapters = mkChapters(6).map((c, i) => (i < 6 ? { ...c, content: `寻宝线收束。${c.content}` } : c))
+    const plotLines: PlotLine[] = [
+      { id: 'p1', name: '寻宝线', startChapter: '第 1 章', endChapter: '第 6 章', status: 'completed' },
+    ]
+    expect(checkPlotLines(chapters, plotLines)).toHaveLength(0)
+  })
+
+  it('已完结线无 endChapter 时跳过完结检查', () => {
+    const chapters = mkChapters(6).map((c) => ({ ...c, content: `旧线回响。${c.content}` }))
+    const plotLines: PlotLine[] = [{ id: 'p1', name: '旧线', startChapter: '第 1 章', status: 'completed' }]
+    expect(checkPlotLines(chapters, plotLines)).toHaveLength(0)
+  })
 })
 
 describe('checkForeshadowRecovery（伏笔回收）', () => {
