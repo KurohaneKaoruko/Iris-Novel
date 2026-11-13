@@ -65,7 +65,7 @@ pnpm run tauri:ios:dev
   - `DiffView.tsx` - 文件变更历史 diff（覆盖写自动留快照；LCS 行级对比、±统计、上下文折叠、版本恢复）
 - **`api/diff.ts`** - 零依赖行级 diff（LCS/collapseDiff，有单测）
 - **`api/sessionExport.ts`** - 会话导出 Markdown 分享稿（工具步骤 details 折叠，有单测）
-- **`components/Icon.tsx`** - 全应用统一 SVG 图标系统（lucide 线性风格 51 枚，`<Icon name size />`；界面图标禁止 emoji）
+- **`components/Icon.tsx`** - 全应用统一 SVG 图标系统（lucide 线性风格 50 枚，`<Icon name size />`；界面图标禁止 emoji）
 - **`workspace/Dialogs`** - 全局 Prompt/Confirm 对话框（唯一从旧工作台保留的组件）
 - **`hooks/useChat.ts`** - 流式聊天（WS 事件协议：挂载时订阅一次 + activeStreamId ref 过滤消除竞态；`ai_error` 即终止；token 累积/done 收尾/会话恢复，有协议单测）
 - **`state/ProjectContext.tsx`** - workRoot/activePath/书架状态；`openDir` 自动登记 external_projects
@@ -76,7 +76,7 @@ pnpm run tauri:ios:dev
 - **`lib.rs`** - 共享库：桌面（Tauri）与 `iris-creation-server` 共用的服务层
 - **`main.rs`** - Tauri 桌面壳入口：setup 内嵌 `iris_creation::server::run`（127.0.0.1:8765），窗口直接加载该地址，与独立 iris-creation-server 形态行为一致；invoke 通道保留但 webui 不使用
 - **`bin/iris-creation-server.rs`** - 本地 Web 服务端入口：托管 webui 静态资源 + RPC + WS
-- **`server/`** - HTTP/WS 服务：`rpc_dispatch.rs`（68 命令分发）、WS 升级与 cancel 指令
+- **`server/`** - HTTP/WS 服务：`rpc_dispatch.rs`（66 命令分发分支，72 个命令名含 6 组新旧别名）、WS 升级与 cancel 指令
 - **`commands.rs`** - 命令实现（`*_impl` 共用函数供 Tauri/RPC 双通道调用）
 - **`agent_system.rs`** - AI 代理运行时，包含工具注册表和记忆存储
 - **`skills/mod.rs`** - 写作技能：内置技能 + Novelist-Skills 子模块（`skills/` 目录，编译期内嵌 + 运行时目录覆盖）
