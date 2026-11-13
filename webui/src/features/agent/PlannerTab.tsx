@@ -14,7 +14,7 @@ import {
   type TaskStatus,
 } from '../../api/planner'
 import { readText, writeText } from '../../api/backend'
-import { syncChapterContent } from '../../api/novel'
+import { syncChapterContent, loadWritingHistory, recordTodayWords } from '../../api/novel'
 import { lintChapter, type LintIssue } from '../../api/lint'
 import { streamStudio, type StudioHandle } from '../../api/studio'
 import { loadStyleFingerprint, fingerprintText, type StyleFingerprint } from '../../api/stylefp'
@@ -272,9 +272,18 @@ export function PlannerTab({ onOpenFile }: { onOpenFile: (p: string) => void }) 
           return false
         }
 
+        // 写作统计闭环：逐章生成的产出也按日累计（写入前先取旧字数算差值）
+        const before = await readText(task.scope).then((c) => c.replace(/\s/g, '').length).catch(() => 0)
         await writeText(task.scope, content)
         // 章节元数据同步（文件已存在则只更新字数；不存在则登记）
         await syncChapterContent(task.scope, content).catch(() => {})
+        {
+          const delta = Math.max(0, content.replace(/\s/g, '').length - before)
+          if (delta > 0) {
+            const { dailyGoal } = await loadWritingHistory()
+            await recordTodayWords(delta, dailyGoal).catch(() => {})
+          }
+        }
         setRunLog(`已写入 ${task.scope}（${content.length} 字，质检通过）`)
 
         const q = await loadRunQueue()

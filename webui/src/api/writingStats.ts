@@ -64,3 +64,40 @@ export function trendAxisLabels(days: WritingDay[]): Array<{ index: number; labe
   // 去重：窗口很短时三点可能重叠
   return out.filter((t, i) => i === 0 || t.index !== out[i - 1].index)
 }
+
+// ============ 每日目标与连续达标 ============
+
+/** 单日达标判定：目标 > 0 且当日字数 ≥ 目标。无目标视为不达标。 */
+export function isGoalHit(day: { wordCount: number; goal: number }): boolean {
+  return day.goal > 0 && day.wordCount >= day.goal
+}
+
+/**
+ * 单日有效目标：逐日 goal 优先（写作历史里已固化的目标），否则回退当前全局目标。
+ * 两者皆无返回 0（无目标）。
+ */
+export function dayGoal(day: { goal: number }, globalGoal: number): number {
+  return day.goal > 0 ? day.goal : globalGoal
+}
+
+/**
+ * 连续达标天数：从窗口末尾（今天）往回数，遇到不达标日即停。
+ * 今天写了但未达标不算断链——跳过今天从昨天继续数（目标鼓励的是不间断的习惯，
+ * 今天的仗还没打完）。无任何达标日返回 0。
+ */
+export function streakGoalDays(days: WritingDay[], globalGoal: number): number {
+  let streak = 0
+  for (let i = days.length - 1; i >= 0; i--) {
+    const d = days[i]
+    const goal = dayGoal(d, globalGoal)
+    if (goal <= 0) return streak
+    if (d.wordCount >= goal) {
+      streak += 1
+    } else if (i === days.length - 1) {
+      continue // 今天未达标：不断链，看昨天
+    } else {
+      break
+    }
+  }
+  return streak
+}

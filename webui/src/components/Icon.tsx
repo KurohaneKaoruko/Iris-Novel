@@ -58,6 +58,7 @@ export type IconName =
   | 'network'
   | 'focus'
   | 'chevron-left'
+  | 'target'
 
 const PATHS: Record<IconName, JSX.Element> = {
   plus: <path d="M12 5v14M5 12h14" />,
@@ -202,6 +203,13 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   'chevron-left': <path d="m15 18-6-6 6-6" />,
+  target: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </>
+  ),
 }
 
 type IconProps = {

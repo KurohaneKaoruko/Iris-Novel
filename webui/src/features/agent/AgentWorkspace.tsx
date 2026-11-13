@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry } from '../../api/backend'
 import { createDir, createFile, listWorkspaceTree, readText, renameEntry, deleteEntry as del, writeText, getSkills, getChatSession, saveChatSession, deleteChatSession, getAppSettings, getApiKeyStatus, exportWork, type Skill, type ChatMessagePayload } from '../../api/backend'
-import { listChapters, createChapterFile } from '../../api/novel'
+import { listChapters, createChapterFile, loadWritingHistory, recordTodayWords } from '../../api/novel'
 
 /** Blob 触发浏览器下载 */
 function downloadText(filename: string, content: string) {
@@ -391,13 +391,21 @@ export function AgentWorkspace() {
     if (!activePath) return
     try {
       await writeText(activePath, editDraft)
+      // 写作统计闭环：章节文件保存时按日累计净增字数（非章节文档不计入）
+      if (/^stories\/.*\.(md|txt)$/i.test(activePath)) {
+        const delta = editDraft.replace(/\s/g, '').length - fileContent.replace(/\s/g, '').length
+        if (delta > 0) {
+          const { dailyGoal: goal } = await loadWritingHistory()
+          await recordTodayWords(delta, goal).catch(() => {})
+        }
+      }
       setFileContent(editDraft)
       setEditing(false)
       void refreshTree()
     } catch (e) {
       setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [activePath, editDraft, refreshTree, setError])
+  }, [activePath, editDraft, fileContent, refreshTree, setError])
 
   return (
     <div className="agw">

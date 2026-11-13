@@ -543,6 +543,17 @@ export async function recordTodayWords(deltaWords: number, dailyGoal: number): P
   await writeText(WRITING_HISTORY, JSON.stringify(doc, null, 2))
 }
 
+/**
+ * 保存每日目标字数：写入 writing-history.json 的 dailyWordCount 字段
+ * （既有约定字段，只增不改——不动已有 history 条目的逐日 goal）。
+ * goal <= 0 视为清除目标（回退为无目标态）。
+ */
+export async function saveDailyGoal(goal: number): Promise<void> {
+  const { history, dailyGoal: current } = await loadWritingHistory()
+  const doc: WritingHistoryDoc = { history, dailyWordCount: Math.max(0, Math.round(goal)) || current }
+  await writeText(WRITING_HISTORY, JSON.stringify(doc, null, 2))
+}
+
 // ============ 作品统计 ============
 
 export type WorkStats = {

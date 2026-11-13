@@ -5,13 +5,14 @@ import {
   listPlotLines,
   loadChapterContents,
   loadWritingHistory,
+  saveDailyGoal,
   loadMemoryIndices,
   computeWorkStats,
   importChapters,
   type Chapter,
   type WorkStats,
 } from '../../api/novel'
-import { recentWritingDays, summarizeWritingDays, trendBarHeights, trendAxisLabels, type WritingDay } from '../../api/writingStats'
+import { recentWritingDays, summarizeWritingDays, trendBarHeights, trendAxisLabels, isGoalHit, dayGoal, streakGoalDays, type WritingDay } from '../../api/writingStats'
 import { runConsistencyCheck, type ConsistencyReport } from '../../api/consistency'
 import { lintChapter, type LintIssue } from '../../api/lint'
 import type { IconName } from '../../components/Icon'
@@ -79,13 +80,15 @@ function StatsTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [trendDays, setTrendDays] = useState<WritingDay[]>([])
   const [trendSummary, setTrendSummary] = useState<{ total: number; activeDays: number; avg: number } | null>(null)
+  const [dailyGoal, setDailyGoal] = useState(0)
   const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     void (async () => {
       setStats(await computeWorkStats().catch(() => null))
       setChapters((await listChapters().catch(() => []) as Chapter[]).sort((a, b) => a.order - b.order))
-      const { history } = await loadWritingHistory()
+      const { history, dailyGoal: goal } = await loadWritingHistory()
+      setDailyGoal(goal)
       const days = recentWritingDays(history, 30)
       setTrendDays(days)
       setTrendSummary(summarizeWritingDays(days))
@@ -138,7 +141,7 @@ function StatsTab({ onOpenFile }: { onOpenFile: (p: string) => void }) {
         ) : null}
       </div>
 
-      <WritingTrend days={trendDays} summary={trendSummary} />
+      <WritingTrend days={trendDays} summary={trendSummary} globalGoal={dailyGoal} onGoalChange={setDailyGoal} />
 
       {chapters.length > 0 ? (
         <div className="stats-chapters">
@@ -165,35 +168,75 @@ function statusLabel(s: Chapter['status']): string {
   return s === 'completed' ? '完结' : s === 'revising' ? '修稿' : '草稿'
 }
 
-/** 最近 30 天每日字数趋势条（实体表面样式；全零时显示空态说明） */
-function WritingTrend({ days, summary }: {
+/** 每日目标设置 + 最近 30 天趋势条（达标绿色高亮；实体表面样式；全零时显示空态说明） */
+function WritingTrend({ days, summary, globalGoal, onGoalChange }: {
   days: WritingDay[]
   summary: { total: number; activeDays: number; avg: number } | null
+  globalGoal: number
+  onGoalChange: (goal: number) => void
 }) {
+  const [goalDraft, setGoalDraft] = useState(globalGoal > 0 ? String(globalGoal) : '')
+  const [goalSaved, setGoalSaved] = useState(false)
+  // globalGoal 异步加载到位后同步一次草稿（仅无草稿时，避免覆盖输入）
+  useEffect(() => {
+    setGoalDraft((d) => (d === '' && globalGoal > 0 ? String(globalGoal) : d))
+  }, [globalGoal])
+
+  const applyGoal = useCallback(async () => {
+    const n = Math.max(0, Math.round(Number(goalDraft) || 0))
+    await saveDailyGoal(n)
+    onGoalChange(n)
+    setGoalSaved(true)
+    window.setTimeout(() => setGoalSaved(false), 1500)
+  }, [goalDraft, onGoalChange])
+
   const heights = trendBarHeights(days.map((d) => d.wordCount))
   const labels = trendAxisLabels(days)
   const hasData = (summary?.total ?? 0) > 0
+  const streak = streakGoalDays(days, globalGoal)
   return (
     <div className="trend-card">
       <div className="trend-head">
         <span className="tools-section-title" style={{ margin: 0 }}>最近 30 天写作趋势</span>
+        <span className="trend-goal">
+          <Icon name="target" size={13} />
+          每日目标
+          <input
+            className="trend-goal-input"
+            value={goalDraft}
+            inputMode="numeric"
+            placeholder="无"
+            onChange={(e) => setGoalDraft(e.target.value.replace(/[^\d]/g, ''))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void applyGoal()
+            }}
+            onBlur={() => void applyGoal()}
+          />
+          字
+          {goalSaved ? <span className="trend-goal-saved"><Icon name="check" size={12} /> 已保存</span> : null}
+        </span>
         {hasData ? (
           <span className="trend-sum">
             合计 <b>{summary!.total.toLocaleString()}</b> 字 · 有产出 <b>{summary!.activeDays}</b> 天 · 日均 <b>{summary!.avg.toLocaleString()}</b> 字
+            {globalGoal > 0 || streak > 0 ? <> · 连续达标 <b>{streak}</b> 天</> : null}
           </span>
         ) : null}
       </div>
       {hasData ? (
         <>
           <div className="trend-bars">
-            {days.map((d, i) => (
-              <div
-                key={d.date}
-                className={`trend-bar ${d.wordCount >= (d.goal || 0) && d.goal > 0 ? 'hit-goal' : ''}`}
-                style={{ height: `${Math.round(heights[i] * 100)}%` }}
-                title={`${d.date}　${d.wordCount.toLocaleString()} 字${d.goal > 0 ? `（目标 ${d.goal}）` : ''}`}
-              />
-            ))}
+            {days.map((d, i) => {
+              const goal = dayGoal(d, globalGoal)
+              const hit = isGoalHit({ wordCount: d.wordCount, goal })
+              return (
+                <div
+                  key={d.date}
+                  className={`trend-bar ${hit ? 'hit-goal' : ''}`}
+                  style={{ height: `${Math.round(heights[i] * 100)}%` }}
+                  title={`${d.date}　${d.wordCount.toLocaleString()} 字${goal > 0 ? `（目标 ${goal}${hit ? '，已达标' : ''}）` : ''}`}
+                />
+              )
+            })}
           </div>
           <div className="trend-axis">
             {labels.map((t) => (
@@ -205,7 +248,7 @@ function WritingTrend({ days, summary }: {
         </>
       ) : (
         <div className="tools-hint">
-          暂无写作记录数据（.novel/.history/writing-history.json 为空）。在编辑器中写作后会按日累计字数。
+          暂无写作记录数据（.novel/.history/writing-history.json 为空）。在编辑器中写作并保存后会按日累计字数。
         </div>
       )}
     </div>

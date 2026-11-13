@@ -689,3 +689,42 @@
 .trend-axis span:first-child { transform: none; }
 .trend-axis span:first-child { position: absolute; }
 .trend-axis span:last-child { transform: translateX(-100%); }
+
+/* 每日目标设置 */
+.trend-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.trend-goal .icon {
+  color: var(--accent);
+}
+
+.trend-goal-input {
+  width: 64px;
+  padding: 3px 7px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.trend-goal-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: none;
+}
+
+.trend-goal-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--success);
+  font-size: 11px;
+}
