@@ -65,7 +65,7 @@ export function AgentWorkspace() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
-  const [toolsTab, setToolsTab] = useState<'planner' | 'stats' | 'consistency' | 'lint' | 'import'>('planner')
+  const [toolsTab, setToolsTab] = useState<'planner' | 'stats' | 'consistency' | 'lint' | 'import' | 'search'>('planner')
   const [studioOpen, setStudioOpen] = useState(false)
   const [studioToolId, setStudioToolId] = useState<string | null>(null)
   /** 编辑器选中文本（选中时显示浮动工坊按钮） */
@@ -75,6 +75,8 @@ export function AgentWorkspace() {
   const [keyMissing, setKeyMissing] = useState(false)
   const savedSigRef = useRef('')
   const sessionIdRef = useRef<string | null>(null)
+  /** 检索面板「点击直达」挂起的跳行请求：文件加载完成后由预览区消费 */
+  const pendingLineRef = useRef<{ path: string; line: number } | null>(null)
 
   const refreshTree = useCallback(async () => {
     if (!workRoot) return
@@ -147,6 +149,26 @@ export function AgentWorkspace() {
         if (!alive) return
         setFileContent(c)
         setFileLoading(false)
+        // 检索面板「点击直达」：文件就绪后滚动到目标行并短暂高亮
+        const pending = pendingLineRef.current
+        if (pending && pending.path === activePath) {
+          pendingLineRef.current = null
+          window.setTimeout(() => {
+            const el = document.querySelector('.agw-file-body .mdv') ?? document.querySelector('.agw-file-body')
+            if (!el) return
+            const lines = c.replace(/\r\n/g, '\n').split('\n')
+            const target = Math.min(Math.max(pending.line, 1), lines.length)
+            // 估算：取前 target-1 行文本按段落渲染块定位（渲染块无逐行锚点，用行比例滚动兜底）
+            const ratio = (target - 1) / Math.max(1, lines.length)
+            const block = el.querySelectorAll<HTMLElement>('.mdv-p, .mdv-h, .mdv-list, .mdv-quote, .mdv-code')
+            const idx = Math.min(block.length - 1, Math.round(ratio * block.length))
+            if (block.length > 0 && block[idx]) {
+              block[idx].scrollIntoView({ behavior: 'smooth', block: 'center' })
+            } else {
+              el.scrollTop = ratio * el.scrollHeight
+            }
+          }, 80)
+        }
       })
       .catch((e) => {
         if (!alive) return
@@ -250,6 +272,7 @@ export function AgentWorkspace() {
     { id: 'studio-brainstorm', icon: 'sparkles', label: '工坊：头脑风暴', keywords: '工坊 点子 创意 brainstorm', run: () => { setStudioToolId('brainstorm'); setStudioOpen(true) } },
     { id: 'studio-polish', icon: 'pencil', label: '工坊：润色文本', keywords: '工坊 润色 polish 改写', run: () => { setStudioToolId('polish'); setStudioOpen(true) } },
     { id: 'studio-critique', icon: 'search', label: '工坊：专业评审', keywords: '工坊 评审 critique 编辑', run: () => { setStudioToolId('critique'); setStudioOpen(true) } },
+    { id: 'tools-search', icon: 'search', label: '全文检索', keywords: '工具 search 检索 搜索 全文 查找 find', run: () => { setToolsTab('search'); setToolsOpen(true) } },
     { id: 'tools-planner', icon: 'list-checks', label: 'AI 任务队列', keywords: '工具 任务 拆解 队列 planner 章节 连续生成', run: () => { setToolsTab('planner'); setToolsOpen(true) } },
     { id: 'tools-stats', icon: 'chart', label: '作品统计', keywords: '工具 stats 统计', run: () => { setToolsTab('stats'); setToolsOpen(true) } },
     { id: 'tools-consistency', icon: 'list-checks', label: '一致性检查', keywords: '工具 检查 consistency 人物 伏笔 情节线', run: () => { setToolsTab('consistency'); setToolsOpen(true) } },
@@ -291,12 +314,13 @@ export function AgentWorkspace() {
   }, [tree])
 
   const jumpToFile = useCallback(
-    (p: string) => {
+    (p: string, line?: number) => {
       const hit = mdFiles.find((f) => f.path === p || f.path.endsWith(`/${p}`) || f.name === p)
       if (hit) {
         setActivePath(hit.path)
         setPanelOpen(true)
         setPanelTab('file')
+        if (line != null) pendingLineRef.current = { path: hit.path, line }
       }
     },
     [mdFiles, setActivePath],
@@ -381,7 +405,7 @@ export function AgentWorkspace() {
         <button className="agw-iconbtn" onClick={() => { setStudioToolId(null); setStudioOpen(true) }} title="创作工坊：头脑风暴 / 场景 / 对话 / 润色等 AI 快捷创作">
           <Icon name="sparkles" size={16} />
         </button>
-        <button className="agw-iconbtn" onClick={() => setToolsOpen(true)} title="工具中心：统计 / 一致性 / 铁律 / 导入切章">
+        <button className="agw-iconbtn" onClick={() => setToolsOpen(true)} title="工具中心：检索 / 统计 / 一致性 / 铁律 / 导入切章 / 任务队列">
           <Icon name="wrench" size={17} />
         </button>
         <button className="agw-iconbtn" onClick={() => setSettingsOpen(true)} title="模型与密钥设置">

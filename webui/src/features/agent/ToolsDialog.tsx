@@ -18,12 +18,14 @@ import { splitIntoChapters, importSummary } from '../../api/import'
 import { readText } from '../../api/backend'
 import { Icon } from '../../components/Icon'
 import { PlannerTab } from './PlannerTab'
+import { SearchTab } from './SearchTab'
 import './ToolsDialog.css'
 import './PlannerTab.css'
 
-type TabId = 'import' | 'consistency' | 'lint' | 'stats' | 'planner'
+type TabId = 'import' | 'consistency' | 'lint' | 'stats' | 'planner' | 'search'
 
 const TABS: Array<{ id: TabId; label: string; icon: IconName }> = [
+  { id: 'search', label: '检索', icon: 'search' },
   { id: 'planner', label: '任务队列', icon: 'list-checks' },
   { id: 'stats', label: '作品统计', icon: 'chart' },
   { id: 'consistency', label: '一致性检查', icon: 'check-circle' },
@@ -31,9 +33,9 @@ const TABS: Array<{ id: TabId; label: string; icon: IconName }> = [
   { id: 'import', label: '导入切章', icon: 'file-input' },
 ]
 
-type Props = { initialTab?: TabId; onClose: () => void; onOpenFile: (path: string) => void }
+type Props = { initialTab?: TabId; onClose: () => void; onOpenFile: (path: string, line?: number) => void }
 
-/** 工具中心：作品统计 / 一致性检查 / 正文铁律体检 / 存量导入切章 */
+/** 工具中心：全文检索 / 作品统计 / 一致性检查 / 正文铁律体检 / 存量导入切章 / 任务队列 */
 export function ToolsDialog({ initialTab = 'planner', onClose, onOpenFile }: Props) {
   const [tab, setTab] = useState<TabId>(initialTab)
   return (
@@ -51,6 +53,7 @@ export function ToolsDialog({ initialTab = 'planner', onClose, onOpenFile }: Pro
           <button className="tools-x" onClick={onClose} title="关闭"><Icon name="x" size={16} /></button>
         </div>
         <div className="tools-body">
+          {tab === 'search' ? <SearchTab onOpenFile={onOpenFile} /> : null}
           {tab === 'stats' ? <StatsTab onOpenFile={onOpenFile} /> : null}
           {tab === 'consistency' ? <ConsistencyTab onOpenFile={onOpenFile} /> : null}
           {tab === 'lint' ? <LintTab onOpenFile={onOpenFile} /> : null}
