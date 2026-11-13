@@ -47,6 +47,8 @@ pnpm run tauri:ios:dev
 - **`api/writing.ts`** - AI 写作工作流：续写/大纲/细纲/润色提示词构建 + 流式生成
 - **`api/studio.ts`** - 创作工坊工具集：16 个 AI 快捷创作工具（构思/写作/润改/实用四分类），prompt 模板化 + 纯净补全通道（`studio_complete_stream` RPC，不走 ReAct、不要求打开作品目录）；多稿对照（`generateVariants`，同输入 2-4 稿不同视角并排择优）；风格学习（`learnStyleFingerprint`+`parseStyleFingerprint`，范文 → 六维文风指纹注入所有文风类工具），有单测
 - **`api/search.ts`** - 作品级全文检索：stories/concept/outline 三范围搜索（正则元字符转义字面量匹配、大小写开关）；分批扫描（每批 50 文件、批间让出主线程，千章级不冻 UI）；命中带行号 + 单文件/总量上限防刷屏；`escapeRegExp`/`collectScopeFiles`/`matchInContent`/`searchFiles` 纯函数有单测；UI 在 ToolsDialog「检索」页签，点击直达文件并跳行
+- **`api/exportCenter.ts`** - 导出中心纯函数层：整本 TXT 前端组装（章节标题独立行 + `stripMarkdown` 去语法）、资料册合并（人物卡/设定集/情节线三区，`assembleDossier`）、备份快照报告（`assembleBackupReport` + `collectBackupFiles` 排除 exports/ + `sha256Hex` Web Crypto 校验值）、文件名净化与时间戳（`buildExportFilename`）；落盘统一走 `write_text` 到作品目录 `exports/`（`exports/backups/` 为备份），全部纯函数有单测
+- **`api/writingStats.ts`** - 写作会话统计纯函数：`recentWritingDays`（.novel 写作历史 → 最近 N 天零补位窗口）/`trendBarHeights`（趋势条高度归一）/`summarizeWritingDays`（按有产出天计日均）/`trendAxisLabels`，有单测；UI 在「作品统计」页签 30 天趋势条
 - **`api/rpc.ts`** - Web RPC 客户端 + WS 事件订阅：流式事件走全局共享 WS 连接（`subscribeStreamEvents`，多流并发不漏帧；旧的 `subscribeEvent` 每订阅一条连接仅限低频事件使用）
 - **`features/launch/`** - 启动页：继续上次工程（last_workspace + 书架统计）、点选式目录选择器（`browse_dir`/`quick_locations`，拒绝手输路径）、新建标准工程
 - **`features/agent/`** - Agent 工作台（2026-11 重构，主流 Agent 布局，视觉规范：实体表面+SVG 图标，禁 emoji/玻璃拟态/胶囊按钮）：
@@ -58,7 +60,9 @@ pnpm run tauri:ios:dev
   - `FileTree.tsx` - 递归文件树（重命名/删除/新建，`fs_changed` 事件驱动刷新）
   - `ChaptersPanel.tsx` - 章节页签（字数/状态三态循环/拖拽排序/新建/导入直跳）
   - `LorePanel.tsx` - 设定页签（人物卡/情节线/设定集三合一，直读 novel.ts 解析 concept|outline 下的 Markdown）
-  - `ToolsDialog.tsx` - 工具中心（检索/任务队列/统计/一致性/铁律/导入切章六页签；检索=作品级全文搜索跨 stories/concept/outline；任务队列=AI 拆解目标或大纲导入→逐章连续生成正文）
+  - `ToolsDialog.tsx` - 工具中心（检索/任务队列/统计/导出/备份/一致性/铁律/导入切章八页签；检索=作品级全文搜索跨 stories/concept/outline；任务队列=AI 拆解目标或大纲导入→逐章连续生成正文；导出=整本 TXT/MD/资料册三式落盘 exports/（UI 在 ExportTab）；备份=工程快照报告落盘 exports/backups/（UI 在 BackupTab））
+  - `ExportTab.tsx` - 导出页签：整本 TXT（前端组装去语法）/整本 Markdown（复用 `export_work` RPC）/资料册（人物/设定/情节线区块勾选合并），文件名带时间戳防覆盖，完成显示落盘路径
+  - `BackupTab.tsx` - 备份页签：工程快照报告（零新依赖，非压缩包）——全工程文件清单（排除 exports/）逐文件字数/大小/SHA-256，分批采集不冻 UI，落盘 exports/backups/
   - `PlannerTab.tsx` - 任务队列页签（studio 纯净补全通道逐章生成 + 人物卡/前章结尾/文风指纹上下文 + lint 一级套路质检闸门不过即标待重试、连写遇拦截即停；手动添加任务/内联编辑细纲/批量重试/导出 Markdown 写作计划（`tasksToPlanMarkdown`）；`buildChapterPrompt`/`gateIssues` 纯函数有单测）
   - `StudioDialog.tsx` - 创作工坊（16 个 AI 快捷创作工具四分类；支持 initialText 预填——编辑器选中文本经浮动工具条直达润改；风格学习：范文提取六维文风指纹徽章可移除；多稿对照开关 2-4 稿不同视角选稿卡片；五个出口：复制 / 存为 studio/*.md / 存为章节（stories/chapter-XXXX.md 纳入章节管理）/ 插入编辑器 / 替换选区（编辑器有选区时出现，润改闭环）；Ctrl+K 有快捷入口）
   - `CommandPalette.tsx` - Ctrl+K 命令面板（模糊过滤/键盘导航）
