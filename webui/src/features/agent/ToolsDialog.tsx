@@ -20,16 +20,18 @@ import { Icon } from '../../components/Icon'
 import { PlannerTab } from './PlannerTab'
 import { SearchTab } from './SearchTab'
 import { ExportTab } from './ExportTab'
+import { BackupTab } from './BackupTab'
 import './ToolsDialog.css'
 import './PlannerTab.css'
 
-type TabId = 'import' | 'consistency' | 'lint' | 'stats' | 'planner' | 'search' | 'export'
+type TabId = 'import' | 'consistency' | 'lint' | 'stats' | 'planner' | 'search' | 'export' | 'backup'
 
 const TABS: Array<{ id: TabId; label: string; icon: IconName }> = [
   { id: 'search', label: '检索', icon: 'search' },
   { id: 'planner', label: '任务队列', icon: 'list-checks' },
   { id: 'stats', label: '作品统计', icon: 'chart' },
   { id: 'export', label: '导出', icon: 'download' },
+  { id: 'backup', label: '备份', icon: 'package' },
   { id: 'consistency', label: '一致性检查', icon: 'check-circle' },
   { id: 'lint', label: '正文铁律', icon: 'scale' },
   { id: 'import', label: '导入切章', icon: 'file-input' },
@@ -58,6 +60,7 @@ export function ToolsDialog({ initialTab = 'planner', onClose, onOpenFile }: Pro
           {tab === 'search' ? <SearchTab onOpenFile={onOpenFile} /> : null}
           {tab === 'stats' ? <StatsTab onOpenFile={onOpenFile} /> : null}
           {tab === 'export' ? <ExportTab /> : null}
+          {tab === 'backup' ? <BackupTab /> : null}
           {tab === 'consistency' ? <ConsistencyTab onOpenFile={onOpenFile} /> : null}
           {tab === 'lint' ? <LintTab onOpenFile={onOpenFile} /> : null}
           {tab === 'planner' ? <PlannerTab onOpenFile={onOpenFile} /> : null}

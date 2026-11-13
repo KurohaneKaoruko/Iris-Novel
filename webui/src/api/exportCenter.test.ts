@@ -6,6 +6,10 @@ import {
   stripMarkdown,
   assembleBookTxt,
   assembleDossier,
+  sha256Hex,
+  isBackupExcluded,
+  collectBackupFiles,
+  assembleBackupReport,
 } from './exportCenter'
 import type { Character, CodexEntry, PlotLine } from './novel'
 
@@ -174,5 +178,66 @@ describe('assembleDossier', () => {
   it('导出统计行计数正确', () => {
     const md = assembleDossier({ workName: '星海', characters, codex, plotLines, exportedAt: 0 })
     expect(md).toContain('人物 1 · 设定 2 · 情节线 1')
+  })
+})
+
+describe('备份快照报告', () => {
+  it('sha256Hex 输出 64 位 hex 且区分不同内容', async () => {
+    const a = await sha256Hex('hello')
+    const b = await sha256Hex('hello!')
+    expect(a).toMatch(/^[0-9a-f]{64}$/)
+    expect(a).not.toBe(b)
+    // 已知向量（UTF-8 "hello"）
+    expect(a).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824')
+  })
+
+  it('isBackupExcluded 只拦 exports/ 前缀（备份落点），.novel/ 照常纳入', () => {
+    expect(isBackupExcluded('exports/书-全文-20260101-0000.md')).toBe(true)
+    expect(isBackupExcluded('exports\\backups\\x.md')).toBe(true)
+    expect(isBackupExcluded('exports-other/x.md')).toBe(false)
+    expect(isBackupExcluded('.novel/.settings/chapters.json')).toBe(false)
+    expect(isBackupExcluded('stories/chapter-0001.md')).toBe(false)
+  })
+
+  it('collectBackupFiles 收集文件、排除 exports/、按路径排序', () => {
+    const tree = {
+      path: 'w',
+      kind: 'dir',
+      children: [
+        { path: 'stories', kind: 'dir', children: [{ path: 'stories/chapter-0002.md', kind: 'file' }, { path: 'stories/chapter-0001.md', kind: 'file' }] },
+        { path: 'exports', kind: 'dir', children: [{ path: 'exports/old.md', kind: 'file' }] },
+        { path: '.novel', kind: 'dir', children: [{ path: '.novel/.settings/chapters.json', kind: 'file' }] },
+        { path: 'README.md', kind: 'file' },
+      ],
+    }
+    expect(collectBackupFiles(tree)).toEqual([
+      '.novel/.settings/chapters.json',
+      'README.md',
+      'stories/chapter-0001.md',
+      'stories/chapter-0002.md',
+    ])
+  })
+
+  it('报告含摘要行、分组与逐文件 hash/字数', () => {
+    const md = assembleBackupReport({
+      workName: '星海',
+      createdAt: 0,
+      files: [
+        { path: 'stories/chapter-0001.md', words: 1200, bytes: 3600, hash: 'a'.repeat(64) },
+        { path: 'concept/characters.md', words: 300, bytes: 900, hash: 'b'.repeat(64) },
+      ],
+    })
+    expect(md).toContain('# 《星海》备份快照')
+    expect(md).toContain('文件 2 个 · 总字数 1,500 · 总大小 4 KB')
+    expect(md).toContain('## concept/')
+    expect(md).toContain('- `concept/characters.md` — 300 字 · 1 KB · `bbbbbbbbbbbb…`')
+    expect(md).toContain('## stories/')
+    expect(md).toContain('- `stories/chapter-0001.md` — 1,200 字 · 4 KB · `aaaaaaaaaaaa…`')
+    expect(md).toContain('SHA-256')
+  })
+
+  it('空工程输出摘要行', () => {
+    const md = assembleBackupReport({ workName: '星海', files: [] })
+    expect(md).toContain('文件 0 个 · 总字数 0 · 总大小 1 KB')
   })
 })
