@@ -1,0 +1,78 @@
+/* ============ 导出中心页签 ============ */
+.expt {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.exp-kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.exp-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.exp-kind:hover { border-color: var(--border-strong); }
+
+.exp-kind .icon { color: var(--text-secondary); }
+
+.exp-kind.on {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.exp-kind.on .icon { color: var(--accent); }
+
+.exp-kind-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.exp-kind-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.exp-sections {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exp-sections .srch-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.exp-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.exp-path {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: inherit;
+}
+
+.expt > .exp-kind-desc {
+  margin-top: -6px;
+}
