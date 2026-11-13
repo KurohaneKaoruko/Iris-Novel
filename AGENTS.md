@@ -48,7 +48,9 @@ pnpm run tauri:ios:dev
 - **`api/studio.ts`** - 创作工坊工具集：16 个 AI 快捷创作工具（构思/写作/润改/实用四分类），prompt 模板化 + 纯净补全通道（`studio_complete_stream` RPC，不走 ReAct、不要求打开作品目录）；多稿对照（`generateVariants`，同输入 2-4 稿不同视角并排择优）；风格学习（`learnStyleFingerprint`+`parseStyleFingerprint`，范文 → 六维文风指纹注入所有文风类工具），有单测
 - **`api/search.ts`** - 作品级全文检索：stories/concept/outline 三范围搜索（正则元字符转义字面量匹配、大小写开关）；分批扫描（每批 50 文件、批间让出主线程，千章级不冻 UI）；命中带行号 + 单文件/总量上限防刷屏；`escapeRegExp`/`collectScopeFiles`/`matchInContent`/`searchFiles` 纯函数有单测；UI 在 ToolsDialog「检索」页签，点击直达文件并跳行
 - **`api/exportCenter.ts`** - 导出中心纯函数层：整本 TXT 前端组装（章节标题独立行 + `stripMarkdown` 去语法）、资料册合并（人物卡/设定集/情节线三区，`assembleDossier`）、备份快照报告（`assembleBackupReport` + `collectBackupFiles` 排除 exports/ + `sha256Hex` Web Crypto 校验值）、文件名净化与时间戳（`buildExportFilename`）；落盘统一走 `write_text` 到作品目录 `exports/`（`exports/backups/` 为备份），全部纯函数有单测
-- **`api/writingStats.ts`** - 写作会话统计纯函数：`recentWritingDays`（.novel 写作历史 → 最近 N 天零补位窗口）/`trendBarHeights`（趋势条高度归一）/`summarizeWritingDays`（按有产出天计日均）/`trendAxisLabels`，有单测；UI 在「作品统计」页签 30 天趋势条
+- **`api/writingStats.ts`** - 写作会话统计纯函数：`recentWritingDays`（.novel 写作历史 → 最近 N 天零补位窗口）/`trendBarHeights`（趋势条高度归一）/`summarizeWritingDays`（按有产出天计日均）/`trendAxisLabels`，目标闭环：`isGoalHit`（单日达标判定）/`dayGoal`（逐日固化目标回退全局）/`streakGoalDays`（连续达标天数，今天未达标不断链），有单测；UI 在「作品统计」页签 30 天趋势条 + 每日目标设置（持久化 writing-history.json 既有 `dailyWordCount` 字段，`saveDailyGoal` 只增不改）；数据写入方为编辑器保存与任务队列逐章生成（`recordTodayWords` 按净增字数日累计）
+- **`api/loreGraph.ts`** - 人物关系图纯函数层：人物卡「关系」自由文本 → 边投影（`parseRelationSegments` 分隔符切段 + `buildRelationEdges` 括号注记剥取关系标签/双向合并/长名优先防误配）+ `loreGraphLayout` 确定性力导向布局（环形初始位 + 斥力/弹簧/向心迭代，无随机数同输入恒同输出，孤节点也落位），有单测；UI 在 LorePanel「关系图」页签（LoreGraph.tsx：SVG 节点/边、悬浮显关系描述、点击节点打开人物卡）
+- **`api/editorFind.ts`** - 章节编辑器内查找纯函数：`findHits`（命中位置序列，重叠命中步进 1 逐一列出、大小写开关）/`nextHit`（循环导航，之前无则回绕到最后、之后无则回绕到首个），有单测；UI 为编辑器右上查找条（AgentWorkspace 内 EditorFindBar：Ctrl+F 唤起/Esc 关闭、第 n/共 m 计数、Enter/Shift+Enter 与按钮循环导航、命中 selection 定位滚动）
 - **`api/rpc.ts`** - Web RPC 客户端 + WS 事件订阅：流式事件走全局共享 WS 连接（`subscribeStreamEvents`，多流并发不漏帧；旧的 `subscribeEvent` 每订阅一条连接仅限低频事件使用）
 - **`features/launch/`** - 启动页：继续上次工程（last_workspace + 书架统计）、点选式目录选择器（`browse_dir`/`quick_locations`，拒绝手输路径）、新建标准工程
 - **`features/agent/`** - Agent 工作台（2026-11 重构，主流 Agent 布局，视觉规范：实体表面+SVG 图标，禁 emoji/玻璃拟态/胶囊按钮）：
@@ -59,8 +61,9 @@ pnpm run tauri:ios:dev
   - `SettingsDialog.tsx` - 模型 Provider 管理（Key 走 secrets 通道、测试连接、单选激活）
   - `FileTree.tsx` - 递归文件树（重命名/删除/新建，`fs_changed` 事件驱动刷新）
   - `ChaptersPanel.tsx` - 章节页签（字数/状态三态循环/拖拽排序/新建/导入直跳）
-  - `LorePanel.tsx` - 设定页签（人物卡/情节线/设定集三合一，直读 novel.ts 解析 concept|outline 下的 Markdown）
-  - `ToolsDialog.tsx` - 工具中心（检索/任务队列/统计/导出/备份/一致性/铁律/导入切章八页签；检索=作品级全文搜索跨 stories/concept/outline；任务队列=AI 拆解目标或大纲导入→逐章连续生成正文；导出=整本 TXT/MD/资料册三式落盘 exports/（UI 在 ExportTab）；备份=工程快照报告落盘 exports/backups/（UI 在 BackupTab））
+  - `LorePanel.tsx` - 设定页签（人物卡/关系图/情节线/设定集四合一，直读 novel.ts 解析 concept|outline 下的 Markdown）
+  - `LoreGraph.tsx` - 人物关系图页签：人物为节点、人物卡「关系」字段文字投影为边（loreGraph.ts 纯函数），确定性力导向 SVG 布局（零依赖自写，孤节点也显示）；悬浮节点/连线显关系描述，点击节点打开人物卡
+  - `ToolsDialog.tsx` - 工具中心（检索/任务队列/统计/导出/备份/一致性/铁律/导入切章八页签；检索=作品级全文搜索跨 stories/concept/outline；任务队列=AI 拆解目标或大纲导入→逐章连续生成正文；统计=汇总卡+30 天趋势+每日目标闭环；导出=整本 TXT/MD/资料册三式落盘 exports/（UI 在 ExportTab）；备份=工程快照报告落盘 exports/backups/（UI 在 BackupTab））
   - `ExportTab.tsx` - 导出页签：整本 TXT（前端组装去语法）/整本 Markdown（复用 `export_work` RPC）/资料册（人物/设定/情节线区块勾选合并），文件名带时间戳防覆盖，完成显示落盘路径
   - `BackupTab.tsx` - 备份页签：工程快照报告（零新依赖，非压缩包）——全工程文件清单（排除 exports/）逐文件字数/大小/SHA-256，分批采集不冻 UI，落盘 exports/backups/
   - `PlannerTab.tsx` - 任务队列页签（studio 纯净补全通道逐章生成 + 人物卡/前章结尾/文风指纹上下文 + lint 一级套路质检闸门不过即标待重试、连写遇拦截即停；手动添加任务/内联编辑细纲/批量重试/导出 Markdown 写作计划（`tasksToPlanMarkdown`）；`buildChapterPrompt`/`gateIssues` 纯函数有单测）
@@ -70,7 +73,7 @@ pnpm run tauri:ios:dev
   - `DiffView.tsx` - 文件变更历史 diff（覆盖写自动留快照；LCS 行级对比、±统计、上下文折叠、版本恢复）
 - **`api/diff.ts`** - 零依赖行级 diff（LCS/collapseDiff，有单测）
 - **`api/sessionExport.ts`** - 会话导出 Markdown 分享稿（工具步骤 details 折叠，有单测）
-- **`components/Icon.tsx`** - 全应用统一 SVG 图标系统（lucide 线性风格 50 枚，`<Icon name size />`；界面图标禁止 emoji）
+- **`components/Icon.tsx`** - 全应用统一 SVG 图标系统（lucide 线性风格 54 枚，`<Icon name size />`；界面图标禁止 emoji）
 - **`workspace/Dialogs`** - 全局 Prompt/Confirm 对话框（唯一从旧工作台保留的组件）
 - **`hooks/useChat.ts`** - 流式聊天（WS 事件协议：挂载时订阅一次 + activeStreamId ref 过滤消除竞态；`ai_error` 即终止；token 累积/done 收尾/会话恢复，有协议单测）
 - **`state/ProjectContext.tsx`** - workRoot/activePath/书架状态；`openDir` 自动登记 external_projects
