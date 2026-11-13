@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseOutlineChapters, outlineToTasks, tasksToPlanMarkdown, draftTasksFromGoal } from './planner'
+import { parseOutlineChapters, outlineToTasks, tasksToPlanMarkdown, draftTasksFromGoal, extractJsonArray } from './planner'
 
 describe('parseOutlineChapters（大纲抽取）', () => {
   it('抽取章节标题与细纲正文', () => {
@@ -89,5 +89,28 @@ describe('tasksToPlanMarkdown（写作计划导出）', () => {
     const md = tasksToPlanMarkdown(t)
     expect(md).not.toContain('时间窗')
     expect(md).toContain('情节线：主线、复仇线')
+  })
+})
+
+describe('extractJsonArray（AI 输出 JSON 提取）', () => {
+  it('数组后带杂文本仍可解析（回归：lastIndexOf 被 ] 污染带偏）', () => {
+    // 真实场景：AI 返回 '[{"a":1}] 结果 [完]'——杂文本的 ] 使 lastIndexOf 解析失败
+    const parsed = extractJsonArray('[{"a":1}] 结果 [完]')
+    expect(parsed).toEqual([{ a: 1 }])
+  })
+
+  it('围栏与前后杂文本', () => {
+    const raw = '好的，以下是任务：\n```json\n[{"title":"第一章"}]\n```\n以上。'
+    expect(extractJsonArray(raw)).toEqual([{ title: '第一章' }])
+  })
+
+  it('内层 ] 先闭合失败后逐层前进（嵌套数组）', () => {
+    const parsed = extractJsonArray('前缀 [ {"tags":["甲","乙"], "n":1} ] 后缀')
+    expect(parsed).toEqual([{ tags: ['甲', '乙'], n: 1 }])
+  })
+
+  it('无数组返回 null', () => {
+    expect(extractJsonArray('没有任何数组的普通回复')).toBeNull()
+    expect(extractJsonArray('[破碎的 JSON')).toBeNull()
   })
 })

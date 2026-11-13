@@ -141,17 +141,19 @@ export function newTaskId(chapterIndex: number): string {
 export function extractJsonArray(raw: string): unknown[] | null {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
   const text = fenced ? fenced[1] : raw
-  // 杂文本里可能混入无关的 [，从每个 [ 起尝试解析，取第一个成功的
+  // 杂文本里可能混入无关的 [ 与 ], 从每个 [ 起用逐个 ] 尝试闭合（先前用
+  // lastIndexOf(']') 会被数组之后杂文本里的 ] 带偏，导致可解析的数组漏报）
   let from = text.indexOf('[')
   while (from >= 0) {
-    const end = text.lastIndexOf(']')
-    if (end > from) {
+    let end = text.indexOf(']', from)
+    while (end >= 0) {
       try {
         const parsed: unknown = JSON.parse(text.slice(from, end + 1))
         if (Array.isArray(parsed)) return parsed
       } catch {
-        /* 尝试下一个 [ */
+        /* 尝试下一个 ] */
       }
+      end = text.indexOf(']', end + 1)
     }
     from = text.indexOf('[', from + 1)
   }
