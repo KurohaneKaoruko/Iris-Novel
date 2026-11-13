@@ -633,8 +633,8 @@ export function AgentWorkspace() {
         <ToolsDialog
           initialTab={toolsTab}
           onClose={() => setToolsOpen(false)}
-          onOpenFile={(p) => {
-            jumpToFile(p)
+          onOpenFile={(p, line) => {
+            jumpToFile(p, line)
             setToolsOpen(false)
           }}
         />

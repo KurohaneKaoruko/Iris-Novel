@@ -115,9 +115,14 @@ export async function reorderChapters(fromPath: string, toPath: string): Promise
   }
 }
 
+/** 新章节的下一个 order：取现有最大 order + 1（不能用条数——删章产生 order 空洞时按条数会撞上已有文件并覆盖） */
+export function nextChapterOrder(chapters: Array<{ order: number }>): number {
+  return chapters.reduce((mx, c) => Math.max(mx, c.order), 0) + 1
+}
+
 export async function createChapterFile(title: string, order?: number): Promise<string> {
   const chapters = await listChapters()
-  const nextOrder = order ?? chapters.length + 1
+  const nextOrder = order ?? nextChapterOrder(chapters)
   const num = String(nextOrder).padStart(4, '0')
   const slug = `chapter-${num}`
   const path = `stories/${slug}.md`
@@ -154,7 +159,7 @@ export function chapterBodyFromResult(raw: string): { title: string; body: strin
  */
 export async function createChapterWithContent(title: string, content: string): Promise<string> {
   const chapters = await listChapters()
-  const order = chapters.reduce((mx, c) => Math.max(mx, c.order), 0) + 1
+  const order = nextChapterOrder(chapters)
   const num = String(order).padStart(4, '0')
   const path = `stories/chapter-${num}.md`
   const cleanTitle = title.trim() || `第 ${order} 章`
@@ -295,11 +300,11 @@ export async function saveCharacters(characters: Character[]): Promise<void> {
 export type CodexType = 'location' | 'faction' | 'item' | 'term' | 'setting'
 
 export const CODEX_TYPES: Array<{ id: CodexType; zh: string; icon: string }> = [
-  { id: 'location', zh: '地点', icon: '🏔' },
-  { id: 'faction', zh: '组织', icon: '⚑' },
-  { id: 'item', zh: '物品', icon: '🗡' },
-  { id: 'term', zh: '术语', icon: '📖' },
-  { id: 'setting', zh: '设定', icon: '✨' },
+  { id: 'location', zh: '地点', icon: 'map-pin' },
+  { id: 'faction', zh: '组织', icon: 'flag' },
+  { id: 'item', zh: '物品', icon: 'package' },
+  { id: 'term', zh: '术语', icon: 'book-open' },
+  { id: 'setting', zh: '设定', icon: 'sparkles' },
 ]
 
 export type CodexEntry = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCharacters, serializeCharacters, parsePlotLines, serializePlotLines, chapterBodyFromResult } from './novel'
+import { parseCharacters, serializeCharacters, parsePlotLines, serializePlotLines, chapterBodyFromResult, nextChapterOrder, CODEX_TYPES } from './novel'
 import {
   scanCharacterMentions,
   buildCharacterStateIndex,
@@ -320,5 +320,36 @@ describe('chapterBodyFromResult（工坊结果 → 章节体）', () => {
     const r = chapterBodyFromResult('\r\n# 标题X\r\n\r\n正文\r\n')
     expect(r.title).toBe('标题X')
     expect(r.body).toBe('正文')
+  })
+})
+
+describe('nextChapterOrder（新章节编号取 max+1 而非条数）', () => {
+  it('删章产生 order 空洞时按 max+1，避免覆盖已有文件', () => {
+    // 剩 order 1、3（order 2 的章被删）：按条数算 length+1=3 会撞 chapter-0003
+    const chapters = [{ order: 1 }, { order: 3 }]
+    expect(nextChapterOrder(chapters)).toBe(4)
+  })
+
+  it('连续 order 时与条数结果一致', () => {
+    expect(nextChapterOrder([{ order: 1 }, { order: 2 }, { order: 3 }])).toBe(4)
+  })
+
+  it('空工程从 1 开始', () => {
+    expect(nextChapterOrder([])).toBe(1)
+  })
+
+  it('乱序数组也取最大值', () => {
+    expect(nextChapterOrder([{ order: 7 }, { order: 2 }, { order: 12 }])).toBe(13)
+  })
+})
+
+describe('CODEX_TYPES 图标遵循视觉规范', () => {
+  it('icon 字段必须是 SVG 图标名（IconName 集合内），禁止 emoji', () => {
+    const svgNames = ['map-pin', 'flag', 'package', 'book-open', 'sparkles']
+    for (const t of CODEX_TYPES) {
+      expect(svgNames).toContain(t.icon)
+      // emoji/符号字符（非 ASCII 字母连字符）一律不允许
+      expect(t.icon).toMatch(/^[a-z-]+$/)
+    }
   })
 })
