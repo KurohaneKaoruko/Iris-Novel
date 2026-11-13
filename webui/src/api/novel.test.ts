@@ -234,6 +234,14 @@ describe('scanCharacterMentions（人物提及统计）', () => {
     const hits = scanCharacterMentions([{ title: 'a', path: 'a.md', content: 'A.B 出现了。' }], ['A.B'])
     expect(hits[0].mentions).toBe(1)
   })
+
+  it('名字前缀包含时长名优先（回归：林越秋被误计为林越）', () => {
+    const hits = scanCharacterMentions([{ title: 'a', path: 'a.md', content: '林越秋走在路上，林越跟在后面。' }], ['林越', '林越秋'])
+    const linyeqiu = hits.find((h) => h.name === '林越秋')
+    const linyue = hits.find((h) => h.name === '林越')
+    expect(linyeqiu?.mentions).toBe(1)
+    expect(linyue?.mentions).toBe(1)
+  })
 })
 
 describe('buildCharacterStateIndex（人物状态索引生成）', () => {

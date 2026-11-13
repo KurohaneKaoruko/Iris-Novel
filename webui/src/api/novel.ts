@@ -599,7 +599,10 @@ export function scanCharacterMentions(
   names: string[],
 ): CharacterMention[] {
   if (names.length === 0) return []
-  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  // 长名优先：alternation 左优先，若短名在前，「林越秋」会被误计为「林越」
+  const escaped = [...names]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   const nameRe = new RegExp(`(${escaped.join('|')})`, 'g')
   const dialogueRe = new RegExp(`^\\s*(?:「|『|"|“)?(${escaped.join('|')})(?:」|』|"|”)?(?:：|:|说|道|问|答|喊|叫|叹|笑|低声道|开口)`, 'm')
   const out: CharacterMention[] = []
