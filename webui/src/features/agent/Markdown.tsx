@@ -174,11 +174,20 @@ function inline(text: string): ReactNode[] {
     if (m[2]) parts.push(<strong key={k++}>{m[2]}</strong>)
     else if (m[3]) parts.push(<em key={k++}>{m[3]}</em>)
     else if (m[4]) parts.push(<code key={k++} className="md-code">{m[4]}</code>)
-    else if (m[5]) parts.push(<a key={k++} className="md-link" href={m[6]} target="_blank" rel="noreferrer">{m[5]}</a>)
+    else if (m[5]) parts.push(<a key={k++} className="md-link" href={sanitizeLinkHref(m[6])} target="_blank" rel="noreferrer">{m[5]}</a>)
     last = m.index + m[0].length
   }
   if (last < text.length) parts.push(text.slice(last))
   return parts
+}
+
+/** 链接协议白名单：AI 输出的 Markdown 可能含 javascript:/data: 等危险协议，一律降级为纯文本 */
+function sanitizeLinkHref(href: string): string {
+  const trimmed = href.trim()
+  const colon = trimmed.indexOf(':')
+  if (colon === -1) return trimmed
+  const scheme = trimmed.slice(0, colon).toLowerCase()
+  return scheme === 'http' || scheme === 'https' || scheme === 'mailto' ? trimmed : '#'
 }
 
 function CodeBlock({ code, lang }: { code: string; lang: string }) {

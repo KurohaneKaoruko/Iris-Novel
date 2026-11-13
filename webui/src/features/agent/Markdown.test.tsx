@@ -56,4 +56,27 @@ describe('Markdown 渲染器', () => {
     expect(out).not.toContain('<script>')
     expect(out).toContain('&lt;script&gt;')
   })
+
+  it('XSS：链接协议白名单（回归 javascript:/data: 注入）', () => {
+    // javascript: 伪协议降级为 #，不再可执行
+    const js = html('[点我](javascript:alert(1))')
+    expect(js).not.toContain('javascript:')
+    expect(js).toContain('href="#"')
+
+    // data: URL 同样拦截
+    const data = html('[点我](data:text/html;base64,PHNjcmlwdD4=)')
+    expect(data).not.toContain('href="data:')
+
+    // 相对路径无协议分隔符，保持原样（应用内锚点/文件链接）
+    const rel = html('[说明](README.md)')
+    expect(rel).toContain('href="README.md"')
+
+    // 白名单协议正常保留
+    expect(html('[官网](https://example.com)')).toContain('href="https://example.com"')
+    expect(html('[邮箱](mailto:a@b.c)')).toContain('href="mailto:a@b.c"')
+
+    // 大小写/空白混淆绕过也被拦截
+    const obfuscated = html('[点我](  JaVaScRiPt:alert(1) )')
+    expect(obfuscated).not.toContain('javascript:')
+  })
 })
