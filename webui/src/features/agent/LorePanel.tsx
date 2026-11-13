@@ -9,8 +9,9 @@ import {
   type CodexEntry,
 } from '../../api/novel'
 import { Icon, type IconName } from '../../components/Icon'
+import { LoreGraph } from './LoreGraph'
 
-type Tab = 'characters' | 'plots' | 'codex'
+type Tab = 'characters' | 'graph' | 'plots' | 'codex'
 
 const PLOT_STATUS: Record<PlotLine['status'], { label: string; cls: string }> = {
   ongoing: { label: '进行中', cls: 'ongoing' },
@@ -74,6 +75,9 @@ export function LorePanel({ activePath, onOpen }: Props) {
         <button className={tab === 'characters' ? 'active' : ''} onClick={() => setTab('characters')}>
           人物 {characters.length > 0 ? characters.length : ''}
         </button>
+        <button className={tab === 'graph' ? 'active' : ''} onClick={() => setTab('graph')} title="人物关系图">
+          <Icon name="network" size={13} />
+        </button>
         <button className={tab === 'plots' ? 'active' : ''} onClick={() => setTab('plots')}>
           情节线 {plots.length > 0 ? plots.length : ''}
         </button>
@@ -118,6 +122,8 @@ export function LorePanel({ activePath, onOpen }: Props) {
               ))
             )
           ) : null}
+
+          {tab === 'graph' ? <LoreGraph characters={characters} onOpen={onOpen} /> : null}
 
           {tab === 'plots' ? (
             plots.length === 0 ? (

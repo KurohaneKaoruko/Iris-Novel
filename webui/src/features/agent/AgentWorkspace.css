@@ -1364,6 +1364,167 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ============ 人物关系图（LorePanel 页签） ============ */
+.lgraph {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.lgraph-canvas {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.lgraph-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.lgraph-edge {
+  stroke: var(--border-strong);
+  stroke-width: 1.4;
+  transition: stroke 0.12s ease, opacity 0.12s ease;
+}
+
+.lgraph-edge.active {
+  stroke: var(--accent);
+  stroke-width: 1.8;
+}
+
+.lgraph-edge-hit {
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.lgraph g.dim .lgraph-edge {
+  opacity: 0.25;
+}
+
+.lgraph-edge-tip {
+  fill: var(--bg-elev);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.lgraph-edge-tip-text {
+  fill: var(--text-primary);
+  font-size: 10.5px;
+}
+
+.lgraph-node {
+  cursor: pointer;
+}
+
+.lgraph-node-hit {
+  fill: transparent;
+}
+
+.lgraph-node-dot {
+  fill: var(--accent-weak);
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  transition: opacity 0.12s ease, fill 0.12s ease;
+}
+
+.lgraph-node.active .lgraph-node-dot {
+  fill: var(--accent);
+}
+
+.lgraph-node.dim {
+  opacity: 0.35;
+}
+
+.lgraph-node-label {
+  fill: var(--text-primary);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.lgraph-side {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.lgraph-legend {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  padding: 2px 2px 8px;
+}
+
+.lgraph-legend .icon {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.lgraph-legend-dim {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+.lgraph-focus {
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lgraph-focus-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.lgraph-focus-name .icon {
+  color: var(--accent);
+}
+
+.lgraph-focus-empty {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.lgraph-rel {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.lgraph-rel-name {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.lgraph-rel-label {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 章节拖拽排序 */
 .chp-grip {
   color: var(--text-muted);

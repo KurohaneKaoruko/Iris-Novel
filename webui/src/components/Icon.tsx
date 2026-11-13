@@ -55,6 +55,9 @@ export type IconName =
   | 'clock'
   | 'home'
   | 'grip'
+  | 'network'
+  | 'focus'
+  | 'chevron-left'
 
 const PATHS: Record<IconName, JSX.Element> = {
   plus: <path d="M12 5v14M5 12h14" />,
@@ -184,6 +187,21 @@ const PATHS: Record<IconName, JSX.Element> = {
   ),
   home: <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8m-6-11a2 2 0 0 1 .71-1.53l7-6a2 2 0 0 1 2.58 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
   grip: <path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01M9.5 5.5a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Zm0 7a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Zm0 7a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Zm6-14a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Zm0 7a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Zm0 7a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Z" />,
+  network: (
+    <>
+      <rect x="16" y="16" width="6" height="6" rx="1" />
+      <rect x="2" y="16" width="6" height="6" rx="1" />
+      <rect x="9" y="2" width="6" height="6" rx="1" />
+      <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8" />
+    </>
+  ),
+  focus: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
+    </>
+  ),
+  'chevron-left': <path d="m15 18-6-6 6-6" />,
 }
 
 type IconProps = {
