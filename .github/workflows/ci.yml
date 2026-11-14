@@ -39,10 +39,15 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            webui/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install dependencies (root)
         run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies (webui)
+        run: pnpm --dir webui install --frozen-lockfile
 
       - name: Lint (non-blocking)
         continue-on-error: true

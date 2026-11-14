@@ -60,8 +60,11 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: Install JavaScript dependencies
+      - name: Install JavaScript dependencies (root)
         run: pnpm install --frozen-lockfile
+
+      - name: Install JavaScript dependencies (webui)
+        run: pnpm --dir webui install --frozen-lockfile
 
       - name: Generate icon set
         shell: bash
