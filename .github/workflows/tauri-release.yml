@@ -107,7 +107,6 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             release-artifacts/**/*.exe
-            release-artifacts/**/*.msi
             release-artifacts/**/*.dmg
             release-artifacts/**/*.AppImage
             release-artifacts/**/*.deb
