@@ -100,20 +100,27 @@ jobs:
           pattern: bundle-*
           merge-multiple: true
 
-      - name: Clean stale assets from previous runs
+      - name: Delete stale release for this tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          ASSETS=$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq '.assets[].id' 2>/dev/null || true)
-          if [ -n "$ASSETS" ]; then
-            echo "发现旧 run 残留产物，清理中..."
-            for id in $ASSETS; do
-              gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id"
-            done
+          # softprops 只追加不清理：重跑会把旧 run 的残留产物永久留在 release 里。
+          # 因此发布前把同名 release 连同其全部产物整对象删除，让本次发布全新落盘。
+          RELEASE_ID=$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq '.id' 2>/dev/null || true)
+          if [ -n "$RELEASE_ID" ]; then
+            echo "发现旧 release（id=$RELEASE_ID），连产物一起删除..."
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$RELEASE_ID"
+            echo "已删除"
           else
-            echo "无旧 release 或无残留产物，跳过"
+            echo "无同名 release，全新发布"
           fi
+          # 历史失败遗留的同 tag 草稿（softprops 中断产物）顺带清掉，容忍单个失败
+          DRAFT_IDS=$(gh api "repos/${{ github.repository }}/releases" --paginate --jq ".[] | select(.draft == true and .tag_name == \"${{ github.ref_name }}\") | .id" 2>/dev/null || true)
+          for rid in $DRAFT_IDS; do
+            echo "清理同 tag 草稿 release（id=$rid）..."
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$rid" || true
+          done
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
