@@ -100,6 +100,21 @@ jobs:
           pattern: bundle-*
           merge-multiple: true
 
+      - name: Clean stale assets from previous runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          ASSETS=$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq '.assets[].id' 2>/dev/null || true)
+          if [ -n "$ASSETS" ]; then
+            echo "发现旧 run 残留产物，清理中..."
+            for id in $ASSETS; do
+              gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id"
+            done
+          else
+            echo "无旧 release 或无残留产物，跳过"
+          fi
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
